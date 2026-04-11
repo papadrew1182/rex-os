@@ -14,8 +14,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.financials import (
-    BillingPeriod, BudgetLineItem, BudgetSnapshot, ChangeEvent, Commitment,
-    CommitmentChangeOrder, CommitmentLineItem, CostCode, DirectCost,
+    BillingPeriod, BudgetLineItem, BudgetSnapshot, ChangeEvent, ChangeEventLineItem,
+    Commitment, CommitmentChangeOrder, CommitmentLineItem, CostCode, DirectCost,
     LienWaiver, PaymentApplication, PcoCcoLink, PotentialChangeOrder, PrimeContract,
 )
 from app.services.crud import _classify_integrity_error, create, get_by_id, update  # noqa: F401
@@ -415,6 +415,188 @@ async def get_payment_application_summary(db: AsyncSession, pay_app_id: UUID) ->
 
 
 # ── Commitment / PCO / CCO summary ──────────────────────────────────────────
+
+async def list_change_event_line_items(
+    db: AsyncSession,
+    *,
+    change_event_id: UUID | None = None,
+    skip: int = 0,
+    limit: int = 100,
+    accessible_project_ids: set[UUID] | None = None,
+):
+    return await _flist_via_change_event(
+        db, ChangeEventLineItem,
+        ChangeEventLineItem.change_event_id == ChangeEvent.id,
+        {"change_event_id": change_event_id},
+        skip, limit, accessible_project_ids=accessible_project_ids,
+    )
+
+
+async def get_project_budget_summary(db: AsyncSession, project_id: UUID) -> dict:
+    """Return aggregated budget KPIs + line items with cost code info for a project."""
+    result = await db.execute(
+        select(BudgetLineItem, CostCode)
+        .join(CostCode, BudgetLineItem.cost_code_id == CostCode.id)
+        .where(BudgetLineItem.project_id == project_id)
+    )
+    rows = result.all()
+
+    total_original = 0.0
+    total_approved = 0.0
+    total_revised = 0.0
+    total_committed = 0.0
+    total_direct = 0.0
+    total_pending = 0.0
+    total_projected = 0.0
+    total_over_under = 0.0
+    line_items = []
+
+    for line, cc in rows:
+        total_original += float(line.original_budget or 0)
+        total_approved += float(line.approved_changes or 0)
+        total_revised += float(line.revised_budget or 0)
+        total_committed += float(line.committed_costs or 0)
+        total_direct += float(line.direct_costs or 0)
+        total_pending += float(line.pending_changes or 0)
+        total_projected += float(line.projected_cost or 0)
+        total_over_under += float(line.over_under or 0)
+        line_items.append({
+            "id": line.id,
+            "cost_code_id": line.cost_code_id,
+            "cost_code_code": cc.code if cc else None,
+            "cost_code_name": cc.name if cc else None,
+            "description": line.description,
+            "original_budget": float(line.original_budget or 0),
+            "approved_changes": float(line.approved_changes or 0),
+            "revised_budget": float(line.revised_budget or 0),
+            "committed_costs": float(line.committed_costs or 0),
+            "direct_costs": float(line.direct_costs or 0),
+            "pending_changes": float(line.pending_changes or 0),
+            "projected_cost": float(line.projected_cost or 0),
+            "over_under": float(line.over_under or 0),
+        })
+
+    return {
+        "project_id": project_id,
+        "total_original_budget": total_original,
+        "total_approved_changes": total_approved,
+        "total_revised_budget": total_revised,
+        "total_committed": total_committed,
+        "total_direct": total_direct,
+        "total_pending": total_pending,
+        "total_projected": total_projected,
+        "total_over_under": total_over_under,
+        "line_item_count": len(line_items),
+        "line_items": line_items,
+    }
+
+
+async def get_project_pay_app_summary(db: AsyncSession, project_id: UUID) -> dict:
+    """Return aggregated pay app KPIs for all pay apps on a project."""
+    result = await db.execute(
+        select(PaymentApplication, Commitment)
+        .join(Commitment, PaymentApplication.commitment_id == Commitment.id)
+        .where(Commitment.project_id == project_id)
+    )
+    rows = result.all()
+
+    total_this_period = 0.0
+    total_completed = 0.0
+    total_retention_held = 0.0
+    total_retention_released = 0.0
+    total_net_due = 0.0
+    counts_by_status: dict[str, int] = {}
+    pay_apps = []
+
+    for pa, commitment in rows:
+        total_this_period += float(pa.this_period_amount or 0)
+        total_completed += float(pa.total_completed or 0)
+        total_retention_held += float(pa.retention_held or 0)
+        total_retention_released += float(pa.retention_released or 0)
+        total_net_due += float(pa.net_payment_due or 0)
+        counts_by_status[pa.status] = counts_by_status.get(pa.status, 0) + 1
+        pay_apps.append({
+            "id": pa.id,
+            "pay_app_number": pa.pay_app_number,
+            "status": pa.status,
+            "period_start": pa.period_start,
+            "period_end": pa.period_end,
+            "this_period_amount": float(pa.this_period_amount or 0),
+            "total_completed": float(pa.total_completed or 0),
+            "retention_held": float(pa.retention_held or 0),
+            "retention_released": float(pa.retention_released or 0),
+            "net_payment_due": float(pa.net_payment_due or 0),
+            "commitment_id": pa.commitment_id,
+            "vendor_id": commitment.vendor_id if commitment else None,
+        })
+
+    return {
+        "project_id": project_id,
+        "total_pay_apps": len(pay_apps),
+        "total_this_period": total_this_period,
+        "total_completed": total_completed,
+        "total_retention_held": total_retention_held,
+        "total_retention_released": total_retention_released,
+        "total_net_due": total_net_due,
+        "counts_by_status": counts_by_status,
+        "pay_apps": pay_apps,
+    }
+
+
+async def get_change_event_detail(db: AsyncSession, change_event_id: UUID) -> dict:
+    """Return a change event with its line items, linked PCOs, and linked CCOs."""
+    ce = await db.get(ChangeEvent, change_event_id)
+    if ce is None:
+        raise HTTPException(status_code=404, detail="Change event not found")
+
+    li_result = await db.execute(
+        select(ChangeEventLineItem).where(ChangeEventLineItem.change_event_id == change_event_id)
+    )
+    line_items = list(li_result.scalars().all())
+
+    pco_result = await db.execute(
+        select(PotentialChangeOrder).where(PotentialChangeOrder.change_event_id == change_event_id)
+    )
+    pcos = list(pco_result.scalars().all())
+
+    # Gather linked CCOs via PCO-CCO links
+    cco_ids: set[UUID] = set()
+    if pcos:
+        pco_ids = [p.id for p in pcos]
+        link_result = await db.execute(
+            select(PcoCcoLink).where(PcoCcoLink.pco_id.in_(pco_ids))
+        )
+        links = list(link_result.scalars().all())
+        cco_ids = {lnk.cco_id for lnk in links}
+
+    ccos: list[CommitmentChangeOrder] = []
+    if cco_ids:
+        cco_result = await db.execute(
+            select(CommitmentChangeOrder).where(CommitmentChangeOrder.id.in_(list(cco_ids)))
+        )
+        ccos = list(cco_result.scalars().all())
+
+    return {
+        "id": ce.id,
+        "project_id": ce.project_id,
+        "event_number": ce.event_number,
+        "title": ce.title,
+        "description": ce.description,
+        "status": ce.status,
+        "change_reason": ce.change_reason,
+        "event_type": ce.event_type,
+        "scope": ce.scope,
+        "estimated_amount": float(ce.estimated_amount or 0),
+        "rfi_id": ce.rfi_id,
+        "prime_contract_id": ce.prime_contract_id,
+        "created_by": ce.created_by,
+        "created_at": ce.created_at,
+        "updated_at": ce.updated_at,
+        "line_items": line_items,
+        "linked_pcos": pcos,
+        "linked_ccos": ccos,
+    }
+
 
 async def get_commitment_summary(db: AsyncSession, commitment_id: UUID) -> dict:
     """Aggregate financial picture for a commitment including PCOs, CCOs, links."""

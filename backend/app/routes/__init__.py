@@ -35,7 +35,7 @@ from app.routes.commitment_change_orders import router as commitment_change_orde
 from app.routes.pco_cco_links import router as pco_cco_links_router
 from app.routes.billing_periods import router as billing_periods_router
 from app.routes.direct_costs import router as direct_costs_router
-from app.routes.payment_applications import router as payment_applications_router
+from app.routes.payment_applications import router as payment_applications_router, project_router as pay_app_project_router
 from app.routes.lien_waivers import router as lien_waivers_router
 from app.routes.drawing_areas import router as drawing_areas_router
 from app.routes.drawings import router as drawings_router
@@ -55,6 +55,8 @@ from app.routes.warranties import router as warranties_router
 from app.routes.warranty_claims import router as warranty_claims_router
 from app.routes.warranty_alerts import router as warranty_alerts_router
 from app.routes.completion_milestones import router as completion_milestones_router
+from app.routes.budget_summary import router as budget_summary_router
+from app.routes.change_event_line_items import router as change_event_line_items_router
 
 all_routers = [
     # Ops
@@ -78,7 +80,8 @@ all_routers = [
     change_events_router, potential_change_orders_router,
     commitment_change_orders_router, pco_cco_links_router,
     billing_periods_router, direct_costs_router,
-    payment_applications_router, lien_waivers_router,
+    payment_applications_router, pay_app_project_router, lien_waivers_router,
+    budget_summary_router, change_event_line_items_router,
     # Document Management
     drawing_areas_router, drawings_router, drawing_revisions_router,
     specifications_router, rfis_router, submittal_packages_router,

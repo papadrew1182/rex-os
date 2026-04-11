@@ -10,6 +10,13 @@ import Milestones from "./pages/Milestones";
 import Attachments from "./pages/Attachments";
 import ScheduleHealth from "./pages/ScheduleHealth";
 import ExecutionHealth from "./pages/ExecutionHealth";
+import BudgetOverview from "./pages/BudgetOverview";
+import PayApplications from "./pages/PayApplications";
+import Commitments from "./pages/Commitments";
+import ChangeOrders from "./pages/ChangeOrders";
+import RfiManagement from "./pages/RfiManagement";
+import PunchList from "./pages/PunchList";
+import SubmittalManagement from "./pages/SubmittalManagement";
 
 function SidebarItem({ to, children }) {
   const loc = useLocation();
@@ -30,6 +37,15 @@ function Shell() {
           <div className="rex-sidebar-brand">REX OS</div>
           <div className="rex-sidebar-group">Overview</div>
           <SidebarItem to="/">Portfolio</SidebarItem>
+          <div className="rex-sidebar-group">Financials</div>
+          <SidebarItem to="/budget">Budget Overview</SidebarItem>
+          <SidebarItem to="/pay-apps">Pay Applications</SidebarItem>
+          <SidebarItem to="/commitments">Commitments</SidebarItem>
+          <SidebarItem to="/change-orders">Change Orders</SidebarItem>
+          <div className="rex-sidebar-group">Field Ops</div>
+          <SidebarItem to="/rfis">RFIs</SidebarItem>
+          <SidebarItem to="/punch-list">Punch List</SidebarItem>
+          <SidebarItem to="/submittals">Submittals</SidebarItem>
           <div className="rex-sidebar-group">Project</div>
           <SidebarItem to="/schedule">Schedule Health</SidebarItem>
           <SidebarItem to="/execution">Execution Health</SidebarItem>
@@ -61,6 +77,13 @@ function Shell() {
                 <Route path="/checklists" element={<Checklists />} />
                 <Route path="/milestones" element={<Milestones />} />
                 <Route path="/attachments" element={<Attachments />} />
+                <Route path="/budget" element={<BudgetOverview />} />
+                <Route path="/pay-apps" element={<PayApplications />} />
+                <Route path="/commitments" element={<Commitments />} />
+                <Route path="/change-orders" element={<ChangeOrders />} />
+                <Route path="/rfis" element={<RfiManagement />} />
+                <Route path="/punch-list" element={<PunchList />} />
+                <Route path="/submittals" element={<SubmittalManagement />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>

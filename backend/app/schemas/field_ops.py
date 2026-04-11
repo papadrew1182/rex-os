@@ -130,6 +130,8 @@ class PunchItemCreate(BaseModel):
     schedule_impact: ImpactChoice | None = None
     due_date: date | None = None
     created_by: UUID | None = None
+    closed_by: UUID | None = None
+    is_critical_path: bool = False
 
 
 class PunchItemUpdate(BaseModel):
@@ -150,6 +152,8 @@ class PunchItemUpdate(BaseModel):
     due_date: date | None = None
     closed_date: date | None = None
     days_open: int | None = None
+    closed_by: UUID | None = None
+    is_critical_path: bool | None = None
 
 
 class PunchItemResponse(BaseModel):
@@ -175,6 +179,8 @@ class PunchItemResponse(BaseModel):
     closed_date: date | None
     days_open: int | None
     created_by: UUID | None
+    closed_by: UUID | None
+    is_critical_path: bool
     created_at: datetime
     updated_at: datetime
 

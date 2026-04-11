@@ -160,6 +160,7 @@ class CommitmentCreate(BaseModel):
     scope_of_work: str | None = None
     notes: str | None = None
     created_by: UUID | None = None
+    estimated_completion_date: date | None = None
 
 class CommitmentUpdate(BaseModel):
     title: str | None = None
@@ -174,6 +175,7 @@ class CommitmentUpdate(BaseModel):
     retention_held: float | None = None
     scope_of_work: str | None = None
     notes: str | None = None
+    estimated_completion_date: date | None = None
 
 class CommitmentResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -182,6 +184,7 @@ class CommitmentResponse(BaseModel):
     original_value: float; approved_cos: float; revised_value: float
     invoiced_to_date: float; remaining_to_invoice: float; retention_rate: float; retention_held: float
     scope_of_work: str | None; notes: str | None; created_by: UUID | None
+    estimated_completion_date: date | None
     created_at: datetime; updated_at: datetime
 
 
@@ -528,3 +531,114 @@ class CommitmentSummaryResponse(BaseModel):
     cco_counts_by_status: dict[str, int]
     linked_pco_to_cco_count: int
     pay_app_count: int
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Change Event Line Items
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ChangeEventLineItemCreate(BaseModel):
+    change_event_id: UUID
+    cost_code_id: UUID | None = None
+    description: str
+    amount: float = 0
+    sort_order: int = 0
+
+class ChangeEventLineItemUpdate(BaseModel):
+    cost_code_id: UUID | None = None
+    description: str | None = None
+    amount: float | None = None
+    sort_order: int | None = None
+
+class ChangeEventLineItemResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID; change_event_id: UUID; cost_code_id: UUID | None
+    description: str; amount: float; sort_order: int; created_at: datetime
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Budget Summary
+# ═══════════════════════════════════════════════════════════════════════════
+
+class BudgetSummaryLineItemResponse(BaseModel):
+    id: UUID
+    cost_code_id: UUID
+    cost_code_code: str | None
+    cost_code_name: str | None
+    description: str | None
+    original_budget: float
+    approved_changes: float
+    revised_budget: float
+    committed_costs: float
+    direct_costs: float
+    pending_changes: float
+    projected_cost: float
+    over_under: float
+
+class ProjectBudgetSummaryResponse(BaseModel):
+    project_id: UUID
+    total_original_budget: float
+    total_approved_changes: float
+    total_revised_budget: float
+    total_committed: float
+    total_direct: float
+    total_pending: float
+    total_projected: float
+    total_over_under: float
+    line_item_count: int
+    line_items: list[BudgetSummaryLineItemResponse]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Pay App Project Summary
+# ═══════════════════════════════════════════════════════════════════════════
+
+class PayAppSummaryItemResponse(BaseModel):
+    id: UUID
+    pay_app_number: int
+    status: str
+    period_start: date
+    period_end: date
+    this_period_amount: float
+    total_completed: float
+    retention_held: float
+    retention_released: float
+    net_payment_due: float
+    commitment_id: UUID
+    vendor_id: UUID | None
+
+class ProjectPayAppSummaryResponse(BaseModel):
+    project_id: UUID
+    total_pay_apps: int
+    total_this_period: float
+    total_completed: float
+    total_retention_held: float
+    total_retention_released: float
+    total_net_due: float
+    counts_by_status: dict[str, int]
+    pay_apps: list[PayAppSummaryItemResponse]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# Change Event Detail
+# ═══════════════════════════════════════════════════════════════════════════
+
+class ChangeEventDetailResponse(BaseModel):
+    id: UUID
+    project_id: UUID
+    event_number: str
+    title: str
+    description: str | None
+    status: str
+    change_reason: str
+    event_type: str
+    scope: str
+    estimated_amount: float
+    rfi_id: UUID | None
+    prime_contract_id: UUID | None
+    created_by: UUID | None
+    created_at: datetime
+    updated_at: datetime
+    line_items: list[ChangeEventLineItemResponse]
+    linked_pcos: list[PotentialChangeOrderResponse]
+    linked_ccos: list[CommitmentChangeOrderResponse]

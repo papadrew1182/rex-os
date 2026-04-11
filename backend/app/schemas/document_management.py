@@ -97,6 +97,7 @@ class RfiCreate(BaseModel):
     ball_in_court: UUID | None = None; created_by: UUID | None = None
     due_date: date | None = None; drawing_id: UUID | None = None
     spec_section: str | None = None; location: str | None = None
+    rfi_manager: UUID | None = None
 
 class RfiUpdate(BaseModel):
     subject: str | None = None; status: RfiStatus | None = None; priority: Priority | None = None
@@ -105,13 +106,14 @@ class RfiUpdate(BaseModel):
     assigned_to: UUID | None = None; ball_in_court: UUID | None = None
     due_date: date | None = None; answered_date: date | None = None; days_open: int | None = None
     location: str | None = None
+    rfi_manager: UUID | None = None
 
 class RfiResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID; project_id: UUID; rfi_number: str; subject: str; status: str; priority: str
     question: str; answer: str | None; cost_impact: str | None; schedule_impact: str | None
     cost_code_id: UUID | None; assigned_to: UUID | None; ball_in_court: UUID | None
-    created_by: UUID | None; due_date: date | None; answered_date: date | None
+    created_by: UUID | None; rfi_manager: UUID | None; due_date: date | None; answered_date: date | None
     days_open: int | None; drawing_id: UUID | None; spec_section: str | None
     location: str | None; created_at: datetime; updated_at: datetime
 
@@ -147,6 +149,7 @@ class SubmittalCreate(BaseModel):
     responsible_contractor: UUID | None = None; created_by: UUID | None = None
     due_date: date | None = None; lead_time_days: int | None = None
     required_on_site: date | None = None; location: str | None = None
+    submittal_manager_id: UUID | None = None; is_critical_path: bool = False
 
 class SubmittalUpdate(BaseModel):
     title: str | None = None; status: SubmittalStatus | None = None
@@ -155,6 +158,7 @@ class SubmittalUpdate(BaseModel):
     due_date: date | None = None; submitted_date: date | None = None
     approved_date: date | None = None; lead_time_days: int | None = None
     required_on_site: date | None = None; location: str | None = None
+    submittal_manager_id: UUID | None = None; is_critical_path: bool | None = None
 
 class SubmittalResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -162,7 +166,8 @@ class SubmittalResponse(BaseModel):
     title: str; status: str; submittal_type: str; spec_section: str | None
     current_revision: int; cost_code_id: UUID | None; schedule_activity_id: UUID | None
     assigned_to: UUID | None; ball_in_court: UUID | None; responsible_contractor: UUID | None
-    created_by: UUID | None; due_date: date | None; submitted_date: date | None
+    created_by: UUID | None; submittal_manager_id: UUID | None; is_critical_path: bool
+    due_date: date | None; submitted_date: date | None
     approved_date: date | None; lead_time_days: int | None; required_on_site: date | None
     location: str | None; created_at: datetime; updated_at: datetime
 

@@ -10,8 +10,8 @@ from app.models.field_ops import (
     Observation, SafetyIncident, PhotoAlbum, Photo, Task, Meeting, MeetingActionItem,
 )
 from app.models.financials import (
-    BillingPeriod, BudgetLineItem, BudgetSnapshot, ChangeEvent, Commitment,
-    CommitmentChangeOrder, CommitmentLineItem, CostCode, DirectCost,
+    BillingPeriod, BudgetLineItem, BudgetSnapshot, ChangeEvent, ChangeEventLineItem,
+    Commitment, CommitmentChangeOrder, CommitmentLineItem, CostCode, DirectCost,
     LienWaiver, PaymentApplication, PcoCcoLink, PotentialChangeOrder, PrimeContract,
 )
 from app.models.document_management import (
@@ -34,8 +34,8 @@ __all__ = [
     "DailyLog", "ManpowerEntry", "PunchItem", "Inspection", "InspectionItem",
     "Observation", "SafetyIncident", "PhotoAlbum", "Photo", "Task", "Meeting", "MeetingActionItem",
     # Financials
-    "BillingPeriod", "BudgetLineItem", "BudgetSnapshot", "ChangeEvent", "Commitment",
-    "CommitmentChangeOrder", "CommitmentLineItem", "CostCode", "DirectCost",
+    "BillingPeriod", "BudgetLineItem", "BudgetSnapshot", "ChangeEvent", "ChangeEventLineItem",
+    "Commitment", "CommitmentChangeOrder", "CommitmentLineItem", "CostCode", "DirectCost",
     "LienWaiver", "PaymentApplication", "PcoCcoLink", "PotentialChangeOrder", "PrimeContract",
     # Document Management
     "Attachment", "Correspondence", "Drawing", "DrawingArea", "DrawingRevision",

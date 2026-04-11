@@ -10,7 +10,7 @@ from app.dependencies import (
 )
 from app.models.foundation import UserAccount
 from app.models.financials import ChangeEvent
-from app.schemas.financials import ChangeEventCreate, ChangeEventResponse, ChangeEventUpdate
+from app.schemas.financials import ChangeEventCreate, ChangeEventResponse, ChangeEventUpdate, ChangeEventDetailResponse
 from app.services import financials as svc
 
 router = APIRouter(prefix="/api/change-events", tags=["change-events"])
@@ -53,3 +53,14 @@ async def create_change_event(data: ChangeEventCreate, db: AsyncSession = Depend
 @router.patch("/{row_id}", response_model=ChangeEventResponse)
 async def update_change_event(row_id: UUID, data: ChangeEventUpdate, db: AsyncSession = Depends(get_db), _auth_user: UserAccount = Depends(require_authenticated_user)):
     return await svc.update(db, ChangeEvent, row_id, data)
+
+
+@router.get("/{row_id}/detail", response_model=ChangeEventDetailResponse)
+async def get_change_event_detail(
+    row_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    row = await svc.get_by_id(db, ChangeEvent, row_id)
+    await enforce_project_read(db, user, row.project_id)
+    return await svc.get_change_event_detail(db, row_id)

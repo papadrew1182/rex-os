@@ -13,11 +13,12 @@ from app.models.foundation import UserAccount
 from app.models.financials import Commitment, PaymentApplication
 from app.schemas.financials import (
     PaymentApplicationCreate, PaymentApplicationResponse, PaymentApplicationUpdate,
-    PaymentApplicationSummaryResponse,
+    PaymentApplicationSummaryResponse, ProjectPayAppSummaryResponse,
 )
 from app.services import financials as svc
 
 router = APIRouter(prefix="/api/payment-applications", tags=["payment-applications"])
+project_router = APIRouter(tags=["payment-applications"])
 
 @router.get("/", response_model=list[PaymentApplicationResponse])
 async def list_payment_applications(
@@ -79,3 +80,13 @@ async def get_payment_application_summary(
     parent = await svc.get_by_id(db, Commitment, row.commitment_id)
     await enforce_project_read(db, user, parent.project_id)
     return await svc.get_payment_application_summary(db, pay_app_id)
+
+
+@project_router.get("/api/projects/{project_id}/pay-app-summary", response_model=ProjectPayAppSummaryResponse)
+async def get_project_pay_app_summary(
+    project_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: UserAccount = Depends(get_current_user),
+):
+    await enforce_project_read(db, user, project_id)
+    return await svc.get_project_pay_app_summary(db, project_id)
