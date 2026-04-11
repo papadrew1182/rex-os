@@ -1,0 +1,186 @@
+/* ═══════════════════════════════════════════════════════════
+   REX OS — UNIFIED THEME
+   Ported from Rex Procore production with targeted cleanup.
+   ═══════════════════════════════════════════════════════════ */
+
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Syne:wght@700;800&display=swap');
+
+:root {
+  --rex-accent: #6b45a1;
+  --rex-accent-hover: #5A3889;
+  --rex-accent-light: #F3EEFA;
+  --rex-accent-lighter: #FBF9FE;
+  --rex-accent-border: #C9B5DD;
+  --rex-accent-dark: #4A2D75;
+  --rex-sidebar-bg: #2D1B4E;
+  --rex-sidebar-hover: #3D2866;
+  --rex-sidebar-active: rgba(107,69,161,0.18);
+  --rex-sidebar-text: #E8DDEF;
+  --rex-sidebar-muted: #B09AC5;
+  --rex-bg-page: #F8F5FC;
+  --rex-bg-card: #FFFFFF;
+  --rex-bg-stripe: #FBF9FE;
+  --rex-text: #1E293B;
+  --rex-text-bold: #0F172A;
+  --rex-text-muted: #475569;
+  --rex-text-faint: #64748B;
+  --rex-border: #E2E0E8;
+  --rex-border-strong: #C9C5D1;
+  --rex-red: #DC2626;
+  --rex-red-bg: #FEF2F2;
+  --rex-amber: #D97706;
+  --rex-amber-bg: #FFFBEB;
+  --rex-green: #16A34A;
+  --rex-green-bg: #F0FDF4;
+  --rex-shadow-sm: 0 1px 3px rgba(0,0,0,0.06);
+  --rex-shadow-md: 0 4px 8px rgba(0,0,0,0.08);
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: 'DM Sans', -apple-system, sans-serif;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--rex-text);
+  background: var(--rex-bg-page);
+  line-height: 1.6;
+}
+a { color: inherit; text-decoration: none; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+@keyframes rex-spin { to { transform: rotate(360deg); } }
+
+/* ── Typography ── */
+.rex-h1 { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 800; color: var(--rex-text-bold); margin: 0; }
+.rex-h2 { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; color: var(--rex-text-bold); margin: 0; }
+.rex-h3 { font-size: 16px; font-weight: 700; color: var(--rex-text-bold); margin: 0; }
+.rex-h4 { font-size: 14px; font-weight: 700; color: var(--rex-text-bold); margin: 0; }
+.rex-muted { color: var(--rex-text-muted); font-size: 13px; }
+.rex-section-label { font-size: 12px; font-weight: 700; color: var(--rex-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+
+/* ── Shell ── */
+.rex-shell { display: flex; min-height: 100vh; }
+.rex-sidebar {
+  width: 220px; background: var(--rex-sidebar-bg); color: var(--rex-sidebar-text);
+  flex-shrink: 0; padding-top: 18px; display: flex; flex-direction: column;
+}
+.rex-sidebar-brand {
+  padding: 0 20px 22px; font-family: 'Syne', sans-serif;
+  font-size: 20px; font-weight: 800; color: #fff;
+}
+.rex-sidebar-group {
+  font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
+  color: rgba(255,255,255,0.35); padding: 16px 20px 6px;
+}
+.rex-sidebar-item {
+  padding: 9px 20px; font-size: 13px; font-weight: 500; color: var(--rex-sidebar-muted);
+  cursor: pointer; display: flex; align-items: center; gap: 8px;
+  border-left: 2px solid transparent; transition: background 0.12s;
+}
+.rex-sidebar-item:hover { background: var(--rex-sidebar-hover); color: var(--rex-sidebar-text); }
+.rex-sidebar-item.active {
+  background: var(--rex-sidebar-active); color: #fff;
+  border-left-color: #9F7ACA; font-weight: 600;
+}
+.rex-sidebar-bottom { margin-top: auto; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,0.08); }
+
+.rex-topbar {
+  height: 54px; background: var(--rex-bg-card); border-bottom: 1px solid var(--rex-border);
+  display: flex; align-items: center; padding: 0 24px; gap: 14px;
+}
+.rex-topbar-project { font-weight: 600; color: var(--rex-text-bold); font-size: 14px; }
+.rex-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--rex-text-muted); }
+
+.rex-content { padding: 24px 28px; flex: 1; overflow-y: auto; }
+
+/* ── Cards ── */
+.rex-card {
+  background: var(--rex-bg-card); border: 1px solid var(--rex-border);
+  border-radius: 8px; box-shadow: var(--rex-shadow-sm); padding: 16px 20px;
+}
+.rex-stat-card {
+  background: var(--rex-bg-card); border: 1px solid var(--rex-border);
+  border-left: 3px solid var(--rex-accent); border-radius: 8px;
+  padding: 14px 18px; box-shadow: var(--rex-shadow-sm);
+}
+.rex-stat-card.red { border-left-color: var(--rex-red); }
+.rex-stat-card.green { border-left-color: var(--rex-green); }
+.rex-stat-card.amber { border-left-color: var(--rex-amber); }
+.rex-stat-label { font-size: 11px; font-weight: 700; color: var(--rex-text-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+.rex-stat-num { font-size: 32px; font-weight: 800; color: var(--rex-text-bold); line-height: 1.1; }
+.rex-stat-num.red { color: var(--rex-red); }
+.rex-stat-num.green { color: var(--rex-green); }
+.rex-stat-num.amber { color: var(--rex-amber); }
+.rex-stat-sub { font-size: 12px; color: var(--rex-text-muted); margin-top: 2px; }
+
+/* ── Tables ── */
+.rex-table-wrap { border-radius: 8px; border: 1px solid var(--rex-border); overflow: hidden; box-shadow: var(--rex-shadow-sm); }
+.rex-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.rex-table thead th {
+  background: var(--rex-accent); color: #fff; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 14px; text-align: left;
+}
+.rex-table tbody td { padding: 10px 14px; border-bottom: 1px solid var(--rex-border); }
+.rex-table tbody tr:nth-child(even) { background: var(--rex-bg-stripe); }
+.rex-table tbody tr:hover { background: var(--rex-accent-light); cursor: pointer; }
+
+/* ── Badges — SOLID, strong, uppercase ── */
+.rex-badge {
+  display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px;
+  border-radius: 4px; text-transform: uppercase; letter-spacing: 0.03em; white-space: nowrap;
+}
+.rex-badge-red { background: var(--rex-red); color: #fff; }
+.rex-badge-amber { background: var(--rex-amber); color: #fff; }
+.rex-badge-green { background: var(--rex-green); color: #fff; }
+.rex-badge-purple { background: var(--rex-accent); color: #fff; }
+.rex-badge-gray { background: #94A3B8; color: #fff; }
+
+/* ── Buttons ── */
+.rex-btn {
+  display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px;
+  font-size: 13px; font-weight: 600; border-radius: 6px; cursor: pointer;
+  border: none; transition: background 0.15s, transform 0.1s;
+}
+.rex-btn:active { transform: scale(0.98); }
+.rex-btn-primary { background: var(--rex-accent); color: #fff; }
+.rex-btn-primary:hover { background: var(--rex-accent-hover); }
+.rex-btn-outline { background: transparent; color: var(--rex-accent); border: 1px solid var(--rex-accent-border); }
+.rex-btn-outline:hover { background: var(--rex-accent-light); }
+.rex-btn-danger { background: var(--rex-red); color: #fff; }
+
+/* ── Inputs ── */
+.rex-input {
+  background: #fff; border: 1px solid var(--rex-border-strong); border-radius: 6px;
+  padding: 8px 12px; font-size: 13px; font-family: inherit; color: var(--rex-text);
+}
+.rex-input:focus { outline: none; border-color: var(--rex-accent); box-shadow: 0 0 0 3px var(--rex-accent-light); }
+select.rex-input { padding-right: 24px; }
+
+/* ── Progress bar ── */
+.rex-progress { height: 6px; background: var(--rex-border); border-radius: 3px; overflow: hidden; }
+.rex-progress-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* ── Alerts ── */
+.rex-alert {
+  padding: 10px 14px; border-radius: 6px; border-left: 3px solid; font-size: 13px;
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.rex-alert-amber { background: var(--rex-amber-bg); border-left-color: var(--rex-amber); }
+.rex-alert-red { background: var(--rex-red-bg); border-left-color: var(--rex-red); }
+.rex-alert-green { background: var(--rex-green-bg); border-left-color: var(--rex-green); }
+
+/* ── Spinner ── */
+.rex-spinner {
+  display: inline-block; border: 2px solid var(--rex-accent-border);
+  border-top-color: var(--rex-accent); border-radius: 50%;
+  animation: rex-spin 0.6s linear infinite;
+}
+
+/* ── Row helper ── */
+.rex-row { display: flex; justify-content: space-between; padding: 4px 0; font-size: 14px; }
+.rex-row-label { color: var(--rex-text-muted); }
+.rex-row-value { font-weight: 600; color: var(--rex-text-bold); }
+
+/* ── Grid ── */
+.rex-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.rex-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }

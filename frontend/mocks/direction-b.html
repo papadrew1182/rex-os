@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Rex OS — Direction B: Modern Rex</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root {
+  --rex-accent: #7c5cbf;
+  --rex-accent-hover: #6845a8;
+  --rex-accent-light: #F0EBFA;
+  --rex-accent-lighter: #F9F7FD;
+  --rex-sidebar-bg: #1c1532;
+  --rex-bg-page: #F5F3F9;
+  --rex-bg-card: #FFFFFF;
+  --rex-border: #E5E2EC;
+  --rex-text: #1E1B2E;
+  --rex-text-bold: #0C0A1A;
+  --rex-text-muted: #6B6580;
+  --rex-red: #E5484D;
+  --rex-amber: #F5A623;
+  --rex-green: #30A46C;
+  --rex-red-bg: #FEECEE;
+  --rex-amber-bg: #FFF7E0;
+  --rex-green-bg: #E9F9EF;
+  --rex-shadow-sm: 0 1px 2px rgba(0,0,0,0.05);
+  --rex-shadow-card: 0 1px 3px rgba(0,0,0,0.04), 0 1px 2px rgba(0,0,0,0.06);
+  --radius: 10px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Inter', -apple-system, sans-serif; font-size: 14px; font-weight: 500; color: var(--rex-text); background: var(--rex-bg-page); line-height: 1.6; }
+h1 { font-size: 26px; font-weight: 800; color: var(--rex-text-bold); letter-spacing: -0.02em; }
+h2 { font-size: 20px; font-weight: 700; color: var(--rex-text-bold); letter-spacing: -0.01em; }
+h3 { font-size: 15px; font-weight: 700; color: var(--rex-text-bold); }
+.muted { color: var(--rex-text-muted); font-size: 13px; }
+
+/* Layout */
+.shell { display: flex; min-height: 100vh; }
+.sidebar { width: 200px; background: var(--rex-sidebar-bg); color: #C8BFD8; flex-shrink: 0; padding-top: 18px; }
+.sidebar-brand { padding: 0 18px 22px; font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -0.02em; }
+.sidebar-group { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; color: rgba(255,255,255,0.3); padding: 14px 18px 6px; }
+.sidebar-item { padding: 8px 18px; font-size: 13px; font-weight: 500; color: #9D90B5; cursor: pointer; display: flex; align-items: center; gap: 8px; border-radius: 0 6px 6px 0; margin-right: 8px; }
+.sidebar-item:hover { background: rgba(255,255,255,0.06); color: #D4CAE8; }
+.sidebar-item.active { background: rgba(124,92,191,0.2); color: #fff; font-weight: 600; }
+
+.main { flex: 1; display: flex; flex-direction: column; }
+.topbar { height: 52px; background: #fff; border-bottom: 1px solid var(--rex-border); display: flex; align-items: center; padding: 0 24px; gap: 14px; font-size: 13px; }
+.topbar-project { font-weight: 700; color: var(--rex-text-bold); font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.topbar-dot { width: 6px; height: 6px; background: var(--rex-green); border-radius: 50%; }
+.topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--rex-text-muted); }
+.content { padding: 22px 24px; flex: 1; }
+
+/* Cards */
+.card { background: var(--rex-bg-card); border: 1px solid var(--rex-border); border-radius: var(--radius); box-shadow: var(--rex-shadow-card); padding: 16px 18px; }
+.stat-card { background: var(--rex-bg-card); border: 1px solid var(--rex-border); border-radius: var(--radius); box-shadow: var(--rex-shadow-card); padding: 14px 16px; position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--rex-accent); }
+.stat-card.red::before { background: var(--rex-red); }
+.stat-card.green::before { background: var(--rex-green); }
+.stat-card.amber::before { background: var(--rex-amber); }
+.stat-label { font-size: 11px; font-weight: 600; color: var(--rex-text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 4px; }
+.stat-num { font-size: 28px; font-weight: 800; color: var(--rex-text-bold); line-height: 1.1; }
+.stat-num.red { color: var(--rex-red); }
+.stat-num.green { color: var(--rex-green); }
+.stat-num.amber { color: var(--rex-amber); }
+
+/* Table */
+table { width: 100%; border-collapse: collapse; }
+thead th { background: var(--rex-accent); color: #fff; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; padding: 9px 14px; text-align: left; }
+thead th:first-child { border-radius: 8px 0 0 0; }
+thead th:last-child { border-radius: 0 8px 0 0; }
+tbody td { padding: 10px 14px; border-bottom: 1px solid var(--rex-border); }
+tbody tr:nth-child(even) { background: var(--rex-accent-lighter); }
+tbody tr:hover { background: var(--rex-accent-light); }
+
+/* Badge — slightly rounded, more subtle */
+.badge { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 3px 8px; border-radius: 5px; text-transform: uppercase; letter-spacing: 0.03em; }
+.badge-red { background: var(--rex-red); color: #fff; }
+.badge-green { background: var(--rex-green); color: #fff; }
+.badge-amber { background: var(--rex-amber); color: #fff; }
+.badge-purple { background: var(--rex-accent); color: #fff; }
+.badge-gray { background: #8E8BA0; color: #fff; }
+.badge-soft-red { background: var(--rex-red-bg); color: var(--rex-red); }
+.badge-soft-green { background: var(--rex-green-bg); color: var(--rex-green); }
+.badge-soft-amber { background: var(--rex-amber-bg); color: var(--rex-amber); }
+
+/* Button — softer corners */
+.btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 16px; font-size: 13px; font-weight: 600; border-radius: 8px; cursor: pointer; border: none; }
+.btn-primary { background: var(--rex-accent); color: #fff; }
+.btn-outline { background: transparent; color: var(--rex-accent); border: 1px solid var(--rex-border); }
+
+/* Tabs — pill style instead of underline */
+.tabs { display: flex; gap: 4px; background: var(--rex-accent-lighter); border-radius: 8px; padding: 3px; margin-bottom: 20px; width: fit-content; }
+.tab { padding: 7px 16px; font-size: 13px; font-weight: 600; color: var(--rex-text-muted); border-radius: 6px; cursor: pointer; background: none; border: none; }
+.tab.active { background: #fff; color: var(--rex-accent); box-shadow: var(--rex-shadow-sm); }
+
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.flex-row { display: flex; gap: 10px; align-items: center; }
+.mt-16 { margin-top: 16px; }
+.mt-24 { margin-top: 24px; }
+.mb-12 { margin-bottom: 12px; }
+.mb-16 { margin-bottom: 16px; }
+.mb-24 { margin-bottom: 24px; }
+
+.screen-sep { border: none; border-top: 4px dashed #C9B5DD; margin: 60px 0; }
+.screen-label { font-size: 13px; font-weight: 800; color: var(--rex-accent); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 14px; }
+
+.search-input { padding: 7px 12px; border: 1px solid var(--rex-border); border-radius: 8px; font-size: 13px; width: 220px; background: #fff; }
+.search-input:focus { outline: none; border-color: var(--rex-accent); box-shadow: 0 0 0 3px var(--rex-accent-light); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════ SCREEN 1: PORTFOLIO ═══════════ -->
+<div class="screen-label" style="padding: 20px 24px 0;">Screen 1 — Portfolio</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">Rex OS</div>
+    <div class="sidebar-group">Overview</div>
+    <div class="sidebar-item active">Portfolio</div>
+    <div class="sidebar-group">Project</div>
+    <div class="sidebar-item">Schedule</div>
+    <div class="sidebar-item">Execution</div>
+    <div class="sidebar-item">Checklists</div>
+    <div class="sidebar-item">Milestones</div>
+    <div class="sidebar-item">Files</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-project"><span class="topbar-dot"></span> Bishop Modern</div>
+      <div class="topbar-right">
+        Andrew Roberts
+        <span class="badge badge-purple">Admin</span>
+      </div>
+    </div>
+    <div class="content">
+      <h1 class="mb-16">Portfolio</h1>
+
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;" class="mb-24">
+        <div class="stat-card"><div class="stat-label">Total</div><div class="stat-num">4</div></div>
+        <div class="stat-card green"><div class="stat-label">Pass</div><div class="stat-num green">1</div></div>
+        <div class="stat-card amber"><div class="stat-label">Warning</div><div class="stat-num amber">1</div></div>
+        <div class="stat-card red"><div class="stat-label">Fail</div><div class="stat-num red">0</div></div>
+        <div class="stat-card"><div class="stat-label">Not Started</div><div class="stat-num">2</div></div>
+      </div>
+
+      <div class="flex-row mb-16">
+        <input class="search-input" placeholder="Search..." />
+        <select class="search-input" style="width:auto;"><option>All statuses</option></select>
+        <label style="font-size:12px;color:var(--rex-text-muted);display:flex;align-items:center;gap:4px;">
+          <input type="checkbox" checked /> Hide test
+        </label>
+        <span class="muted" style="margin-left:auto;">4 projects</span>
+      </div>
+
+      <div class="card" style="padding:0;overflow:hidden;border-radius:var(--radius);">
+        <table>
+          <thead><tr><th>Project</th><th>Status</th><th>Checklist</th><th>Milestones</th><th>Holdback</th><th>Issues</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Bishop Modern</strong> <span class="muted">BM-001</span></td>
+              <td><span class="badge badge-soft-amber">Warning</span></td>
+              <td>67%</td><td>2/3</td><td><span class="badge badge-soft-amber">Warning</span></td><td>3</td>
+            </tr>
+            <tr>
+              <td><strong>Lakewood Heights</strong> <span class="muted">LH-002</span></td>
+              <td><span class="badge badge-soft-green">Pass</span></td>
+              <td>100%</td><td>3/3</td><td><span class="badge badge-soft-green">Pass</span></td><td>0</td>
+            </tr>
+            <tr>
+              <td><strong>Jungle Fort Worth</strong> <span class="muted">JFW-003</span></td>
+              <td><span class="badge badge-gray">Not Started</span></td>
+              <td>0%</td><td>0/2</td><td><span class="badge badge-gray">N/A</span></td><td>0</td>
+            </tr>
+            <tr>
+              <td><strong>Jungle Lovers Lane</strong> <span class="muted">JLL-004</span></td>
+              <td><span class="badge badge-gray">Not Started</span></td>
+              <td>0%</td><td>0/1</td><td><span class="badge badge-gray">N/A</span></td><td>0</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="screen-sep" />
+
+<!-- ═══════════ SCREEN 2: PROJECT DETAIL ═══════════ -->
+<div class="screen-label" style="padding: 0 24px;">Screen 2 — Project Detail</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">Rex OS</div>
+    <div class="sidebar-group">Overview</div>
+    <div class="sidebar-item">Portfolio</div>
+    <div class="sidebar-group">Project</div>
+    <div class="sidebar-item">Schedule</div>
+    <div class="sidebar-item">Execution</div>
+    <div class="sidebar-item active">Checklists</div>
+    <div class="sidebar-item">Milestones</div>
+    <div class="sidebar-item">Files</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <span style="color:var(--rex-accent);font-weight:600;font-size:13px;cursor:pointer;">&larr; Portfolio</span>
+      <div class="topbar-project"><span class="topbar-dot"></span> Bishop Modern</div>
+      <div class="topbar-right">Andrew Roberts <span class="badge badge-purple">Admin</span></div>
+    </div>
+    <div class="content">
+      <div class="flex-row mb-12"><h1>Bishop Modern</h1><span class="badge badge-soft-amber" style="font-size:12px;padding:4px 10px;">Warning</span></div>
+      <p class="muted mb-24">Checklist progress below 80% — review items to identify blockers.</p>
+
+      <div class="tabs">
+        <button class="tab active">Readiness</button>
+        <button class="tab">Schedule</button>
+        <button class="tab">Execution</button>
+      </div>
+
+      <div class="grid-2">
+        <div class="card"><h3 class="mb-16">Checklist</h3>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Checklists</span><span style="font-weight:600;">2</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Items</span><span style="font-weight:600;">23 / 34</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Best %</span><span style="font-weight:600;">67.6%</span></div>
+          <div style="height:5px;background:var(--rex-border);border-radius:3px;margin-top:8px;overflow:hidden;"><div style="width:67.6%;height:100%;background:var(--rex-amber);border-radius:3px;"></div></div>
+        </div>
+        <div class="card"><h3 class="mb-16">Milestones</h3>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Total</span><span style="font-weight:600;">3</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Achieved</span><span style="font-weight:600;color:var(--rex-green);">2</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Certified</span><span style="font-weight:600;">2</span></div>
+        </div>
+        <div class="card"><h3 class="mb-16">Holdback</h3>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Gate</span><span class="badge badge-soft-amber">Warning</span></div>
+          <p class="muted" style="margin-top:8px;">Checklist below 80%</p>
+        </div>
+        <div class="card"><h3 class="mb-16">Warranties</h3>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Claimed</span><span style="font-weight:600;">0</span></div>
+          <div style="display:flex;justify-content:space-between;padding:3px 0;"><span class="muted">Expiring Soon</span><span style="font-weight:600;color:var(--rex-amber);">1</span></div>
+        </div>
+      </div>
+
+      <div class="mt-24"><h3 class="mb-12">Issues</h3>
+        <div style="padding:10px 14px;background:var(--rex-amber-bg);border-radius:8px;border-left:3px solid var(--rex-amber);margin-bottom:6px;font-size:13px;"><strong>Warning</strong> Best checklist 67.6% (below 80%)</div>
+        <div style="padding:10px 14px;background:var(--rex-red-bg);border-radius:8px;border-left:3px solid var(--rex-red);margin-bottom:6px;font-size:13px;"><strong>High</strong> Final Completion milestone pending</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="screen-sep" />
+
+<!-- ═══════════ SCREEN 3: CHECKLISTS WORKFLOW ═══════════ -->
+<div class="screen-label" style="padding: 0 24px;">Screen 3 — Checklists Workflow</div>
+
+<div class="shell">
+  <aside class="sidebar">
+    <div class="sidebar-brand">Rex OS</div>
+    <div class="sidebar-group">Overview</div>
+    <div class="sidebar-item">Portfolio</div>
+    <div class="sidebar-group">Project</div>
+    <div class="sidebar-item">Schedule</div>
+    <div class="sidebar-item">Execution</div>
+    <div class="sidebar-item active">Checklists</div>
+    <div class="sidebar-item">Milestones</div>
+    <div class="sidebar-item">Files</div>
+  </aside>
+  <div class="main">
+    <div class="topbar">
+      <div class="topbar-project"><span class="topbar-dot"></span> Bishop Modern</div>
+      <div class="topbar-right">Andrew Roberts <span class="badge badge-purple">Admin</span></div>
+    </div>
+    <div class="content">
+      <div class="flex-row mb-16"><h1>Checklists</h1><button class="btn btn-primary" style="margin-left:auto;">+ Create from Template</button></div>
+
+      <div style="display:grid;grid-template-columns:260px 1fr;gap:14px;">
+        <div class="card" style="padding:0;overflow:hidden;">
+          <div style="padding:12px 14px;background:var(--rex-accent-light);border-bottom:1px solid var(--rex-border);">
+            <div style="font-weight:700;font-size:13px;">Checklist 1</div>
+            <div class="muted" style="font-size:12px;">SC Jun 1 · 23/34 (68%)</div>
+            <div style="height:4px;background:var(--rex-border);border-radius:2px;margin-top:5px;overflow:hidden;"><div style="width:68%;height:100%;background:var(--rex-amber);border-radius:2px;"></div></div>
+          </div>
+          <div style="padding:12px 14px;border-bottom:1px solid var(--rex-border);">
+            <div style="font-weight:600;font-size:13px;">Checklist 2</div>
+            <div class="muted" style="font-size:12px;">SC Jul 15 · 0/34 (0%)</div>
+          </div>
+        </div>
+        <div>
+          <div class="flex-row mb-12"><h2>68% complete</h2><span class="muted">23 of 34 done</span></div>
+          <div style="height:7px;background:var(--rex-border);border-radius:4px;overflow:hidden;margin-bottom:16px;">
+            <div style="width:68%;height:100%;background:var(--rex-amber);border-radius:4px;"></div>
+          </div>
+          <div class="card" style="padding:0;">
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;">
+              <input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--rex-accent);">
+              <div style="flex:1;"><div style="text-decoration:line-through;color:var(--rex-text-muted);">Submit O&M Manuals</div><div style="font-size:11px;color:#8E8BA0;">documentation · Due May 15</div></div>
+              <span class="badge badge-soft-green">Complete</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;background:var(--rex-accent-lighter);">
+              <input type="checkbox" style="width:16px;height:16px;accent-color:var(--rex-accent);">
+              <div style="flex:1;"><div>Final fire alarm test</div><div style="font-size:11px;color:#8E8BA0;">safety · Due May 20</div></div>
+              <span class="badge badge-gray">Not Started</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #f0f0f0;">
+              <input type="checkbox" checked style="width:16px;height:16px;accent-color:var(--rex-accent);">
+              <div style="flex:1;"><div style="text-decoration:line-through;color:var(--rex-text-muted);">Record as-built drawings</div><div style="font-size:11px;color:#8E8BA0;">documentation · Due May 10</div></div>
+              <span class="badge badge-soft-green">Complete</span>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;padding:10px 14px;">
+              <input type="checkbox" style="width:16px;height:16px;accent-color:var(--rex-accent);">
+              <div style="flex:1;"><div>Elevator final inspection</div><div style="font-size:11px;color:#8E8BA0;">inspections · Due May 25</div></div>
+              <span class="badge badge-soft-amber">In Progress</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

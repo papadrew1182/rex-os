@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 import db
+from app.routes import all_routers
 
 load_dotenv()
 
@@ -30,32 +31,40 @@ async def lifespan(app: FastAPI):
     await db.close_pool()
 
 
-app = FastAPI(title="Rex OS", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Rex OS", version="0.2.0", lifespan=lifespan)
+
+
+# ── CORS ────────────────────────────────────────────────────────────────────
+#
+# ``REX_CORS_ORIGINS`` (env var, comma-separated):
+#   Allowed origins. Default in development: ``http://localhost:5173`` (Vite)
+#   plus ``http://localhost:3000``.
+#
+#   In production set this to the actual frontend domain(s):
+#     REX_CORS_ORIGINS=https://app.rexos.com,https://staging.rexos.com
+#
+#   The wildcard ``*`` is deliberately NOT the default so a misconfigured
+#   production deploy fails closed rather than open.
+
+_DEFAULT_DEV_ORIGINS = "http://localhost:5173,http://localhost:3000"
+_cors_raw = os.getenv("REX_CORS_ORIGINS", _DEFAULT_DEV_ORIGINS)
+CORS_ORIGINS: list[str] = [o.strip() for o in _cors_raw.split(",") if o.strip()]
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# ── Health ──────────────────────────────────────────────────────────────────
-
-@app.get("/api/health")
-async def health():
-    pool = await db.get_pool()
-    async with pool.acquire() as conn:
-        row = await conn.fetchrow("SELECT NOW() AS ts, current_schema() AS schema")
-    return {"status": "ok", "db_time": str(row["ts"]), "schema": row["schema"]}
+# Ops endpoints (/api/health, /api/ready) are mounted via app.routes.ops
 
 
 # ── Admin: run migrations ────────────────────────────────────────────────────
 
-MIGRATION_ORDER: list[str] = [
-    "001_create_schema.sql",
-]
+from app.migrate import apply_migrations
 
 
 @app.get("/api/admin/migrate")
@@ -64,36 +73,26 @@ async def run_migrations(secret: str = ""):
         from fastapi import HTTPException
         raise HTTPException(status_code=403, detail="Invalid secret")
 
-    import pathlib
-    migrations_dir = pathlib.Path(__file__).parent.parent / "migrations"
-    pool = await db.get_pool()
-    results = []
+    results = await apply_migrations()
+    return {"migrations": [r.to_dict() for r in results]}
 
-    for filename in MIGRATION_ORDER:
-        path = migrations_dir / filename
-        if not path.exists():
-            results.append({"file": filename, "status": "missing"})
-            continue
-        sql = path.read_text()
-        try:
-            async with pool.acquire() as conn:
-                await conn.execute(sql)
-            results.append({"file": filename, "status": "ok"})
-            log.info(f"Migration applied: {filename}")
-        except Exception as e:
-            results.append({"file": filename, "status": "error", "detail": str(e)})
-            log.error(f"Migration failed: {filename} — {e}")
 
-    return {"migrations": results}
+# ── Foundation routers ───────────────────────────────────────────────────────
+
+for router in all_routers:
+    app.include_router(router)
 
 
 # ── Serve frontend (must be last) ────────────────────────────────────────────
 
-if os.path.isdir(FRONTEND_DIST):
+FRONTEND_ASSETS = os.path.join(FRONTEND_DIST, "assets")
+FRONTEND_INDEX = os.path.join(FRONTEND_DIST, "index.html")
+
+if os.path.isdir(FRONTEND_ASSETS) and os.path.isfile(FRONTEND_INDEX):
     from fastapi.responses import FileResponse
 
-    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="assets")
+    app.mount("/assets", StaticFiles(directory=FRONTEND_ASSETS), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str):
-        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
+        return FileResponse(FRONTEND_INDEX)

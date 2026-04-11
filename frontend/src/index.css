@@ -1,9 +1,1 @@
-*, *::before, *::after {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: #fff;
-  color: #111;
-}
+@import './rex-theme.css';
