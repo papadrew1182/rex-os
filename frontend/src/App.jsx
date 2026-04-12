@@ -22,6 +22,11 @@ import Inspections from "./pages/Inspections";
 import Tasks from "./pages/Tasks";
 import Drawings from "./pages/Drawings";
 import Specifications from "./pages/Specifications";
+import Correspondence from "./pages/Correspondence";
+import Photos from "./pages/Photos";
+import Meetings from "./pages/Meetings";
+import Observations from "./pages/Observations";
+import SafetyIncidents from "./pages/SafetyIncidents";
 
 function SidebarItem({ to, children }) {
   const loc = useLocation();
@@ -54,9 +59,14 @@ function Shell() {
           <SidebarItem to="/daily-logs">Daily Logs</SidebarItem>
           <SidebarItem to="/inspections">Inspections</SidebarItem>
           <SidebarItem to="/tasks">Tasks</SidebarItem>
+          <SidebarItem to="/meetings">Meetings</SidebarItem>
+          <SidebarItem to="/observations">Observations</SidebarItem>
+          <SidebarItem to="/safety">Safety Incidents</SidebarItem>
           <div className="rex-sidebar-group">Document Management</div>
           <SidebarItem to="/drawings">Drawings</SidebarItem>
           <SidebarItem to="/specifications">Specifications</SidebarItem>
+          <SidebarItem to="/photos">Photos</SidebarItem>
+          <SidebarItem to="/correspondence">Correspondence</SidebarItem>
           <div className="rex-sidebar-group">Project</div>
           <SidebarItem to="/schedule">Schedule Health</SidebarItem>
           <SidebarItem to="/execution">Execution Health</SidebarItem>
@@ -100,6 +110,11 @@ function Shell() {
                 <Route path="/tasks" element={<Tasks />} />
                 <Route path="/drawings" element={<Drawings />} />
                 <Route path="/specifications" element={<Specifications />} />
+                <Route path="/correspondence" element={<Correspondence />} />
+                <Route path="/photos" element={<Photos />} />
+                <Route path="/meetings" element={<Meetings />} />
+                <Route path="/observations" element={<Observations />} />
+                <Route path="/safety" element={<SafetyIncidents />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
