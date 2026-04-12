@@ -17,6 +17,11 @@ import ChangeOrders from "./pages/ChangeOrders";
 import RfiManagement from "./pages/RfiManagement";
 import PunchList from "./pages/PunchList";
 import SubmittalManagement from "./pages/SubmittalManagement";
+import DailyLogs from "./pages/DailyLogs";
+import Inspections from "./pages/Inspections";
+import Tasks from "./pages/Tasks";
+import Drawings from "./pages/Drawings";
+import Specifications from "./pages/Specifications";
 
 function SidebarItem({ to, children }) {
   const loc = useLocation();
@@ -46,6 +51,12 @@ function Shell() {
           <SidebarItem to="/rfis">RFIs</SidebarItem>
           <SidebarItem to="/punch-list">Punch List</SidebarItem>
           <SidebarItem to="/submittals">Submittals</SidebarItem>
+          <SidebarItem to="/daily-logs">Daily Logs</SidebarItem>
+          <SidebarItem to="/inspections">Inspections</SidebarItem>
+          <SidebarItem to="/tasks">Tasks</SidebarItem>
+          <div className="rex-sidebar-group">Document Management</div>
+          <SidebarItem to="/drawings">Drawings</SidebarItem>
+          <SidebarItem to="/specifications">Specifications</SidebarItem>
           <div className="rex-sidebar-group">Project</div>
           <SidebarItem to="/schedule">Schedule Health</SidebarItem>
           <SidebarItem to="/execution">Execution Health</SidebarItem>
@@ -84,6 +95,11 @@ function Shell() {
                 <Route path="/rfis" element={<RfiManagement />} />
                 <Route path="/punch-list" element={<PunchList />} />
                 <Route path="/submittals" element={<SubmittalManagement />} />
+                <Route path="/daily-logs" element={<DailyLogs />} />
+                <Route path="/inspections" element={<Inspections />} />
+                <Route path="/tasks" element={<Tasks />} />
+                <Route path="/drawings" element={<Drawings />} />
+                <Route path="/specifications" element={<Specifications />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
