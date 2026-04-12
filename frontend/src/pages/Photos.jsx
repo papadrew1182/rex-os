@@ -1,9 +1,24 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import {
+  FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select,
+  cleanPayload,
+} from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
+
+const PHOTO_EDIT_DEFAULT = {
+  filename: "",
+  photo_album_id: null,
+  taken_at: null,
+  location: "",
+  description: "",
+  latitude: null,
+  longitude: null,
+};
 
 function fmtFileSize(bytes) {
   if (bytes == null) return "—";
@@ -14,15 +29,23 @@ function fmtFileSize(bytes) {
 
 export default function Photos() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [albumFilter, setAlbumFilter] = useState("");
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
+  // Edit-only drawer (no create — photo upload requires multipart)
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState(PHOTO_EDIT_DEFAULT);
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null);
     Promise.all([
       api(`/photos?project_id=${selectedId}&limit=500`),
       api(`/photo-albums?project_id=${selectedId}&limit=100`),
@@ -36,6 +59,12 @@ export default function Photos() {
       .catch((e) => setError(e.message));
   }, [selectedId]);
 
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null);
+    refresh();
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const photos = useMemo(() => {
     if (!data) return [];
     return Array.isArray(data.photos) ? data.photos : (data.photos?.items || data.photos?.photos || []);
@@ -43,6 +72,11 @@ export default function Photos() {
 
   const albums = useMemo(() => data?.albums || [], [data]);
   const albumMap = useMemo(() => data?.albumMap || {}, [data]);
+
+  const albumOptions = useMemo(
+    () => albums.map((a) => ({ value: a.id, label: a.name || a.id })),
+    [albums],
+  );
 
   const filtered = useMemo(() => {
     const q = search.toLowerCase();
@@ -67,6 +101,40 @@ export default function Photos() {
     }).length;
     return { total: photos.length, albumCount: albums.length, withLocation, recentUploads, tagged };
   }, [photos, albums]);
+
+  function openEditPhoto(row) {
+    setEditing(row);
+    form.setAll({
+      filename: row.filename,
+      photo_album_id: row.photo_album_id,
+      taken_at: row.taken_at,
+      location: row.location,
+      description: row.description,
+      latitude: row.latitude,
+      longitude: row.longitude,
+    });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      await api(`/photos/${editing.id}`, { method: "PATCH", body: payload });
+      setDrawerOpen(false);
+      // Update selected if it matches
+      if (selected?.id === editing.id) {
+        setSelected((prev) => ({ ...prev, ...payload }));
+      }
+      refresh();
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
@@ -159,7 +227,14 @@ export default function Photos() {
                 )}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" style={{ marginRight: 8 }} onClick={() => openEditPhoto(selected)}>
+                  Edit Metadata
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            </div>
           </div>
 
           {(selected.storage_url || selected.thumbnail_url) && (
@@ -211,6 +286,35 @@ export default function Photos() {
           )}
         </div>
       )}
+
+      {/* Photo metadata edit drawer (edit-only — no file upload in this sprint) */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Edit Photo Metadata"
+        subtitle={editing?.filename}
+        mode="edit"
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Filename" name="filename" value={form.values.filename} onChange={form.setField} required autoFocus />
+        <Select
+          label="Album"
+          name="photo_album_id"
+          value={form.values.photo_album_id}
+          onChange={form.setField}
+          options={albumOptions}
+          placeholder="No album"
+        />
+        <DateField label="Taken At" name="taken_at" value={form.values.taken_at} onChange={form.setField} />
+        <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
+        <TextArea label="Description" name="description" value={form.values.description} onChange={form.setField} />
+        <NumberField label="Latitude" name="latitude" value={form.values.latitude} onChange={form.setField} />
+        <NumberField label="Longitude" name="longitude" value={form.values.longitude} onChange={form.setField} />
+      </FormDrawer>
     </div>
   );
 }

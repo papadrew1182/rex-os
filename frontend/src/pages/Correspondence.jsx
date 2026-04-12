@@ -1,12 +1,46 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import {
+  FormDrawer, useFormState, Field, DateField, TextArea, Select,
+  WriteButton, cleanPayload,
+} from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
+const CORR_DEFAULT = {
+  correspondence_number: "",
+  subject: "",
+  correspondence_type: null,
+  status: "draft",
+  from_person_id: null,
+  to_person_id: null,
+  sent_date: null,
+  received_date: null,
+  body: "",
+};
+
+const CORR_TYPES = [
+  { value: "letter", label: "Letter" },
+  { value: "email", label: "Email" },
+  { value: "memo", label: "Memo" },
+  { value: "notice", label: "Notice" },
+  { value: "transmittal", label: "Transmittal" },
+];
+
+const STATUSES = [
+  { value: "draft", label: "Draft" },
+  { value: "sent", label: "Sent" },
+  { value: "received", label: "Received" },
+  { value: "closed", label: "Closed" },
+];
+
 export default function Correspondence() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -15,13 +49,35 @@ export default function Correspondence() {
   const [selected, setSelected] = useState(null);
   const [attachments, setAttachments] = useState(null);
 
+  // People for from/to selects
+  const [people, setPeople] = useState([]);
   useEffect(() => {
+    api(`/people?limit=500`).catch(() => []).then((p) => setPeople(Array.isArray(p) ? p : []));
+  }, []);
+  const peopleOptions = useMemo(
+    () => people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` })),
+    [people],
+  );
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState(CORR_DEFAULT);
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null); setAttachments(null);
     api(`/correspondence?project_id=${selectedId}&limit=200`)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null); setAttachments(null);
+    refresh();
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function handleRowClick(row) {
     if (selected?.id === row.id) { setSelected(null); setAttachments(null); return; }
@@ -30,6 +86,42 @@ export default function Correspondence() {
     api(`/attachments?source_type=correspondence&source_id=${row.id}`)
       .then(setAttachments)
       .catch(() => setAttachments([]));
+  }
+
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ ...CORR_DEFAULT });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/correspondence/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/correspondence/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   const items = useMemo(() => Array.isArray(data) ? data : (data?.items || data?.correspondence || []), [data]);
@@ -65,7 +157,10 @@ export default function Correspondence() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Correspondence Log</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Correspondence Log</h1>
+        <WriteButton onClick={openCreate}>+ New</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -154,7 +249,14 @@ export default function Correspondence() {
                 )}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setAttachments(null); }}>×</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" style={{ marginRight: 8 }} onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setAttachments(null); }}>×</button>
+            </div>
           </div>
 
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
@@ -218,6 +320,57 @@ export default function Correspondence() {
           </Card>
         </div>
       )}
+
+      {/* Correspondence create/edit drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Correspondence" : "Edit Correspondence"}
+        subtitle={drawerMode === "edit" ? editing?.correspondence_number : undefined}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Correspondence Number" name="correspondence_number" value={form.values.correspondence_number} onChange={form.setField} required autoFocus />
+        <Field label="Subject" name="subject" value={form.values.subject} onChange={form.setField} required />
+        <Select
+          label="Type"
+          name="correspondence_type"
+          value={form.values.correspondence_type}
+          onChange={form.setField}
+          options={CORR_TYPES}
+          required
+        />
+        <Select
+          label="Status"
+          name="status"
+          value={form.values.status}
+          onChange={form.setField}
+          options={STATUSES}
+        />
+        <Select
+          label="From Person"
+          name="from_person_id"
+          value={form.values.from_person_id}
+          onChange={form.setField}
+          options={peopleOptions}
+          placeholder="Select person…"
+        />
+        <Select
+          label="To Person"
+          name="to_person_id"
+          value={form.values.to_person_id}
+          onChange={form.setField}
+          options={peopleOptions}
+          placeholder="Select person…"
+        />
+        <DateField label="Sent Date" name="sent_date" value={form.values.sent_date} onChange={form.setField} />
+        <DateField label="Received Date" name="received_date" value={form.values.received_date} onChange={form.setField} />
+        <TextArea label="Body" name="body" value={form.values.body} onChange={form.setField} rows={5} />
+      </FormDrawer>
     </div>
   );
 }

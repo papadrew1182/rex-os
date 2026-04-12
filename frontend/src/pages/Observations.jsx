@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select, WriteButton, cleanPayload } from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -20,8 +22,14 @@ function isOpen(status) {
   return status === "open" || status === "in_progress";
 }
 
+const OBS_TYPES = ["safety", "quality", "housekeeping", "environmental", "commissioning"];
+const OBS_STATUSES = ["open", "in_progress", "closed"];
+const OBS_PRIORITIES = ["low", "medium", "high", "critical"];
+
 export default function Observations() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -30,14 +38,43 @@ export default function Observations() {
   const [priorityFilter, setPriorityFilter] = useState("");
   const [selected, setSelected] = useState(null);
   const [attachments, setAttachments] = useState(null);
+  const [people, setPeople] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
-  useEffect(() => {
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState({});
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null); setAttachments(null);
     api(`/observations?project_id=${selectedId}&limit=200`)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null); setAttachments(null);
+    refresh();
+  }, [selectedId, refresh]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    Promise.all([
+      api(`/people?limit=500`).catch(() => []),
+      api(`/companies?limit=500`).catch(() => []),
+    ]).then(([p, c]) => {
+      setPeople(Array.isArray(p) ? p : []);
+      setCompanies(Array.isArray(c) ? c : []);
+    });
+  }, [selectedId]);
+
+  const peopleOptions = useMemo(() => people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` })), [people]);
+  const companyOptions = useMemo(() => companies.map((c) => ({ value: c.id, label: c.name })), [companies]);
 
   function handleRowClick(row) {
     if (selected?.id === row.id) { setSelected(null); setAttachments(null); return; }
@@ -76,6 +113,43 @@ export default function Observations() {
     return { total: items.length, open: openItems.length, overdue, closed, highCritical };
   }, [items]);
 
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ status: "open", priority: "medium" });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/observations/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/observations/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+      setSelected(null);
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading observations..." />;
@@ -84,7 +158,10 @@ export default function Observations() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Observations</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Observations</h1>
+        <WriteButton onClick={openCreate}>+ New Observation</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -180,7 +257,14 @@ export default function Observations() {
                 )}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setAttachments(null); }}>×</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setAttachments(null); }}>×</button>
+            </div>
           </div>
 
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
@@ -254,6 +338,36 @@ export default function Observations() {
           </Card>
         </div>
       )}
+
+      {/* Observation Drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Observation" : "Edit Observation"}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <NumberField label="Observation Number" name="observation_number" value={form.values.observation_number} onChange={form.setField} step={1} required autoFocus />
+        <Field label="Title" name="title" value={form.values.title} onChange={form.setField} required />
+        <Select label="Observation Type" name="observation_type" value={form.values.observation_type} onChange={form.setField} options={OBS_TYPES} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Select label="Status" name="status" value={form.values.status} onChange={form.setField} options={OBS_STATUSES} />
+          <Select label="Priority" name="priority" value={form.values.priority} onChange={form.setField} options={OBS_PRIORITIES} />
+        </div>
+        <TextArea label="Description" name="description" value={form.values.description} onChange={form.setField} rows={3} required />
+        <TextArea label="Corrective Action" name="corrective_action" value={form.values.corrective_action} onChange={form.setField} rows={3} />
+        <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
+        <Select label="Assigned To" name="assigned_to" value={form.values.assigned_to} onChange={form.setField} options={peopleOptions} />
+        <Select label="Assigned Company" name="assigned_company_id" value={form.values.assigned_company_id} onChange={form.setField} options={companyOptions} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <DateField label="Due Date" name="due_date" value={form.values.due_date} onChange={form.setField} />
+          <DateField label="Closed Date" name="closed_date" value={form.values.closed_date} onChange={form.setField} />
+        </div>
+      </FormDrawer>
     </div>
   );
 }

@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select, WriteButton, cleanPayload } from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -13,8 +15,14 @@ function resultBadge(result) {
   return <span className="rex-badge rex-badge-gray">{result || "—"}</span>;
 }
 
+const INSP_TYPES = ["municipal", "quality", "safety", "pre_concrete", "framing", "mep_rough", "mep_final", "other"];
+const INSP_STATUSES = ["scheduled", "in_progress", "passed", "failed", "partial", "cancelled"];
+const ITEM_RESULTS = ["pass", "fail", "n_a", "not_inspected"];
+
 export default function Inspections() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -23,14 +31,57 @@ export default function Inspections() {
   const [selected, setSelected] = useState(null);
   const [inspSummary, setInspSummary] = useState(null);
   const [inspItems, setInspItems] = useState(null);
+  const [people, setPeople] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
-  useEffect(() => {
+  // Main drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState({});
+
+  // Child (inspection item) drawer state
+  const [childDrawerOpen, setChildDrawerOpen] = useState(false);
+  const [childMode, setChildMode] = useState("create");
+  const [childEditing, setChildEditing] = useState(null);
+  const [childSubmitting, setChildSubmitting] = useState(false);
+  const [childError, setChildError] = useState(null);
+  const childForm = useFormState({});
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null);
     api(`/inspections?project_id=${selectedId}&limit=200`)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null);
+    refresh();
+  }, [selectedId, refresh]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    Promise.all([
+      api(`/people?limit=500`).catch(() => []),
+      api(`/companies?limit=500`).catch(() => []),
+    ]).then(([p, c]) => {
+      setPeople(Array.isArray(p) ? p : []);
+      setCompanies(Array.isArray(c) ? c : []);
+    });
+  }, [selectedId]);
+
+  const peopleOptions = useMemo(() => people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` })), [people]);
+  const companyOptions = useMemo(() => companies.map((c) => ({ value: c.id, label: c.name })), [companies]);
+
+  function refreshItems(inspId) {
+    api(`/inspection-items?inspection_id=${inspId}&limit=100`)
+      .then(setInspItems)
+      .catch(() => setInspItems([]));
+  }
 
   function handleRowClick(row) {
     if (selected?.id === row.id) { setSelected(null); setInspSummary(null); setInspItems(null); return; }
@@ -68,6 +119,79 @@ export default function Inspections() {
     return { total: items.length, openScheduled, completed, failed, passRate };
   }, [items]);
 
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ status: "scheduled" });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/inspections/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/inspections/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+      setSelected(null);
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function openChildCreate(inspId) {
+    setChildMode("create");
+    setChildEditing(null);
+    childForm.setAll({ inspection_id: inspId, result: "not_inspected" });
+    setChildError(null);
+    setChildDrawerOpen(true);
+  }
+
+  function openChildEdit(item) {
+    setChildMode("edit");
+    setChildEditing(item);
+    childForm.setAll({ ...item });
+    setChildError(null);
+    setChildDrawerOpen(true);
+  }
+
+  async function onChildSubmit() {
+    setChildSubmitting(true);
+    setChildError(null);
+    try {
+      const payload = cleanPayload(childForm.values);
+      if (childMode === "create") {
+        await api("/inspection-items/", { method: "POST", body: payload });
+      } else {
+        const { inspection_id, ...updateOnly } = payload;
+        await api(`/inspection-items/${childEditing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setChildDrawerOpen(false);
+      if (selected) refreshItems(selected.id);
+    } catch (e) {
+      setChildError(e.message);
+    } finally {
+      setChildSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading inspections..." />;
@@ -76,7 +200,10 @@ export default function Inspections() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Inspections</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Inspections</h1>
+        <WriteButton onClick={openCreate}>+ New Inspection</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -151,7 +278,14 @@ export default function Inspections() {
                 {selected.inspection_type && <span className="rex-badge rex-badge-gray">{selected.inspection_type.replace(/_/g, " ")}</span>}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setInspSummary(null); setInspItems(null); }}>×</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setInspSummary(null); setInspItems(null); }}>×</button>
+            </div>
           </div>
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
             <Card title="Inspection Info">
@@ -202,8 +336,17 @@ export default function Inspections() {
               <p style={{ margin: 0, fontSize: 13, color: "var(--rex-text-muted)" }}>{selected.comments}</p>
             </Card>
           )}
-          {itemsList.length > 0 && (
-            <Card title="Inspection Items">
+          <Card title="Inspection Items">
+            {canWrite && (
+              <div style={{ marginBottom: 8 }}>
+                <WriteButton onClick={() => openChildCreate(selected.id)} variant="outline">+ Add Item</WriteButton>
+              </div>
+            )}
+            {inspItems === null ? (
+              <p className="rex-muted" style={{ margin: 0, fontSize: 12 }}>Loading…</p>
+            ) : itemsList.length === 0 ? (
+              <p className="rex-muted" style={{ margin: 0, fontSize: 12 }}>No inspection items.</p>
+            ) : (
               <div className="rex-table-wrap" style={{ marginTop: 8 }}>
                 <table className="rex-table">
                   <thead>
@@ -212,6 +355,7 @@ export default function Inspections() {
                       <th>Description</th>
                       <th>Result</th>
                       <th>Comments</th>
+                      {canWrite && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -221,15 +365,67 @@ export default function Inspections() {
                         <td>{item.description || "—"}</td>
                         <td>{resultBadge(item.result)}</td>
                         <td>{item.comments || "—"}</td>
+                        {canWrite && (
+                          <td>
+                            <button className="rex-btn rex-btn-outline" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => openChildEdit(item)}>
+                              Edit
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
                 </table>
               </div>
-            </Card>
-          )}
+            )}
+          </Card>
         </div>
       )}
+
+      {/* Main Inspection Drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Inspection" : "Edit Inspection"}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Inspection Number" name="inspection_number" value={form.values.inspection_number} onChange={form.setField} required autoFocus />
+        <Field label="Title" name="title" value={form.values.title} onChange={form.setField} required />
+        <Select label="Inspection Type" name="inspection_type" value={form.values.inspection_type} onChange={form.setField} options={INSP_TYPES} required />
+        <Select label="Status" name="status" value={form.values.status} onChange={form.setField} options={INSP_STATUSES} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <DateField label="Scheduled Date" name="scheduled_date" value={form.values.scheduled_date} onChange={form.setField} required />
+          <DateField label="Completed Date" name="completed_date" value={form.values.completed_date} onChange={form.setField} />
+        </div>
+        <Field label="Inspector Name" name="inspector_name" value={form.values.inspector_name} onChange={form.setField} />
+        <Select label="Inspecting Company" name="inspecting_company_id" value={form.values.inspecting_company_id} onChange={form.setField} options={companyOptions} />
+        <Select label="Responsible Person" name="responsible_person_id" value={form.values.responsible_person_id} onChange={form.setField} options={peopleOptions} />
+        <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
+        <TextArea label="Comments" name="comments" value={form.values.comments} onChange={form.setField} />
+      </FormDrawer>
+
+      {/* Child Inspection Item Drawer */}
+      <FormDrawer
+        open={childDrawerOpen}
+        onClose={() => setChildDrawerOpen(false)}
+        title={childMode === "create" ? "Add Inspection Item" : "Edit Inspection Item"}
+        mode={childMode}
+        onSubmit={onChildSubmit}
+        onReset={childForm.reset}
+        dirty={childForm.dirty}
+        submitting={childSubmitting}
+        error={childError}
+      >
+        <NumberField label="Item Number" name="item_number" value={childForm.values.item_number} onChange={childForm.setField} step={1} required />
+        <Field label="Description" name="description" value={childForm.values.description} onChange={childForm.setField} required />
+        <Select label="Result" name="result" value={childForm.values.result} onChange={childForm.setField} options={ITEM_RESULTS} required />
+        <TextArea label="Comments" name="comments" value={childForm.values.comments} onChange={childForm.setField} />
+      </FormDrawer>
     </div>
   );
 }

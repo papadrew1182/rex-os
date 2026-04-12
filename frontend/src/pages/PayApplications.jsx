@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { FormDrawer, useFormState, Field, NumberField, DateField, Select, WriteButton, cleanPayload } from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmt = (n) => n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
@@ -14,10 +16,38 @@ export default function PayApplications() {
   const [statusFilter, setStatusFilter] = useState("");
   const [selected, setSelected] = useState(null);
 
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const [commitments, setCommitments] = useState([]);
+  const [billingPeriods, setBillingPeriods] = useState([]);
+
+  const form = useFormState({});
+  const { canWrite } = usePermissions();
+
+  const refresh = useCallback(() => {
+    if (!selectedId) return;
+    api(`/projects/${selectedId}/pay-app-summary`).then(setData).catch((e) => setError(e.message));
+  }, [selectedId]);
+
   useEffect(() => {
     if (!selectedId) return;
     setData(null); setError(null); setSelected(null);
     api(`/projects/${selectedId}/pay-app-summary`).then(setData).catch((e) => setError(e.message));
+  }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    Promise.all([
+      api(`/commitments?project_id=${selectedId}&limit=200`),
+      api(`/billing-periods?project_id=${selectedId}&limit=100`),
+    ]).then(([c, b]) => {
+      setCommitments(Array.isArray(c) ? c : []);
+      setBillingPeriods(Array.isArray(b) ? b : []);
+    }).catch(() => {});
   }, [selectedId]);
 
   const filtered = useMemo(() => {
@@ -35,6 +65,66 @@ export default function PayApplications() {
     return [...new Set(data.pay_apps.map((r) => r.status).filter(Boolean))];
   }, [data]);
 
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({
+      pay_app_number: "",
+      status: "draft",
+      period_start: null,
+      period_end: null,
+      this_period_amount: 0,
+      total_completed: 0,
+      retention_held: 0,
+      retention_released: 0,
+      net_payment_due: 0,
+      commitment_id: "",
+      billing_period_id: "",
+    });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({
+      pay_app_number: row.pay_app_number ?? row.number,
+      status: row.status,
+      period_start: row.period_start,
+      period_end: row.period_end,
+      this_period_amount: row.this_period_amount,
+      total_completed: row.total_completed_amount ?? row.total_completed,
+      retention_held: row.retention_amount ?? row.retention_held,
+      retention_released: row.retention_released,
+      net_payment_due: row.net_due ?? row.net_payment_due,
+      commitment_id: row.commitment_id,
+      billing_period_id: row.billing_period_id,
+    });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/payment-applications/", { method: "POST", body: payload });
+      } else {
+        const { commitment_id, billing_period_id, pay_app_number, ...updateOnly } = payload;
+        await api(`/payment-applications/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading pay applications..." />;
@@ -43,7 +133,10 @@ export default function PayApplications() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Pay Applications</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Pay Applications</h1>
+        <WriteButton onClick={openCreate}>+ New Pay App</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -111,7 +204,10 @@ export default function PayApplications() {
               <div className="rex-h3">Pay App #{selected.number} — {selected.vendor_name}</div>
               <div style={{ marginTop: 4 }}><Badge status={selected.status} /></div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {canWrite && <button className="rex-btn rex-btn-outline" onClick={() => openEdit(selected)}>Edit</button>}
+              <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            </div>
           </div>
           <div className="rex-grid-2">
             <Card title="Payment Details">
@@ -142,6 +238,42 @@ export default function PayApplications() {
           )}
         </div>
       )}
+
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Pay Application" : `Edit Pay App #${form.values.pay_app_number || ""}`}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+        mode={drawerMode}
+      >
+        <div className="rex-form-row">
+          <Field label="Pay App Number" name="pay_app_number" value={form.values.pay_app_number} onChange={form.setField} required />
+          <Select label="Status" name="status" value={form.values.status} onChange={form.setField} required options={["draft","submitted","under_review","approved","paid","rejected"]} />
+        </div>
+        {drawerMode === "create" && (
+          <div className="rex-form-row">
+            <Select label="Commitment" name="commitment_id" value={form.values.commitment_id} onChange={form.setField} required options={commitments.map(c => ({ value: c.id, label: `${c.commitment_number || c.number} — ${c.title}` }))} />
+            <Select label="Billing Period" name="billing_period_id" value={form.values.billing_period_id} onChange={form.setField} required options={billingPeriods.map(b => ({ value: b.id, label: `Period ${b.period_number} (${b.start_date} → ${b.end_date})` }))} />
+          </div>
+        )}
+        <div className="rex-form-row">
+          <DateField label="Period Start" name="period_start" value={form.values.period_start} onChange={form.setField} required />
+          <DateField label="Period End" name="period_end" value={form.values.period_end} onChange={form.setField} required />
+        </div>
+        <div className="rex-form-row">
+          <NumberField label="This Period Amount" name="this_period_amount" value={form.values.this_period_amount} onChange={form.setField} />
+          <NumberField label="Total Completed" name="total_completed" value={form.values.total_completed} onChange={form.setField} />
+        </div>
+        <div className="rex-form-row">
+          <NumberField label="Retention Held" name="retention_held" value={form.values.retention_held} onChange={form.setField} />
+          <NumberField label="Retention Released" name="retention_released" value={form.values.retention_released} onChange={form.setField} />
+        </div>
+        <NumberField label="Net Payment Due" name="net_payment_due" value={form.values.net_payment_due} onChange={form.setField} />
+      </FormDrawer>
     </div>
   );
 }

@@ -1,25 +1,89 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import {
+  FormDrawer, useFormState, Field, NumberField, DateField,
+  WriteButton, cleanPayload,
+} from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
+const SPEC_DEFAULT = {
+  section_number: "",
+  title: "",
+  division: "",
+  current_revision: 0,
+  revision_date: null,
+  attachment_id: "",
+};
+
 export default function Specifications() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
   const [divisionFilter, setDivisionFilter] = useState("");
   const [selected, setSelected] = useState(null);
 
-  useEffect(() => {
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState(SPEC_DEFAULT);
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null);
     api(`/specifications?project_id=${selectedId}&limit=500`)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null);
+    refresh();
+  }, [selectedId]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ ...SPEC_DEFAULT });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/specifications/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/specifications/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   const items = useMemo(() => Array.isArray(data) ? data : (data?.items || data?.specifications || []), [data]);
 
@@ -49,7 +113,10 @@ export default function Specifications() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Specifications</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Specifications</h1>
+        <WriteButton onClick={openCreate}>+ New Spec</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-4" style={{ marginBottom: 24 }}>
@@ -119,7 +186,14 @@ export default function Specifications() {
                 {selected.attachment_id && <span className="rex-badge rex-badge-green">FILE</span>}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            <div style={{ display: "flex", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" style={{ marginRight: 8 }} onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            </div>
           </div>
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
             <Card title="Section Info">
@@ -141,6 +215,27 @@ export default function Specifications() {
           </div>
         </div>
       )}
+
+      {/* Spec create/edit drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Specification" : "Edit Specification"}
+        subtitle={drawerMode === "edit" ? editing?.section_number : undefined}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Section Number" name="section_number" value={form.values.section_number} onChange={form.setField} required autoFocus />
+        <Field label="Title" name="title" value={form.values.title} onChange={form.setField} required />
+        <Field label="Division" name="division" value={form.values.division} onChange={form.setField} required />
+        <NumberField label="Current Revision" name="current_revision" value={form.values.current_revision} onChange={form.setField} step={1} />
+        <DateField label="Revision Date" name="revision_date" value={form.values.revision_date} onChange={form.setField} />
+        <Field label="Attachment ID (UUID)" name="attachment_id" value={form.values.attachment_id} onChange={form.setField} placeholder="Optional UUID" />
+      </FormDrawer>
     </div>
   );
 }

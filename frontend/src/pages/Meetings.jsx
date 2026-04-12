@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { FormDrawer, useFormState, Field, NumberField, DateField, TimeField, TextArea, Select, WriteButton, cleanPayload } from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -13,8 +15,33 @@ function isUpcoming(dateStr) {
   return new Date(dateStr + "T00:00:00") >= today;
 }
 
+const ACTION_STATUSES = ["open", "complete", "void"];
+
+const MEETING_DEFAULT = {
+  title: "",
+  meeting_type: "",
+  meeting_date: null,
+  start_time: null,
+  end_time: null,
+  location: "",
+  agenda: "",
+  minutes: "",
+  packet_url: "",
+};
+
+const ACTION_ITEM_DEFAULT = {
+  meeting_id: null,
+  item_number: null,
+  description: "",
+  assigned_to: null,
+  due_date: null,
+  status: "open",
+};
+
 export default function Meetings() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -22,10 +49,26 @@ export default function Meetings() {
   const [timeFilter, setTimeFilter] = useState("all");
   const [selected, setSelected] = useState(null);
   const [actionItems, setActionItems] = useState(null);
+  const [people, setPeople] = useState([]);
 
-  useEffect(() => {
+  // Main drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState(MEETING_DEFAULT);
+
+  // Child (action item) drawer state
+  const [childDrawerOpen, setChildDrawerOpen] = useState(false);
+  const [childMode, setChildMode] = useState("create");
+  const [childEditing, setChildEditing] = useState(null);
+  const [childSubmitting, setChildSubmitting] = useState(false);
+  const [childError, setChildError] = useState(null);
+  const childForm = useFormState(ACTION_ITEM_DEFAULT);
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null); setActionItems(null);
     Promise.all([
       api(`/meetings?project_id=${selectedId}&limit=200`),
       api(`/meeting-action-items?status=open&limit=500`),
@@ -33,6 +76,25 @@ export default function Meetings() {
       .then(([m, a]) => setData({ meetings: m, openActions: a }))
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null); setActionItems(null);
+    refresh();
+  }, [selectedId, refresh]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    api(`/people?limit=500`).catch(() => []).then((p) => setPeople(Array.isArray(p) ? p : []));
+  }, [selectedId]);
+
+  const peopleOptions = useMemo(() => people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` })), [people]);
+
+  function refreshActionItems(meetingId) {
+    api(`/meeting-action-items?meeting_id=${meetingId}&limit=100`)
+      .then(setActionItems)
+      .catch(() => setActionItems([]));
+  }
 
   function handleRowClick(row) {
     if (selected?.id === row.id) { setSelected(null); setActionItems(null); return; }
@@ -77,6 +139,79 @@ export default function Meetings() {
     return { total: meetings.length, upcoming, past, withPackets };
   }, [meetings]);
 
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ ...MEETING_DEFAULT });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/meetings/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/meetings/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+      setSelected(null);
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function openChildCreate(meetingId) {
+    setChildMode("create");
+    setChildEditing(null);
+    childForm.setAll({ meeting_id: meetingId, status: "open" });
+    setChildError(null);
+    setChildDrawerOpen(true);
+  }
+
+  function openChildEdit(item) {
+    setChildMode("edit");
+    setChildEditing(item);
+    childForm.setAll({ ...item });
+    setChildError(null);
+    setChildDrawerOpen(true);
+  }
+
+  async function onChildSubmit() {
+    setChildSubmitting(true);
+    setChildError(null);
+    try {
+      const payload = cleanPayload(childForm.values);
+      if (childMode === "create") {
+        await api("/meeting-action-items/", { method: "POST", body: payload });
+      } else {
+        const { meeting_id, ...updateOnly } = payload;
+        await api(`/meeting-action-items/${childEditing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setChildDrawerOpen(false);
+      if (selected) refreshActionItems(selected.id);
+    } catch (e) {
+      setChildError(e.message);
+    } finally {
+      setChildSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading meetings..." />;
@@ -90,7 +225,10 @@ export default function Meetings() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Meetings</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Meetings</h1>
+        <WriteButton onClick={openCreate}>+ New Meeting</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -184,7 +322,14 @@ export default function Meetings() {
                 )}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setActionItems(null); }}>×</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => { setSelected(null); setActionItems(null); }}>×</button>
+            </div>
           </div>
 
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
@@ -233,6 +378,11 @@ export default function Meetings() {
           )}
 
           <Card title="Action Items">
+            {canWrite && (
+              <div style={{ marginBottom: 8 }}>
+                <WriteButton onClick={() => openChildCreate(selected.id)} variant="outline">+ Add Action Item</WriteButton>
+              </div>
+            )}
             {actionItems === null ? (
               <p className="rex-muted" style={{ margin: 0, fontSize: 12 }}>Loading action items…</p>
             ) : aiList.length === 0 ? (
@@ -248,6 +398,7 @@ export default function Meetings() {
                       <th>Due Date</th>
                       <th>Status</th>
                       <th>Linked Task</th>
+                      {canWrite && <th></th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -267,6 +418,13 @@ export default function Meetings() {
                             ? <span style={{ fontFamily: "monospace", fontSize: 11 }}>{ai.task_id.slice(0, 8)}…</span>
                             : "—"}
                         </td>
+                        {canWrite && (
+                          <td>
+                            <button className="rex-btn rex-btn-outline" style={{ padding: "2px 8px", fontSize: 11 }} onClick={() => openChildEdit(ai)}>
+                              Edit
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -276,6 +434,50 @@ export default function Meetings() {
           </Card>
         </div>
       )}
+
+      {/* Main Meeting Drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Meeting" : "Edit Meeting"}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Title" name="title" value={form.values.title} onChange={form.setField} required autoFocus />
+        <Field label="Meeting Type" name="meeting_type" value={form.values.meeting_type} onChange={form.setField} required placeholder="e.g. OAC, Safety, Kickoff" />
+        <DateField label="Meeting Date" name="meeting_date" value={form.values.meeting_date} onChange={form.setField} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <TimeField label="Start Time" name="start_time" value={form.values.start_time} onChange={form.setField} />
+          <TimeField label="End Time" name="end_time" value={form.values.end_time} onChange={form.setField} />
+        </div>
+        <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
+        <TextArea label="Agenda" name="agenda" value={form.values.agenda} onChange={form.setField} rows={4} />
+        <TextArea label="Minutes" name="minutes" value={form.values.minutes} onChange={form.setField} rows={4} />
+        <Field label="Packet URL" name="packet_url" value={form.values.packet_url} onChange={form.setField} placeholder="https://..." />
+      </FormDrawer>
+
+      {/* Child Action Item Drawer */}
+      <FormDrawer
+        open={childDrawerOpen}
+        onClose={() => setChildDrawerOpen(false)}
+        title={childMode === "create" ? "Add Action Item" : "Edit Action Item"}
+        mode={childMode}
+        onSubmit={onChildSubmit}
+        onReset={childForm.reset}
+        dirty={childForm.dirty}
+        submitting={childSubmitting}
+        error={childError}
+      >
+        <NumberField label="Item Number" name="item_number" value={childForm.values.item_number} onChange={childForm.setField} step={1} required />
+        <TextArea label="Description" name="description" value={childForm.values.description} onChange={childForm.setField} rows={2} required />
+        <Select label="Assigned To" name="assigned_to" value={childForm.values.assigned_to} onChange={childForm.setField} options={peopleOptions} />
+        <DateField label="Due Date" name="due_date" value={childForm.values.due_date} onChange={childForm.setField} />
+        <Select label="Status" name="status" value={childForm.values.status} onChange={childForm.setField} options={ACTION_STATUSES} />
+      </FormDrawer>
     </div>
   );
 }

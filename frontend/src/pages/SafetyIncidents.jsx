@@ -1,7 +1,9 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { FormDrawer, useFormState, Field, NumberField, DateField, TimeField, TextArea, Select, Checkbox, WriteButton, cleanPayload } from "../forms";
+import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -13,8 +15,14 @@ function severityBadge(s) {
   return s ? <span className="rex-badge rex-badge-gray">{s}</span> : "—";
 }
 
+const INCIDENT_TYPES = ["near_miss", "first_aid", "recordable", "lost_time", "property_damage", "environmental"];
+const SEVERITIES = ["minor", "moderate", "serious", "critical"];
+const STATUSES = ["open", "under_investigation", "corrective_action", "closed"];
+
 export default function SafetyIncidents() {
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
+
   const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [search, setSearch] = useState("");
@@ -23,14 +31,43 @@ export default function SafetyIncidents() {
   const [statusFilter, setStatusFilter] = useState("");
   const [oshaOnly, setOshaOnly] = useState(false);
   const [selected, setSelected] = useState(null);
+  const [people, setPeople] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
-  useEffect(() => {
+  // Drawer state
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [drawerMode, setDrawerMode] = useState("create");
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState({});
+
+  const refresh = useCallback(() => {
     if (!selectedId) return;
-    setData(null); setError(null); setSelected(null);
     api(`/safety-incidents?project_id=${selectedId}&limit=200`)
       .then(setData)
       .catch((e) => setError(e.message));
   }, [selectedId]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    setData(null); setError(null); setSelected(null);
+    refresh();
+  }, [selectedId, refresh]);
+
+  useEffect(() => {
+    if (!selectedId) return;
+    Promise.all([
+      api(`/people?limit=500`).catch(() => []),
+      api(`/companies?limit=500`).catch(() => []),
+    ]).then(([p, c]) => {
+      setPeople(Array.isArray(p) ? p : []);
+      setCompanies(Array.isArray(c) ? c : []);
+    });
+  }, [selectedId]);
+
+  const peopleOptions = useMemo(() => people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` })), [people]);
+  const companyOptions = useMemo(() => companies.map((c) => ({ value: c.id, label: c.name })), [companies]);
 
   const items = useMemo(() => Array.isArray(data) ? data : (data?.items || data?.safety_incidents || []), [data]);
 
@@ -61,13 +98,53 @@ export default function SafetyIncidents() {
     return { total: items.length, openItems, oshaRecordable, severeCritical, lostTimeDays };
   }, [items]);
 
+  function openCreate() {
+    setDrawerMode("create");
+    setEditing(null);
+    form.setAll({ status: "open", severity: "minor", is_osha_recordable: false });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  function openEdit(row) {
+    setDrawerMode("edit");
+    setEditing(row);
+    form.setAll({ ...row });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmit() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      if (drawerMode === "create") {
+        await api("/safety-incidents/", { method: "POST", body: { ...payload, project_id: selectedId } });
+      } else {
+        const { project_id, ...updateOnly } = payload;
+        await api(`/safety-incidents/${editing.id}`, { method: "PATCH", body: updateOnly });
+      }
+      setDrawerOpen(false);
+      refresh();
+      setSelected(null);
+    } catch (e) {
+      setSubmitError(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading safety incidents..." />;
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Safety Incidents</h1>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
+        <h1 className="rex-h1">Safety Incidents</h1>
+        <WriteButton onClick={openCreate}>+ New Incident</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -175,7 +252,14 @@ export default function SafetyIncidents() {
                 {selected.is_osha_recordable && <span className="rex-badge rex-badge-red">OSHA RECORDABLE</span>}
               </div>
             </div>
-            <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              {canWrite && (
+                <button className="rex-btn rex-btn-outline" onClick={() => openEdit(selected)}>
+                  Edit
+                </button>
+              )}
+              <button className="rex-detail-panel-close" onClick={() => setSelected(null)}>×</button>
+            </div>
           </div>
 
           <div className="rex-grid-3" style={{ marginBottom: 14 }}>
@@ -235,6 +319,50 @@ export default function SafetyIncidents() {
           )}
         </div>
       )}
+
+      {/* Safety Incident Drawer */}
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title={drawerMode === "create" ? "New Safety Incident" : "Edit Safety Incident"}
+        mode={drawerMode}
+        onSubmit={onSubmit}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+        width={560}
+      >
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Field label="Incident Number" name="incident_number" value={form.values.incident_number} onChange={form.setField} required autoFocus />
+          <DateField label="Incident Date" name="incident_date" value={form.values.incident_date} onChange={form.setField} required />
+        </div>
+        <Field label="Title" name="title" value={form.values.title} onChange={form.setField} required />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <TimeField label="Incident Time" name="incident_time" value={form.values.incident_time} onChange={form.setField} />
+          <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+          <Select label="Incident Type" name="incident_type" value={form.values.incident_type} onChange={form.setField} options={INCIDENT_TYPES} required />
+          <Select label="Severity" name="severity" value={form.values.severity} onChange={form.setField} options={SEVERITIES} required />
+        </div>
+        <Select label="Status" name="status" value={form.values.status} onChange={form.setField} options={STATUSES} />
+        <TextArea label="Description" name="description" value={form.values.description} onChange={form.setField} rows={3} required />
+        <TextArea label="Root Cause" name="root_cause" value={form.values.root_cause} onChange={form.setField} rows={2} />
+        <TextArea label="Corrective Action" name="corrective_action" value={form.values.corrective_action} onChange={form.setField} rows={2} />
+        <Select label="Reported By" name="reported_by" value={form.values.reported_by} onChange={form.setField} options={peopleOptions} />
+        <Select label="Affected Person" name="affected_person_id" value={form.values.affected_person_id} onChange={form.setField} options={peopleOptions} />
+        <Select label="Affected Company" name="affected_company_id" value={form.values.affected_company_id} onChange={form.setField} options={companyOptions} />
+        <NumberField label="Lost Time Days" name="lost_time_days" value={form.values.lost_time_days} onChange={form.setField} step={1} />
+        <div>
+          <Checkbox label="OSHA Recordable" name="is_osha_recordable" value={form.values.is_osha_recordable} onChange={form.setField} />
+          {form.values.is_osha_recordable && (
+            <p style={{ margin: "4px 0 0 24px", fontSize: 12, color: "var(--rex-red)", fontWeight: 600 }}>
+              OSHA Recordable — this incident will appear on OSHA 300 log
+            </p>
+          )}
+        </div>
+      </FormDrawer>
     </div>
   );
 }
