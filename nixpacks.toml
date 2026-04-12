@@ -10,6 +10,11 @@
 
 [phases.setup]
 nixPkgs = ["python312", "gcc"]
+# greenlet (a SQLAlchemy async dependency) is loaded as a C extension that
+# dynamically links libstdc++.so.6 at runtime. Nix-managed Python doesn't
+# bundle it, so we add stdenv.cc.cc.lib at runtime via LD_LIBRARY_PATH
+# in the start command.
+aptPkgs = ["libstdc++6"]
 
 [phases.install]
 cmds = ["cd backend && python -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt"]
