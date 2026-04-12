@@ -19,12 +19,12 @@
 
 -- ════════════════════════════════════════════════════════════
 -- 0. DEFENSIVE CONSTRAINT BACKFILL
--- The Railway Postgres has a leftover connector_mappings table from a
--- previous deploy whose uq_connector_mapping constraint is on the
--- wrong columns (rex_table, rex_id, connector). The canonical schema
--- expects (rex_table, connector, external_id). Drop the wrong one and
--- create the right one before the INSERT ... ON CONFLICT runs.
--- All steps are idempotent and safe on a fresh DB too.
+-- The Railway Postgres has a leftover connector_mappings from an
+-- older schema whose uq_connector_mapping is a standalone UNIQUE
+-- INDEX on (rex_table, rex_id, connector). The canonical schema
+-- expects a UNIQUE CONSTRAINT on (rex_table, connector, external_id).
+-- Drop the wrong index, then add the right constraint. Idempotent
+-- and safe on fresh DBs.
 -- ════════════════════════════════════════════════════════════
 
 DO $$
@@ -42,7 +42,7 @@ BEGIN
     ) INTO has_correct_unique;
 
     IF NOT has_correct_unique THEN
-        -- Drop the misnamed/miscolumned constraint if present
+        -- Drop the wrong-columned constraint if it's a constraint
         IF EXISTS (
             SELECT 1 FROM pg_constraint
             WHERE conname = 'uq_connector_mapping'
@@ -51,7 +51,10 @@ BEGIN
             ALTER TABLE rex.connector_mappings DROP CONSTRAINT uq_connector_mapping;
         END IF;
 
-        -- Create the correct unique constraint (idempotent on fresh DBs too)
+        -- Drop the wrong-columned standalone index if it's just an index
+        DROP INDEX IF EXISTS rex.uq_connector_mapping;
+
+        -- Now create the correct unique constraint
         BEGIN
             ALTER TABLE rex.connector_mappings
                 ADD CONSTRAINT uq_connector_mapping
