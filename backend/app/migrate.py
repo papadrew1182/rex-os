@@ -44,7 +44,39 @@ MIGRATION_ORDER: list[str] = [
     "004_phase31_jobs_notifications.sql",
 ]
 
-MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "migrations"
+def _find_migrations_dir() -> Path:
+    """Locate the migrations directory robustly across local + container layouts.
+
+    Tries (in order):
+      1. ``REX_MIGRATIONS_DIR`` env var (explicit override for prod)
+      2. <repo-root>/migrations (computed from this file's location)
+      3. <cwd>/migrations  (when uvicorn is started from backend/)
+      4. <cwd>/../migrations  (when uvicorn is started from backend/)
+      5. /migrations  (if Nixpacks puts repo contents at /)
+      6. /app/migrations  (if Nixpacks puts repo at /app/)
+
+    Returns the first existing directory; falls back to (2) so missing-file
+    warnings still log a stable path.
+    """
+    import os
+    env = os.getenv("REX_MIGRATIONS_DIR")
+    if env:
+        return Path(env)
+
+    candidates: list[Path] = [
+        Path(__file__).resolve().parent.parent.parent / "migrations",
+        Path.cwd() / "migrations",
+        Path.cwd().parent / "migrations",
+        Path("/migrations"),
+        Path("/app/migrations"),
+    ]
+    for p in candidates:
+        if p.is_dir():
+            return p
+    return candidates[0]
+
+
+MIGRATIONS_DIR = _find_migrations_dir()
 
 log = logging.getLogger("rex.migrate")
 
