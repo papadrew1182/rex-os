@@ -4,15 +4,15 @@
 # This file tells Nixpacks how to install Python deps and start the
 # FastAPI app from the right location.
 #
-# We install deps into the system Python (not a venv) so uvicorn lands
-# on the system PATH. The start command in railway.json is the source
-# of truth for how the app actually launches.
+# We use a venv at backend/.venv because Nix-managed Python doesn't
+# ship with pip. python -m venv bootstraps pip automatically.
+# railway.json's startCommand must use the same .venv/bin/uvicorn path.
 
 [phases.setup]
 nixPkgs = ["python312", "gcc"]
 
 [phases.install]
-cmds = ["python -m pip install --upgrade pip && pip install -r backend/requirements.txt"]
+cmds = ["cd backend && python -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt"]
 
 [start]
-cmd = "cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT"
+cmd = "cd backend && .venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT"
