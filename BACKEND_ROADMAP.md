@@ -4,6 +4,20 @@ Single source of truth for backend planning. Reflects actual implemented state.
 
 ---
 
+## POST-SPRINT UPDATE — 2026-04-12 (Phases 31-35)
+
+- **Background job runner foundation** — apscheduler-based runner with DB-backed `rex.job_runs` table, in-process `_RUNNING_JOBS` guard, advisory-lock-safe single-instance scheduling, `run_job_now()` helper callable from both scheduler and HTTP handlers
+- **5 jobs registered**: `warranty_refresh` (daily 06:00 UTC), `insurance_refresh` (daily 06:15 UTC), `schedule_snapshot` (daily 06:30 UTC), `aging_alerts` (daily 06:45 UTC), `session_purge` (every 2 hours). All enabled by default; scheduler boot gated by `REX_ENABLE_SCHEDULER`.
+- **Generic notification table + 5 user-facing endpoints** — `rex.notifications` with dedupe partial unique index; endpoints: `GET /api/notifications/`, `GET /api/notifications/unread-count`, `PATCH /api/notifications/{id}/read`, `PATCH /api/notifications/{id}/dismiss`, `PATCH /api/notifications/read-all`
+- **Admin Operations page** — `GET /api/admin/jobs` (list with last-run), `POST /api/admin/jobs/{key}/run` (manual trigger), `GET /api/admin/job-runs` (history); admin/VP-only via `require_admin_or_vp`
+- **Email transport abstraction** — 3 implementations (noop/log/smtp) selected via `REX_EMAIL_TRANSPORT`; SMTP errors caught and logged, never crash the app
+- **Topbar notification bell** + full **Notifications page** — bell polls every 60 s, slide-in drawer with per-item mark-read/dismiss/deep-link, "View all" navigates to `/notifications` page
+- **All 547 backend tests passing**, 78-module frontend bundle (494 KB)
+
+---
+
+---
+
 ## 1) Current backend status
 
 | Domain | Tables | CRUD baseline | Workflow layer |

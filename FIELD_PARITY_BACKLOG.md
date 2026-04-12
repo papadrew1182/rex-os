@@ -5,6 +5,20 @@
 
 ---
 
+## STATUS UPDATE — 2026-04-12 (Phase 35)
+
+### P2-8 CLOSED ✅
+- **P2-8 generic alert/notification infrastructure** — closed by phases 32+33+34.
+  - `rex.notifications` table with dedupe partial unique index ships in migration 004.
+  - `upsert_notification` / `resolve_notifications_by_dedupe_prefix` services handle fan-out and stale-alert resolution.
+  - 5 user-facing API endpoints + admin job-trigger endpoints.
+  - Topbar bell (60 s poll) + full Notifications page.
+  - Domain-specific alert tables like `warranty_alerts` are preserved as the canonical source; `rex.notifications` is the delivery/inbox layer.
+
+All remaining P2 items (P2-1 through P2-7, P2-9) are unchanged.
+
+---
+
 ## STATUS UPDATE — 2026-04-12 (Phase 25)
 
 ### P0 Items: 0 open (none ever opened)
@@ -46,9 +60,10 @@ The following items from the original April 11 audit have been **closed**:
 - Procore datagrid_uuid / datagrid_created_at fields
 
 ### Sprint progress summary
-- **25 phases completed** (1 audit + 24 build phases)
-- **3 migrations applied** (001 base + 002 phase 4-5 batch + 003 phase 21 batch)
+- **35 phases completed** (1 audit + 34 build phases)
+- **4 migrations applied** (001 base + 002 phase 4-5 batch + 003 phase 21 batch + 004 phase 31-35 jobs+notifications)
 - **All P0 + P1 audited gaps closed**
+- **P2-8 also closed** (generic notification/alert infrastructure shipped in phases 32-34)
 - **No mock data anywhere** — every screen reads/writes real backend
 
 ---

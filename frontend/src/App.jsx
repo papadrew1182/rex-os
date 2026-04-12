@@ -1,6 +1,7 @@
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { ProjectProvider, useProject } from "./project";
+import { NotificationProvider, NotificationBell } from "./notifications";
 import ErrorBoundary from "./ErrorBoundary";
 import LoginPage from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
@@ -29,6 +30,8 @@ import Observations from "./pages/Observations";
 import SafetyIncidents from "./pages/SafetyIncidents";
 import Warranties from "./pages/Warranties";
 import InsuranceCertificates from "./pages/InsuranceCertificates";
+import Notifications from "./pages/Notifications";
+import AdminJobs from "./pages/AdminJobs";
 
 function SidebarItem({ to, children }) {
   const loc = useLocation();
@@ -38,11 +41,11 @@ function SidebarItem({ to, children }) {
 
 function Shell() {
   const { user, logout } = useAuth();
-  const loc = useLocation();
   if (!user) return <LoginPage />;
 
   return (
     <ProjectProvider>
+      <NotificationProvider>
       <div className="rex-shell">
         {/* Sidebar */}
         <aside className="rex-sidebar">
@@ -79,6 +82,14 @@ function Shell() {
           <SidebarItem to="/checklists">Checklists</SidebarItem>
           <SidebarItem to="/milestones">Milestones</SidebarItem>
           <SidebarItem to="/attachments">Attachments</SidebarItem>
+          <div className="rex-sidebar-group">Inbox</div>
+          <SidebarItem to="/notifications">Notifications</SidebarItem>
+          {(user.is_admin || user.global_role === "vp") && (
+            <>
+              <div className="rex-sidebar-group">Admin</div>
+              <SidebarItem to="/admin/jobs">Operations</SidebarItem>
+            </>
+          )}
           <div className="rex-sidebar-bottom">
             <div style={{ fontSize: 12, color: "var(--rex-sidebar-muted)", marginBottom: 6 }}>
               {user.first_name || user.email}
@@ -123,12 +134,15 @@ function Shell() {
                 <Route path="/safety" element={<SafetyIncidents />} />
                 <Route path="/warranties" element={<Warranties />} />
                 <Route path="/insurance" element={<InsuranceCertificates />} />
+                <Route path="/notifications" element={<Notifications />} />
+                <Route path="/admin/jobs" element={<AdminJobs />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
           </div>
         </div>
       </div>
+      </NotificationProvider>
     </ProjectProvider>
   );
 }
@@ -145,6 +159,7 @@ function Topbar() {
         </span>
       )}
       <div className="rex-topbar-right">
+        <NotificationBell />
         <select value={selectedId || ""} onChange={(e) => select(e.target.value)} className="rex-input" style={{ width: 180, padding: "5px 8px" }}>
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}{p.project_number ? ` (${p.project_number})` : ""}</option>)}
         </select>

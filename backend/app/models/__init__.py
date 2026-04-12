@@ -1,7 +1,8 @@
 from app.models.foundation import (
-    Base, Company, ConnectorMapping, InsuranceCertificate, Person, Project, ProjectMember,
+    Base, Company, ConnectorMapping, InsuranceCertificate, JobRun, Person, Project, ProjectMember,
     RoleTemplate, RoleTemplateOverride, Session, UserAccount,
 )
+from app.models.notifications import Notification
 from app.models.schedule import (
     ActivityLink, Schedule, ScheduleActivity, ScheduleConstraint, ScheduleSnapshot,
 )
@@ -26,8 +27,10 @@ from app.models.closeout import (
 __all__ = [
     "Base",
     # Foundation
-    "Company", "ConnectorMapping", "InsuranceCertificate", "Person", "Project", "ProjectMember",
+    "Company", "ConnectorMapping", "InsuranceCertificate", "JobRun", "Person", "Project", "ProjectMember",
     "RoleTemplate", "RoleTemplateOverride", "Session", "UserAccount",
+    # Notifications
+    "Notification",
     # Schedule
     "ActivityLink", "Schedule", "ScheduleActivity", "ScheduleConstraint", "ScheduleSnapshot",
     # Field Ops

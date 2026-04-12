@@ -26,7 +26,18 @@ FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"
 async def lifespan(app: FastAPI):
     log.info("Rex OS starting up")
     await db.get_pool()
+    # Start background job scheduler if enabled
+    try:
+        from app.jobs import start_scheduler
+        await start_scheduler()
+    except Exception as exc:  # noqa: BLE001
+        log.error("scheduler_start_failed error=%r", exc)
     yield
+    try:
+        from app.jobs import shutdown_scheduler
+        await shutdown_scheduler()
+    except Exception:
+        pass
     log.info("Rex OS shutting down")
     await db.close_pool()
 

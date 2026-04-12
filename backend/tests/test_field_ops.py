@@ -32,9 +32,18 @@ async def test_create_daily_log(client: AsyncClient):
 
 
 async def test_daily_log_crud(client: AsyncClient):
+    # Use a fresh throwaway project so the (project_id, log_date) unique
+    # constraint can never collide with leftover seed data.
+    proj = await client.post("/api/projects/", json={
+        "name": f"DL-CRUD-{_uid()}",
+        "status": "active",
+    })
+    assert proj.status_code == 201, proj.text
+    project_id = proj.json()["id"]
+
     date_str = f"2090-{(int(_uid()[:2], 16) % 12) + 1:02d}-{(int(_uid()[:2], 16) % 28) + 1:02d}"
     r = await client.post("/api/daily-logs/", json={
-        "project_id": PROJECT_BISHOP, "log_date": date_str, "weather_summary": "sunny",
+        "project_id": project_id, "log_date": date_str, "weather_summary": "sunny",
     })
     assert r.status_code == 201
     log_id = r.json()["id"]

@@ -265,4 +265,7 @@ select.rex-input { padding-right: 24px; }
 .rex-gantt-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .rex-gantt-timeline-wrap { overflow-x: auto; overflow-y: auto; background: var(--rex-bg-card); }
 .rex-gantt-axis { background: var(--rex-bg-stripe); }
+
+/* ── Notification bell ── */
+.rex-bell:hover { background: var(--rex-accent-light) !important; border-radius: 6px; }
 .rex-gantt-bar-row { position: relative; }

@@ -334,3 +334,21 @@ class InsuranceCertificate(Base):
     notes: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+
+
+# ── 11. job_runs ─────────────────────────────────────────────────────────────
+
+class JobRun(Base):
+    __tablename__ = "job_runs"
+    __table_args__ = {"schema": "rex"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    job_key: Mapped[str] = mapped_column(Text, nullable=False)
+    status: Mapped[str] = mapped_column(Text, nullable=False)
+    started_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    finished_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True))
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+    triggered_by: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'system'"))
+    triggered_by_user_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rex.user_accounts.id"))
+    summary: Mapped[str | None] = mapped_column(Text)
+    error_excerpt: Mapped[str | None] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, nullable=False, server_default=text("'{}'::jsonb"))

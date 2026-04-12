@@ -58,6 +58,8 @@ from app.routes.completion_milestones import router as completion_milestones_rou
 from app.routes.budget_summary import router as budget_summary_router
 from app.routes.change_event_line_items import router as change_event_line_items_router
 from app.routes.insurance_certificates import router as insurance_certificates_router
+from app.routes.admin_jobs import router as admin_jobs_router
+from app.routes.notifications import router as notifications_router
 
 all_routers = [
     # Ops
@@ -95,4 +97,7 @@ all_routers = [
     closeout_readiness_router,
     # Insurance
     insurance_certificates_router,
+    # Jobs & Notifications
+    admin_jobs_router,
+    notifications_router,
 ]

@@ -342,3 +342,52 @@ The following fields have moved from "P1 Missing" to "Present in Rex OS" since t
 - `synced_at` / `sync_source` / `is_deleted` / `deleted_at` columns — Rex OS is the source of truth
 - Denormalized `*_name` mirror columns — Rex OS uses FK joins
 - Procore internal status_id / change_type_id / change_reason_id metadata
+
+---
+
+## POST-SPRINT UPDATE — 2026-04-12 (Phases 31-35)
+
+### New tables added (operational, not domain parity)
+
+- `rex.job_runs` — background job execution history
+- `rex.notifications` — generic in-app notification inbox
+
+### Background job runner
+
+- apscheduler-based, env-gated via `REX_ENABLE_SCHEDULER`
+- Postgres advisory locks prevent duplicate runs across instances
+- DB-backed run history for admin visibility
+- 5 jobs registered:
+  - `warranty_refresh` (daily 06:00 UTC)
+  - `insurance_refresh` (daily 06:15 UTC)
+  - `schedule_snapshot` (daily 06:30 UTC)
+  - `aging_alerts` (daily 06:45 UTC)
+  - `session_purge` (every 2 hours)
+
+### Notification system
+
+- Dedupe via partial unique index on `(user_account_id, dedupe_key)` WHERE active
+- `upsert_notification` updates existing unresolved alerts in place
+- `resolve_notifications_by_dedupe_prefix` clears stale alerts when conditions clear
+- Project-bound notifications fan out to project members + admin/VPs
+- Insurance notifications fan out to admin/VPs only (insurance is global)
+- Action paths deep-link to relevant frontend pages
+
+### Email transport
+
+- 3 implementations: noop (default), log, smtp
+- Selected via `REX_EMAIL_TRANSPORT` env var
+- SMTP absence never crashes the app — in-app inbox is the source of truth
+
+### Why these decisions
+
+- Jobs+notifications are infrastructure, not domain parity. Existing
+  domain-specific tables like `warranty_alerts` are kept; notifications
+  are the delivery/inbox layer.
+- No new external queue/broker — single-instance apscheduler with DB
+  advisory locks for multi-instance safety.
+- Notifications are dedupe-keyed to prevent spam on repeat job runs.
+- Email is enhancement, not requirement.
+
+### Closed P2 items
+- P2-8 generic notification/alert infrastructure ✅

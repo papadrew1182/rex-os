@@ -19,6 +19,12 @@
 > **Remaining P1 items**: none currently identified.
 > **Remaining P2 items**: see FIELD_PARITY_BACKLOG.md for the current list.
 
+> **Updated 2026-04-12 (Phase 35)** — Generic notification + background job
+> infrastructure shipped. Closed P2-8 (alert infrastructure) from the
+> original audit. Domain-specific alert tables like warranty_alerts are
+> preserved as the canonical source; the new rex.notifications table is the
+> delivery/inbox layer. No new domain parity fields touched in this sprint.
+
 ---
 
 ## 1. Foundation

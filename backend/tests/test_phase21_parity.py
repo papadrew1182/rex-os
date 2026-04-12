@@ -101,8 +101,20 @@ async def _warranty(c: AsyncClient, **kw) -> dict:
 
 
 async def _cert(c: AsyncClient, **kw) -> dict:
+    """Create an insurance cert against a fresh throwaway company so the
+    list-by-company filter test sees a clean ≤200-row page."""
+    if "company_id" not in kw:
+        co_resp = await c.post("/api/companies/", json={
+            "name": f"Ph21-Co-{uid()}",
+            "company_type": "subcontractor",
+            "status": "active",
+        })
+        assert co_resp.status_code == 201, co_resp.text
+        company_id = co_resp.json()["id"]
+    else:
+        company_id = kw.pop("company_id")
     p = {
-        "company_id": COMPANY_REX,
+        "company_id": company_id,
         "policy_type": "gl",
         "carrier": f"Carrier-{uid()}",
         "policy_number": f"POL-{uid()}",
@@ -234,22 +246,23 @@ async def test_warranty_defaults_null_product_fields(client: AsyncClient):
 # D) Insurance Certificates
 # ═══════════════════════════════════════════════════════════════════════════
 
-async def test_insurance_cert_create_and_get(client: AsyncClient):
-    cert = await _cert(client)
+async def test_insurance_cert_create_and_get(rollback_client: AsyncClient):
+    cert = await _cert(rollback_client)
     assert cert["policy_type"] == "gl"
-    assert cert["company_id"] == COMPANY_REX
+    assert cert["company_id"] is not None
     assert cert["status"] == "current"
 
-    r = await client.get(f"/api/insurance-certificates/{cert['id']}")
+    r = await rollback_client.get(f"/api/insurance-certificates/{cert['id']}")
     assert r.status_code == 200
     assert r.json()["id"] == cert["id"]
 
 
-async def test_insurance_cert_list_filter_by_company(client: AsyncClient):
-    # Create a cert for COMPANY_REX to ensure at least one exists
-    cert = await _cert(client)
+async def test_insurance_cert_list_filter_by_company(rollback_client: AsyncClient):
+    # Create a fresh company + cert so the list-by-company query is unpolluted
+    cert = await _cert(rollback_client)
+    company_id = cert["company_id"]
 
-    r = await client.get(f"/api/insurance-certificates/?company_id={COMPANY_REX}")
+    r = await rollback_client.get(f"/api/insurance-certificates/?company_id={company_id}")
     assert r.status_code == 200
     ids = [c["id"] for c in r.json()]
     assert cert["id"] in ids

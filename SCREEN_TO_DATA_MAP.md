@@ -5,6 +5,24 @@
 
 ---
 
+## POST-SPRINT UPDATE — 2026-04-12 (Phase 34)
+
+### New screens shipped (Phase 34)
+
+| Screen | Route | Data sources | Audience |
+|---|---|---|---|
+| Notifications | /notifications | /api/notifications/, unread-count, read, dismiss | All users |
+| Operations | /admin/jobs | /api/admin/jobs, /api/admin/job-runs, /api/admin/jobs/:key/run | Admin/VP only |
+
+### Topbar additions
+
+- Notification bell with red unread badge (polls every 60s)
+- Click opens slide-in drawer with most-recent 20 notifications
+- Drawer supports per-item mark-read, dismiss, deep-link via action_path
+- "View all" button navigates to full Notifications page
+
+---
+
 ## POST-SPRINT UPDATE — 2026-04-12 (Phases 22-25)
 
 ### New screens shipped
