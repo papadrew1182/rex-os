@@ -26,6 +26,22 @@ FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist"
 async def lifespan(app: FastAPI):
     log.info("Rex OS starting up")
     await db.get_pool()
+
+    # Auto-apply migrations on startup if REX_AUTO_MIGRATE=true.
+    # Used by Railway deploys so a fresh container picks up new schema.
+    if os.getenv("REX_AUTO_MIGRATE", "").lower() in ("1", "true", "yes"):
+        try:
+            from app.migrate import apply_migrations
+            log.info("REX_AUTO_MIGRATE enabled — applying migrations")
+            results = await apply_migrations()
+            applied = sum(1 for r in results if r.status == "ok")
+            failed = [r for r in results if r.status == "error"]
+            log.info("auto_migrate complete applied=%d failed=%d", applied, len(failed))
+            for r in failed:
+                log.error("auto_migrate failed file=%s detail=%s", r.filename, r.detail)
+        except Exception as exc:  # noqa: BLE001
+            log.error("auto_migrate exception error=%r", exc)
+
     # Start background job scheduler if enabled
     try:
         from app.jobs import start_scheduler

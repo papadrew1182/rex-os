@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { api, getToken } from "../api";
+import { api, getToken, apiUrl } from "../api";
 import { useProject } from "../project";
 import { Badge, PageLoader, Flash, Spinner } from "../ui";
 import { FilePreviewDrawer } from "../preview";
@@ -32,7 +32,7 @@ export default function Attachments() {
 
   const download = async (att) => {
     try {
-      const res = await fetch(`/api/attachments/${att.id}/download`, { headers: { Authorization: `Bearer ${getToken()}` } });
+      const res = await fetch(apiUrl(`/attachments/${att.id}/download`), { headers: { Authorization: `Bearer ${getToken()}` } });
       if (!res.ok) { const err = await res.json().catch(() => ({})); throw new Error(err.detail || `HTTP ${res.status}`); }
       const url = URL.createObjectURL(await res.blob()); const a = document.createElement("a"); a.href = url; a.download = att.filename; a.click(); URL.revokeObjectURL(url);
     } catch (e) { setError(e.message); }

@@ -1,0 +1,14 @@
+# Nixpacks build config for Rex OS backend on Railway.
+#
+# Backend lives in backend/ subdir but Railway runs from repo root.
+# This file tells Nixpacks how to install Python deps and start the
+# FastAPI app from the right location.
+
+[phases.setup]
+nixPkgs = ["python312", "gcc"]
+
+[phases.install]
+cmds = ["cd backend && python -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt"]
+
+[start]
+cmd = "cd backend && .venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT"

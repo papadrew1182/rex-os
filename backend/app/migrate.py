@@ -29,10 +29,19 @@ from pathlib import Path
 # ── Ordered migration set (single source of truth) ────────────────────────
 
 MIGRATION_ORDER: list[str] = [
+    # Foundation
     "001_create_schema.sql",
     "rex2_canonical_ddl.sql",
     "rex2_foundation_bootstrap.sql",
     "rex2_business_seed.sql",
+    # Phase 4-5: closed_by, is_critical_path, rfi_manager, submittal_manager_id,
+    # estimated_completion_date, change_event_line_items
+    "002_field_parity_batch.sql",
+    # Phase 21: schedule actuals + WBS, milestone forecast/percent,
+    # warranty product/manufacturer, insurance_certificates table
+    "003_phase21_p1_batch.sql",
+    # Phase 31-32: job_runs + notifications tables
+    "004_phase31_jobs_notifications.sql",
 ]
 
 MIGRATIONS_DIR = Path(__file__).resolve().parent.parent.parent / "migrations"

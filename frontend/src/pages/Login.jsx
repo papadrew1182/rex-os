@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { login as doLogin } from "../api";
+import { login as doLogin, apiUrl } from "../api";
 import { useAuth } from "../auth";
 
 export default function LoginPage() {
@@ -15,7 +15,7 @@ export default function LoginPage() {
     setLoading(true);
     try {
       const data = await doLogin(email, password);
-      const res = await fetch("/api/auth/me", { headers: { Authorization: `Bearer ${data.token}` } });
+      const res = await fetch(apiUrl("/auth/me"), { headers: { Authorization: `Bearer ${data.token}` } });
       if (!res.ok) throw new Error("Failed to load profile");
       setUser(await res.json());
     } catch (err) { setError(err.message); }

@@ -13,7 +13,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { getToken } from "./api";
+import { getToken, apiUrl } from "./api";
 import { Spinner, Flash, Card, Row } from "./ui";
 
 const fmtDate = (d) => d ? new Date(d).toLocaleString() : "—";
@@ -71,7 +71,7 @@ export function FilePreviewDrawer({ open, onClose, attachment, directUrl, title,
     setBlobUrl(null);
 
     const token = getToken();
-    fetch(`/api/attachments/${attachment.id}/download`, {
+    fetch(apiUrl(`/attachments/${attachment.id}/download`), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then(async (res) => {
@@ -121,7 +121,7 @@ export function FilePreviewDrawer({ open, onClose, attachment, directUrl, title,
       return;
     }
     const token = getToken();
-    fetch(`/api/attachments/${attachment.id}/download`, {
+    fetch(apiUrl(`/attachments/${attachment.id}/download`), {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     })
       .then((r) => r.blob())
