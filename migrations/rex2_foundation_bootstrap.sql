@@ -19,25 +19,44 @@
 
 -- ════════════════════════════════════════════════════════════
 -- 0. DEFENSIVE CONSTRAINT BACKFILL
--- If connector_mappings already existed (e.g. leftover from a prior
--- deploy), CREATE TABLE IF NOT EXISTS in the canonical DDL will have
--- skipped creating the unique constraint. Add it idempotently here so
--- the ON CONFLICT clauses below work.
+-- The Railway Postgres has a leftover connector_mappings table from a
+-- previous deploy whose uq_connector_mapping constraint is on the
+-- wrong columns (rex_table, rex_id, connector). The canonical schema
+-- expects (rex_table, connector, external_id). Drop the wrong one and
+-- create the right one before the INSERT ... ON CONFLICT runs.
+-- All steps are idempotent and safe on a fresh DB too.
 -- ════════════════════════════════════════════════════════════
 
 DO $$
+DECLARE
+    has_correct_unique BOOLEAN;
 BEGIN
-    IF NOT EXISTS (
-        SELECT 1 FROM pg_constraint
-        WHERE conname = 'uq_connector_mapping'
-          AND conrelid = 'rex.connector_mappings'::regclass
-    ) THEN
+    -- Is there ALREADY a unique index covering exactly (rex_table, connector, external_id)?
+    SELECT EXISTS (
+        SELECT 1
+        FROM pg_indexes
+        WHERE schemaname = 'rex'
+          AND tablename = 'connector_mappings'
+          AND indexdef ILIKE '%UNIQUE%'
+          AND indexdef ILIKE '%(rex_table, connector, external_id)%'
+    ) INTO has_correct_unique;
+
+    IF NOT has_correct_unique THEN
+        -- Drop the misnamed/miscolumned constraint if present
+        IF EXISTS (
+            SELECT 1 FROM pg_constraint
+            WHERE conname = 'uq_connector_mapping'
+              AND conrelid = 'rex.connector_mappings'::regclass
+        ) THEN
+            ALTER TABLE rex.connector_mappings DROP CONSTRAINT uq_connector_mapping;
+        END IF;
+
+        -- Create the correct unique constraint (idempotent on fresh DBs too)
         BEGIN
             ALTER TABLE rex.connector_mappings
                 ADD CONSTRAINT uq_connector_mapping
                 UNIQUE (rex_table, connector, external_id);
-        EXCEPTION WHEN duplicate_table OR unique_violation THEN
-            -- A unique index with these columns already exists; safe to ignore
+        EXCEPTION WHEN duplicate_table OR unique_violation OR duplicate_object THEN
             NULL;
         END;
     END IF;
