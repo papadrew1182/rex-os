@@ -7,6 +7,7 @@ import {
   WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
+import { FilePreviewDrawer } from "../preview";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -65,6 +66,21 @@ export default function Drawings() {
   const [revSubmitting, setRevSubmitting] = useState(false);
   const [revSubmitError, setRevSubmitError] = useState(null);
   const revForm = useFormState(REV_DEFAULT);
+
+  // Preview drawer
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+  const [previewDirectUrl, setPreviewDirectUrl] = useState(null);
+
+  function openDrawingPreview(drawing) {
+    setPreviewAttachment({
+      id: drawing.id,
+      filename: drawing.title || drawing.drawing_number,
+      content_type: "image/*",
+    });
+    setPreviewDirectUrl(drawing.image_url);
+    setPreviewOpen(true);
+  }
 
   const refresh = useCallback(() => {
     if (!selectedId) return;
@@ -259,7 +275,7 @@ export default function Drawings() {
                   </td>
                   <td>
                     {row.image_url
-                      ? <a href={row.image_url} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()} style={{ fontSize: 12, color: "var(--rex-accent)" }}>View</a>
+                      ? <button className="rex-btn rex-btn-outline" onClick={(e) => { e.stopPropagation(); openDrawingPreview(row); }} style={{ padding: "2px 8px", fontSize: 12 }}>Preview</button>
                       : "—"}
                   </td>
                 </tr>
@@ -306,7 +322,7 @@ export default function Drawings() {
               <Row label="Revision" value={selected.current_revision != null ? `Rev ${selected.current_revision}` : "—"} />
               <Row label="Rev Date" value={fmtDate(selected.current_revision_date)} />
               <Row label="Image" value={selected.image_url
-                ? <a href={selected.image_url} target="_blank" rel="noreferrer" style={{ color: "var(--rex-accent)", fontSize: 12 }}>View</a>
+                ? <button className="rex-btn rex-btn-outline" onClick={() => openDrawingPreview(selected)} style={{ padding: "2px 8px", fontSize: 12 }}>Preview Drawing</button>
                 : "—"} />
             </Card>
           </div>
@@ -410,6 +426,15 @@ export default function Drawings() {
         <TextArea label="Description" name="description" value={revForm.values.description} onChange={revForm.setField} />
         <Field label="Image URL" name="image_url" value={revForm.values.image_url} onChange={revForm.setField} required placeholder="https://..." />
       </FormDrawer>
+
+      <FilePreviewDrawer
+        open={previewOpen}
+        onClose={() => { setPreviewOpen(false); setPreviewDirectUrl(null); }}
+        attachment={previewAttachment}
+        directUrl={previewDirectUrl}
+        title={previewAttachment?.filename}
+        subtitle="Drawing"
+      />
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { api } from "../api";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
 import { FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select, WriteButton, cleanPayload } from "../forms";
 import { usePermissions } from "../permissions";
+import { FilePreviewDrawer } from "../preview";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 const fmt = (n) => n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -25,6 +26,19 @@ export default function InsuranceCertificates() {
   const [submitError, setSubmitError] = useState(null);
   const form = useFormState(CERT_DEFAULT);
   const { canWrite } = usePermissions();
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+
+  async function openCertAttachment() {
+    if (!selected?.attachment_id) return;
+    try {
+      const att = await api(`/attachments/${selected.attachment_id}`);
+      setPreviewAttachment(att);
+      setPreviewOpen(true);
+    } catch (e) {
+      alert("Could not load certificate file: " + e.message);
+    }
+  }
 
   const refresh = useCallback(() => {
     Promise.all([
@@ -229,6 +243,13 @@ export default function InsuranceCertificates() {
               <Row label="Days to Expiry" value={daysToExpiry(selected.expiry_date) ?? "—"} />
             </Card>
           </div>
+          {selected.attachment_id && (
+            <Card title="Certificate File" style={{ marginTop: 12 }}>
+              <button className="rex-btn rex-btn-outline" onClick={openCertAttachment} style={{ fontSize: 12 }}>
+                Preview Certificate
+              </button>
+            </Card>
+          )}
           {selected.notes && (
             <Card title="Notes" style={{ marginTop: 12 }}>
               <p style={{ margin: 0, fontSize: 13, color: "var(--rex-text-muted)" }}>{selected.notes}</p>
@@ -236,6 +257,8 @@ export default function InsuranceCertificates() {
           )}
         </div>
       )}
+
+      <FilePreviewDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} attachment={previewAttachment} />
 
       <FormDrawer
         open={drawerOpen}

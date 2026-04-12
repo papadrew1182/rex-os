@@ -7,6 +7,7 @@ import {
   WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
+import { FilePreviewDrawer } from "../preview";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -35,6 +36,19 @@ export default function Specifications() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const form = useFormState(SPEC_DEFAULT);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+
+  async function openSpecAttachment(spec) {
+    if (!spec.attachment_id) return;
+    try {
+      const att = await api(`/attachments/${spec.attachment_id}`);
+      setPreviewAttachment(att);
+      setPreviewOpen(true);
+    } catch (e) {
+      alert("Could not load attachment: " + e.message);
+    }
+  }
 
   const refresh = useCallback(() => {
     if (!selectedId) return;
@@ -211,10 +225,19 @@ export default function Specifications() {
                   ? <span style={{ fontFamily: "monospace", fontSize: 11 }}>{selected.attachment_id}</span>
                   : "—"
               } />
+              {selected.attachment_id && (
+                <div style={{ marginTop: 8 }}>
+                  <button className="rex-btn rex-btn-outline" onClick={() => openSpecAttachment(selected)} style={{ fontSize: 12 }}>
+                    Preview Document
+                  </button>
+                </div>
+              )}
             </Card>
           </div>
         </div>
       )}
+
+      <FilePreviewDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} attachment={previewAttachment} />
 
       {/* Spec create/edit drawer */}
       <FormDrawer

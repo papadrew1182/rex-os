@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { api, getToken } from "../api";
 import { useProject } from "../project";
 import { Badge, PageLoader, Flash, Spinner } from "../ui";
+import { FilePreviewDrawer } from "../preview";
 
 export default function Attachments() {
   const { selected: project, selectedId } = useProject();
@@ -11,7 +12,11 @@ export default function Attachments() {
   const [uploading, setUploading] = useState(false);
   const [pageLoad, setPageLoad] = useState(true);
   const [sourceType, setSourceType] = useState("rfi");
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
   const flash = (m) => { setSuccess(m); setTimeout(() => setSuccess(null), 3000); };
+
+  function openPreview(attachment) { setPreviewAttachment(attachment); setPreviewOpen(true); }
 
   const load = useCallback(() => { if (!selectedId) return; setPageLoad(true); api(`/attachments/?project_id=${selectedId}&limit=50`).then(setAttachments).catch((e) => setError(e.message)).finally(() => setPageLoad(false)); }, [selectedId]);
   useEffect(() => { load(); }, [load]);
@@ -67,13 +72,17 @@ export default function Attachments() {
                   <td><Badge status={att.source_type === "rfi" ? "purple" : "gray"} label={att.source_type?.replace(/_/g, " ")} /></td>
                   <td>{fmt(att.file_size)}</td>
                   <td>{new Date(att.created_at).toLocaleDateString()}</td>
-                  <td><button onClick={() => download(att)} className="rex-btn rex-btn-outline" style={{ padding: "4px 10px", fontSize: 12 }}>Download</button></td>
+                  <td>
+                    <button className="rex-btn rex-btn-outline" onClick={(e) => { e.stopPropagation(); openPreview(att); }} style={{ padding: "4px 10px", fontSize: 12, marginRight: 4 }}>Preview</button>
+                    <button onClick={() => download(att)} className="rex-btn rex-btn-outline" style={{ padding: "4px 10px", fontSize: 12 }}>Download</button>
+                  </td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
       )}
+      <FilePreviewDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} attachment={previewAttachment} />
     </div>
   );
 }

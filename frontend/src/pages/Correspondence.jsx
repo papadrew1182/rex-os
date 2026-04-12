@@ -7,6 +7,7 @@ import {
   WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
+import { FilePreviewDrawer } from "../preview";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -65,6 +66,10 @@ export default function Correspondence() {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const form = useFormState(CORR_DEFAULT);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+
+  function openPreview(attachment) { setPreviewAttachment(attachment); setPreviewOpen(true); }
 
   const refresh = useCallback(() => {
     if (!selectedId) return;
@@ -297,6 +302,7 @@ export default function Correspondence() {
                       <th>Filename</th>
                       <th style={{ textAlign: "right" }}>File Size</th>
                       <th>Content Type</th>
+                      <th></th>
                     </tr>
                   </thead>
                   <tbody>
@@ -311,6 +317,9 @@ export default function Correspondence() {
                             : "—"}
                         </td>
                         <td>{att.content_type || att.mime_type || "—"}</td>
+                        <td>
+                          <button className="rex-btn rex-btn-outline" onClick={(e) => { e.stopPropagation(); openPreview(att); }} style={{ padding: "2px 8px", fontSize: 12 }}>Preview</button>
+                        </td>
                       </tr>
                     ))}
                   </tbody>
@@ -320,6 +329,8 @@ export default function Correspondence() {
           </Card>
         </div>
       )}
+
+      <FilePreviewDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} attachment={previewAttachment} />
 
       {/* Correspondence create/edit drawer */}
       <FormDrawer

@@ -7,6 +7,7 @@ import {
   Field, NumberField, DateField, TextArea, Select, Checkbox, WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
+import { FilePreviewDrawer } from "../preview";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
@@ -68,6 +69,11 @@ export default function Warranties() {
   const [selected, setSelected] = useState(null);
   const [claims, setClaims] = useState(null);
   const [alerts, setAlerts] = useState(null);
+  const [warrantyAttachments, setWarrantyAttachments] = useState([]);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const [previewAttachment, setPreviewAttachment] = useState(null);
+
+  function openPreview(attachment) { setPreviewAttachment(attachment); setPreviewOpen(true); }
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerMode, setDrawerMode] = useState("create");
@@ -140,12 +146,14 @@ export default function Warranties() {
   }), [items]);
 
   function handleRowClick(row) {
-    if (selected?.id === row.id) { setSelected(null); setClaims(null); setAlerts(null); return; }
+    if (selected?.id === row.id) { setSelected(null); setClaims(null); setAlerts(null); setWarrantyAttachments([]); return; }
     setSelected(row);
     setClaims(null);
     setAlerts(null);
+    setWarrantyAttachments([]);
     api(`/warranty-claims?warranty_id=${row.id}`).then(setClaims).catch(() => setClaims([]));
     api(`/warranty-alerts?warranty_id=${row.id}`).then(setAlerts).catch(() => setAlerts([]));
+    api(`/attachments?source_type=warranty&source_id=${row.id}`).catch(() => []).then((atts) => setWarrantyAttachments(Array.isArray(atts) ? atts : (atts?.items || [])));
   }
 
   function openCreate() {
@@ -371,6 +379,41 @@ export default function Warranties() {
             )}
           </Card>
 
+          {warrantyAttachments.length > 0 && (
+            <Card title={`Attachments (${warrantyAttachments.length})`} style={{ marginBottom: 12 }}>
+              <div className="rex-table-wrap" style={{ marginTop: 8 }}>
+                <table className="rex-table">
+                  <thead>
+                    <tr>
+                      <th>Filename</th>
+                      <th style={{ textAlign: "right" }}>Size</th>
+                      <th>Type</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {warrantyAttachments.map((att, i) => (
+                      <tr key={att.id || i}>
+                        <td>{att.filename || "—"}</td>
+                        <td style={{ textAlign: "right" }}>
+                          {att.file_size != null
+                            ? att.file_size >= 1048576
+                              ? `${(att.file_size / 1048576).toFixed(1)} MB`
+                              : `${(att.file_size / 1024).toFixed(1)} KB`
+                            : "—"}
+                        </td>
+                        <td>{att.content_type || "—"}</td>
+                        <td>
+                          <button className="rex-btn rex-btn-outline" onClick={(e) => { e.stopPropagation(); openPreview(att); }} style={{ padding: "2px 8px", fontSize: 12 }}>Preview</button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </Card>
+          )}
+
           {selected.notes && (
             <Card title="Notes">
               <p style={{ margin: 0, fontSize: 13, color: "var(--rex-text-muted)" }}>{selected.notes}</p>
@@ -378,6 +421,8 @@ export default function Warranties() {
           )}
         </div>
       )}
+
+      <FilePreviewDrawer open={previewOpen} onClose={() => setPreviewOpen(false)} attachment={previewAttachment} />
 
       <FormDrawer
         open={drawerOpen}

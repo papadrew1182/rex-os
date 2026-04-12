@@ -249,3 +249,20 @@ select.rex-input { padding-right: 24px; }
 
 /* ── Money ── */
 .rex-money { font-variant-numeric: tabular-nums; font-family: 'DM Mono', 'Courier New', monospace; font-size: 13px; }
+
+/* ── Gantt ── */
+.rex-gantt-wrap { display: flex; flex-direction: column; border: 1px solid var(--rex-border); border-radius: 8px; overflow: hidden; background: var(--rex-bg-card); box-shadow: var(--rex-shadow-sm); }
+.rex-gantt-toolbar { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; padding: 10px 14px; border-bottom: 1px solid var(--rex-border); background: var(--rex-bg-stripe); }
+.rex-gantt-body { display: flex; overflow: hidden; }
+.rex-gantt-tree-wrap { display: flex; flex-direction: column; border-right: 2px solid var(--rex-border); background: var(--rex-bg-card); flex-shrink: 0; }
+.rex-gantt-axis-spacer { background: var(--rex-accent); color: #fff; border-bottom: 1px solid var(--rex-border); }
+.rex-gantt-tree-rows { overflow-y: auto; }
+.rex-gantt-tree-row { display: flex; align-items: center; border-bottom: 1px solid var(--rex-border); cursor: pointer; transition: background 0.1s; }
+.rex-gantt-tree-row:hover { background: var(--rex-accent-light); }
+.rex-gantt-tree-row:nth-child(even) { background: var(--rex-bg-stripe); }
+.rex-gantt-tree-row:nth-child(even):hover { background: var(--rex-accent-light); }
+.rex-gantt-expand-btn { background: none; border: none; cursor: pointer; font-size: 10px; color: var(--rex-accent); padding: 0 2px; line-height: 1; flex-shrink: 0; }
+.rex-gantt-tree-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rex-gantt-timeline-wrap { overflow-x: auto; overflow-y: auto; background: var(--rex-bg-card); }
+.rex-gantt-axis { background: var(--rex-bg-stripe); }
+.rex-gantt-bar-row { position: relative; }
