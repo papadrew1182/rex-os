@@ -314,3 +314,23 @@ class ConnectorMapping(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )
+
+
+# ── 10. insurance_certificates ──────────────────────────────────────────────
+
+class InsuranceCertificate(Base):
+    __tablename__ = "insurance_certificates"
+    __table_args__ = {"schema": "rex"}
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    company_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("rex.companies.id"), nullable=False)
+    policy_type: Mapped[str] = mapped_column(Text, nullable=False)  # gl|wc|auto|umbrella|other
+    carrier: Mapped[str | None] = mapped_column(Text)
+    policy_number: Mapped[str | None] = mapped_column(Text)
+    effective_date: Mapped[date | None] = mapped_column(Date)
+    expiry_date: Mapped[date | None] = mapped_column(Date)
+    limit_amount: Mapped[float | None] = mapped_column(Numeric)
+    status: Mapped[str] = mapped_column(Text, nullable=False, server_default=text("'current'"))
+    attachment_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))  # deferred FK
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
+    updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))

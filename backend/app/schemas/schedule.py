@@ -79,6 +79,9 @@ class ScheduleActivityCreate(BaseModel):
     assigned_company_id: UUID | None = None
     assigned_person_id: UUID | None = None
     cost_code_id: UUID | None = None
+    actual_start_date: date | None = None
+    actual_finish_date: date | None = None
+    wbs_code: str | None = None
     location: str | None = None
     notes: str | None = None
     sort_order: int = 0
@@ -102,6 +105,9 @@ class ScheduleActivityUpdate(BaseModel):
     assigned_company_id: UUID | None = None
     assigned_person_id: UUID | None = None
     cost_code_id: UUID | None = None
+    actual_start_date: date | None = None
+    actual_finish_date: date | None = None
+    wbs_code: str | None = None
     location: str | None = None
     notes: str | None = None
     sort_order: int | None = None
@@ -129,6 +135,9 @@ class ScheduleActivityResponse(BaseModel):
     assigned_company_id: UUID | None
     assigned_person_id: UUID | None
     cost_code_id: UUID | None
+    actual_start_date: date | None
+    actual_finish_date: date | None
+    wbs_code: str | None
     location: str | None
     notes: str | None
     sort_order: int

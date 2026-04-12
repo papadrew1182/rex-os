@@ -306,3 +306,39 @@ These fields are Rex OS improvements over Rex Procore.
 | contributing_behavior / contributing_condition | observations | Procore | Root cause analysis |
 | spec_division / spec_section | closeout_checklist_items | Procore closeout_checklist | Spec-based closeout tracking |
 | O&M manual tracking fields | New table or warranties extension | Procore om_manual_tracker | Document completeness |
+
+---
+
+## POST-SPRINT UPDATE — 2026-04-12 (Phase 25)
+
+The following fields have moved from "P1 Missing" to "Present in Rex OS" since the original audit:
+
+### Schedule
+- `schedule_activities.actual_start_date` — for actual vs planned variance
+- `schedule_activities.actual_finish_date` — for actual vs planned variance
+- `schedule_activities.wbs_code` — for WBS hierarchy filtering and reporting
+- Variance computation now uses actuals when both are present, otherwise falls back to stored variance_days
+
+### Completion Milestones
+- `completion_milestones.forecast_date` — forecast vs scheduled tracking
+- `completion_milestones.percent_complete` — milestone progress (0-100)
+- New milestone health derivation: ON TRACK / SLIPPING / AT RISK / OVERDUE / ACHIEVED
+
+### Warranties
+- `warranties.system_or_product` — what system/product is covered
+- `warranties.manufacturer` — manufacturer name
+
+### Insurance Compliance (NEW DOMAIN)
+- New normalized table `rex.insurance_certificates` with full CRUD
+- Fields: company_id, policy_type (gl/wc/auto/umbrella/other), carrier, policy_number, effective_date, expiry_date, limit_amount, status, attachment_id, notes
+- Status auto-computes from expiry_date via `/api/insurance-certificates/refresh-status` endpoint
+- One company → many certificates (proper normalization vs flat company columns)
+
+### Field Ops (closed in earlier sprints)
+- `rfis.rfi_manager`, `punch_items.closed_by`, `punch_items.is_critical_path`, `submittals.submittal_manager_id`, `submittals.is_critical_path`, `commitments.estimated_completion_date`, `change_event_line_items` table — all closed in phases 3-5
+
+### Still intentionally excluded (Procore baggage)
+- `procore_id` columns on every table — Rex OS uses `connector_mappings` for external linkage
+- `synced_at` / `sync_source` / `is_deleted` / `deleted_at` columns — Rex OS is the source of truth
+- Denormalized `*_name` mirror columns — Rex OS uses FK joins
+- Procore internal status_id / change_type_id / change_reason_id metadata

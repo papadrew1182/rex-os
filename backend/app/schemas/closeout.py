@@ -122,11 +122,13 @@ class WarrantyCreate(BaseModel):
     commitment_id: UUID | None = None; cost_code_id: UUID | None = None
     status: WarrantyStatus = "active"; is_letter_received: bool = False
     is_om_received: bool = False; notes: str | None = None; created_by: UUID | None = None
+    system_or_product: str | None = None; manufacturer: str | None = None
 
 class WarrantyUpdate(BaseModel):
     status: WarrantyStatus | None = None; is_letter_received: bool | None = None
     is_om_received: bool | None = None; notes: str | None = None
     expiration_date: date | None = None
+    system_or_product: str | None = None; manufacturer: str | None = None
 
 class WarrantyResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -135,6 +137,7 @@ class WarrantyResponse(BaseModel):
     duration_months: int; start_date: date; expiration_date: date; status: str
     is_letter_received: bool; is_om_received: bool; notes: str | None
     created_by: UUID | None; created_at: datetime; updated_at: datetime
+    system_or_product: str | None; manufacturer: str | None
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -194,6 +197,7 @@ class GenerateAlertsResponse(BaseModel):
 class CompletionMilestoneCreate(BaseModel):
     project_id: UUID; milestone_type: MilestoneType; milestone_name: str
     scheduled_date: date | None = None; actual_date: date | None = None
+    forecast_date: date | None = None; percent_complete: float = 0
     variance_days: int | None = None; status: MilestoneStatus = "pending"
     is_evidence_complete: bool = False; evidence_requirements: Any | None = None
     certified_by: UUID | None = None; notes: str | None = None; sort_order: int = 0
@@ -201,6 +205,7 @@ class CompletionMilestoneCreate(BaseModel):
 class CompletionMilestoneUpdate(BaseModel):
     milestone_name: str | None = None; scheduled_date: date | None = None
     actual_date: date | None = None; variance_days: int | None = None
+    forecast_date: date | None = None; percent_complete: float | None = None
     status: MilestoneStatus | None = None; is_evidence_complete: bool | None = None
     evidence_requirements: Any | None = None; certified_by: UUID | None = None
     notes: str | None = None; sort_order: int | None = None
@@ -209,6 +214,7 @@ class CompletionMilestoneResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID; project_id: UUID; milestone_type: str; milestone_name: str
     scheduled_date: date | None; actual_date: date | None; variance_days: int | None
+    forecast_date: date | None; percent_complete: float
     status: str; is_evidence_complete: bool; evidence_requirements: Any | None
     certified_by: UUID | None; notes: str | None; sort_order: int
     created_at: datetime; updated_at: datetime

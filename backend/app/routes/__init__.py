@@ -57,6 +57,7 @@ from app.routes.warranty_alerts import router as warranty_alerts_router
 from app.routes.completion_milestones import router as completion_milestones_router
 from app.routes.budget_summary import router as budget_summary_router
 from app.routes.change_event_line_items import router as change_event_line_items_router
+from app.routes.insurance_certificates import router as insurance_certificates_router
 
 all_routers = [
     # Ops
@@ -92,4 +93,6 @@ all_routers = [
     warranties_router, warranty_claims_router, warranty_alerts_router,
     completion_milestones_router,
     closeout_readiness_router,
+    # Insurance
+    insurance_certificates_router,
 ]

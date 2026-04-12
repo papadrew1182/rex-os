@@ -3,6 +3,22 @@
 > Audit Date: 2026-04-11
 > Sources: Rex Procore repo (C:\Users\rober\rex-procore), live app (railway), Rex OS repo (C:\Users\rober\rex-os)
 
+> **Updated 2026-04-12 (Phase 25)** — All P0 items remained at zero. The following P1 items have been **CLOSED** since the original audit:
+> - ✅ punch_items.closed_by (phase 4)
+> - ✅ punch_items.is_critical_path (phase 4)
+> - ✅ submittals.is_critical_path (phase 4)
+> - ✅ submittals.submittal_manager_id (phase 4)
+> - ✅ rfis.rfi_manager (phase 4)
+> - ✅ commitments.estimated_completion_date (phase 3)
+> - ✅ change_event_line_items table (phase 5)
+> - ✅ schedule_activities.actual_start_date / actual_finish_date / wbs_code (phase 21)
+> - ✅ completion_milestones.forecast_date / percent_complete (phase 21)
+> - ✅ warranties.system_or_product / manufacturer (phase 21)
+> - ✅ insurance_certificates table (phase 21 — implemented as normalized table option)
+> 
+> **Remaining P1 items**: none currently identified.
+> **Remaining P2 items**: see FIELD_PARITY_BACKLOG.md for the current list.
+
 ---
 
 ## 1. Foundation

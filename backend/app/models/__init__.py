@@ -1,5 +1,5 @@
 from app.models.foundation import (
-    Base, Company, ConnectorMapping, Person, Project, ProjectMember,
+    Base, Company, ConnectorMapping, InsuranceCertificate, Person, Project, ProjectMember,
     RoleTemplate, RoleTemplateOverride, Session, UserAccount,
 )
 from app.models.schedule import (
@@ -26,7 +26,7 @@ from app.models.closeout import (
 __all__ = [
     "Base",
     # Foundation
-    "Company", "ConnectorMapping", "Person", "Project", "ProjectMember",
+    "Company", "ConnectorMapping", "InsuranceCertificate", "Person", "Project", "ProjectMember",
     "RoleTemplate", "RoleTemplateOverride", "Session", "UserAccount",
     # Schedule
     "ActivityLink", "Schedule", "ScheduleActivity", "ScheduleConstraint", "ScheduleSnapshot",

@@ -5,6 +5,28 @@
 
 ---
 
+## POST-SPRINT UPDATE — 2026-04-12 (Phases 22-25)
+
+### New screens shipped
+
+| Screen | Route | Data sources | Status |
+|---|---|---|---|
+| Schedule Health (tabbed) | /schedule | `/projects/:id/schedule-health-summary`, `/schedules`, `/schedule-activities`, `/schedule-constraints` | Health + Activities + Lookahead + Critical Path tabs |
+| Warranties | /warranties | `/warranties`, `/warranty-claims`, `/warranty-alerts`, `/companies`, `/cost-codes` | Full CRUD + system_or_product + manufacturer |
+| Insurance Certificates | /insurance | `/insurance-certificates`, `/insurance-certificates/summary`, `/companies` | Full CRUD + auto-status refresh |
+
+### Updated screens
+
+| Screen | What's new |
+|---|---|
+| Milestones | forecast_date, percent_complete, milestone health derivation (ON TRACK / SLIPPING / AT RISK / OVERDUE / ACHIEVED), progress visualization, edit form |
+| Project Readiness | Milestones card now shows on-track/at-risk counts and progress |
+
+### All screens now operational (read + write)
+With phases 1-25 complete, every screen in the navigation supports real CRUD against real backend routes with permission-aware UX. The only intentionally read-only screen is **Photos** (file upload requires multipart + storage backend wiring, deferred).
+
+---
+
 ## Currently Built Screens
 
 ### 1. Portfolio (Closeout Readiness)

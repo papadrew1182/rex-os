@@ -5,6 +5,54 @@
 
 ---
 
+## STATUS UPDATE — 2026-04-12 (Phase 25)
+
+### P0 Items: 0 open (none ever opened)
+
+### P1 Items: ALL CLOSED ✅
+The following items from the original April 11 audit have been **closed**:
+
+| Item | Sprint | Status |
+|---|---|---|
+| P1-1 closed_by on punch_items | Phase 4 | ✅ Closed |
+| P1-2 is_critical_path on punch_items + submittals | Phase 4 | ✅ Closed |
+| P1-3 rfi_manager on rfis | Phase 4 | ✅ Closed |
+| P1-4 submittal_manager_id on submittals | Phase 4 | ✅ Closed |
+| P1-5 actual_start/actual_finish on schedule_activities | Phase 21 | ✅ Closed |
+| P1-6 wbs_code on schedule_activities | Phase 21 | ✅ Closed |
+| P1-7 estimated_completion_date on commitments | Phase 3 | ✅ Closed |
+| P1-8 forecast_date + percent_complete on completion_milestones | Phase 21 | ✅ Closed |
+| P1-9 Insurance detail (new normalized insurance_certificates table) | Phase 21 | ✅ Closed |
+| P1-10 system_or_product + manufacturer on warranties | Phase 21 | ✅ Closed |
+| P1-11 change_event_line_items table | Phase 5 | ✅ Closed |
+
+**P1 backlog is now empty.**
+
+### P2 Items: still open
+- P2-1 latitude/longitude on projects (not yet needed)
+- P2-2 contributing_behavior/condition on observations (root cause analysis)
+- P2-3 spec_division/section on closeout_checklist_items
+- P2-4 O&M Manual Tracker table
+- P2-5 mobile_phone/website on companies
+- P2-6 start_variance/finish_variance separation (currently single variance_days)
+- P2-7 free_float on schedule_activities (currently single float_days)
+- P2-8 Notification/alert infrastructure (warranty_alerts exists; general alerts deferred)
+- P2-9 Bonus/performance system (phase 2+ design needed)
+
+### Intentionally excluded (Procore mirror baggage)
+- procore_id, synced_at, sync_source, is_deleted, deleted_at on every table
+- Denormalized *_name mirror fields where FK joins exist
+- Procore internal status/type/reason mapping metadata
+- Procore datagrid_uuid / datagrid_created_at fields
+
+### Sprint progress summary
+- **25 phases completed** (1 audit + 24 build phases)
+- **3 migrations applied** (001 base + 002 phase 4-5 batch + 003 phase 21 batch)
+- **All P0 + P1 audited gaps closed**
+- **No mock data anywhere** — every screen reads/writes real backend
+
+---
+
 ## P0 Parity Fixes
 
 > P0 = Blocks parity with current product slice or prevents building the next logical screen family.

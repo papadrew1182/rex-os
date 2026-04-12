@@ -92,6 +92,9 @@ class ScheduleActivity(Base):
     )
     # Deferred FK to rex.cost_codes — modeled as bare UUID, enforced at DB level
     cost_code_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
+    actual_start_date: Mapped[date | None] = mapped_column(Date)
+    actual_finish_date: Mapped[date | None] = mapped_column(Date)
+    wbs_code: Mapped[str | None] = mapped_column(Text)
     location: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))

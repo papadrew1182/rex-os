@@ -163,20 +163,31 @@ async def get_schedule_drift_summary(db: AsyncSession, schedule_id: UUID) -> dic
     total = len(activities)
     critical = [a for a in activities if a.is_critical]
     completed = [a for a in activities if float(a.percent_complete or 0) >= 100]
-    with_variance = [a for a in activities if a.variance_days is not None]
-    positive_variance = [a for a in with_variance if a.variance_days > 0]
-    negative_variance = [a for a in with_variance if a.variance_days < 0]
+    # Compute effective variance: prefer actual_finish_date vs baseline_end if actuals are set;
+    # otherwise fall back to stored variance_days (which reflects planned end_date vs baseline_end).
+    def _effective_variance(a: ScheduleActivity) -> int | None:
+        if (
+            a.actual_start_date is not None
+            and a.actual_finish_date is not None
+            and a.baseline_end is not None
+        ):
+            return (a.actual_finish_date - a.baseline_end).days
+        return a.variance_days
 
-    variance_values = [a.variance_days for a in with_variance]
+    with_variance = [a for a in activities if _effective_variance(a) is not None]
+    positive_variance = [a for a in with_variance if _effective_variance(a) > 0]
+    negative_variance = [a for a in with_variance if _effective_variance(a) < 0]
+
+    variance_values = [_effective_variance(a) for a in with_variance]
     avg_variance = round(sum(variance_values) / len(variance_values), 2) if variance_values else 0
 
     worst = None
     if with_variance:
-        worst_act = max(with_variance, key=lambda a: a.variance_days)
+        worst_act = max(with_variance, key=lambda a: _effective_variance(a))
         worst = {
             "activity_id": worst_act.id,
             "name": worst_act.name,
-            "variance_days": worst_act.variance_days,
+            "variance_days": _effective_variance(worst_act),
         }
 
     # Snapshots — count distinct activity_id coverage

@@ -27,6 +27,8 @@ import Photos from "./pages/Photos";
 import Meetings from "./pages/Meetings";
 import Observations from "./pages/Observations";
 import SafetyIncidents from "./pages/SafetyIncidents";
+import Warranties from "./pages/Warranties";
+import InsuranceCertificates from "./pages/InsuranceCertificates";
 
 function SidebarItem({ to, children }) {
   const loc = useLocation();
@@ -67,6 +69,10 @@ function Shell() {
           <SidebarItem to="/specifications">Specifications</SidebarItem>
           <SidebarItem to="/photos">Photos</SidebarItem>
           <SidebarItem to="/correspondence">Correspondence</SidebarItem>
+          <div className="rex-sidebar-group">Closeout &amp; Warranty</div>
+          <SidebarItem to="/warranties">Warranties</SidebarItem>
+          <div className="rex-sidebar-group">Compliance</div>
+          <SidebarItem to="/insurance">Insurance Certificates</SidebarItem>
           <div className="rex-sidebar-group">Project</div>
           <SidebarItem to="/schedule">Schedule Health</SidebarItem>
           <SidebarItem to="/execution">Execution Health</SidebarItem>
@@ -115,6 +121,8 @@ function Shell() {
                 <Route path="/meetings" element={<Meetings />} />
                 <Route path="/observations" element={<Observations />} />
                 <Route path="/safety" element={<SafetyIncidents />} />
+                <Route path="/warranties" element={<Warranties />} />
+                <Route path="/insurance" element={<InsuranceCertificates />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
