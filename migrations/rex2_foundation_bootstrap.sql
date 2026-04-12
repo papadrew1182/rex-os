@@ -18,6 +18,33 @@
 
 
 -- ════════════════════════════════════════════════════════════
+-- 0. DEFENSIVE CONSTRAINT BACKFILL
+-- If connector_mappings already existed (e.g. leftover from a prior
+-- deploy), CREATE TABLE IF NOT EXISTS in the canonical DDL will have
+-- skipped creating the unique constraint. Add it idempotently here so
+-- the ON CONFLICT clauses below work.
+-- ════════════════════════════════════════════════════════════
+
+DO $$
+BEGIN
+    IF NOT EXISTS (
+        SELECT 1 FROM pg_constraint
+        WHERE conname = 'uq_connector_mapping'
+          AND conrelid = 'rex.connector_mappings'::regclass
+    ) THEN
+        BEGIN
+            ALTER TABLE rex.connector_mappings
+                ADD CONSTRAINT uq_connector_mapping
+                UNIQUE (rex_table, connector, external_id);
+        EXCEPTION WHEN duplicate_table OR unique_violation THEN
+            -- A unique index with these columns already exists; safe to ignore
+            NULL;
+        END;
+    END IF;
+END $$;
+
+
+-- ════════════════════════════════════════════════════════════
 -- 1. COMPANIES
 -- ════════════════════════════════════════════════════════════
 
@@ -249,4 +276,4 @@ VALUES
      'https://app.procore.com/562949953445402/project/562949955172624', now()),
     ('people',   '10000000-0000-4000-a000-000000000001', 'procore', '8440337',
      'https://app.procore.com/562949953445402/company/directory/users/8440337', now())
-ON CONFLICT ON CONSTRAINT uq_connector_mapping DO NOTHING;
+ON CONFLICT (rex_table, connector, external_id) DO NOTHING;
