@@ -1,7 +1,7 @@
 # Rex OS Frontend Roadmap
 
 > First-pass real frontend roadmap.
-> Last reconciled: **2026-04-12** (post phase 39).
+> Last reconciled: **2026-04-13** (phases 41–44: production credibility sprint).
 > Reflects actual implemented state on the master branch.
 > A screen-data readiness audit is **not** the same thing as this — see `SCREEN_TO_DATA_MAP.md` for that.
 
@@ -14,7 +14,11 @@
 | Page components | 30 | `frontend/src/pages/*.jsx` |
 | App routes (HashRouter) | 30 | `frontend/src/App.jsx` |
 | Stack | React 18 + Vite 5 + react-router 7 | `package.json` |
-| Build output | 80 modules, ~508 KB raw / ~122 KB gzip | `vite build` (phase 40 reconciliation run) |
+| Build output | 81 modules, ~508 KB raw / ~122 KB gzip | `vite build` (phase 44 run, 1.04s) |
+| Build identity injection | `__REX_GIT_SHA__`, `__REX_BUILD_TIME__` | `vite.config.js` `define` — sourced from `VERCEL_GIT_COMMIT_SHA` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA` at build time |
+| Version module | `frontend/src/version.js` | exports `GIT_SHA`, `BUILD_TIME`, `VERSION_INFO` and `main.jsx` pins them to `window.__REX_VERSION__` (read-only) |
+| CI gates | pytest + vite build + eslint | `.github/workflows/ci.yml` runs on every push + PR |
+| Deployed smoke | Playwright + curl invariants | `.github/workflows/deployed-smoke.yml` (workflow_dispatch + 6h cron) |
 | Shared components | 7 | ui.jsx (Badge/StatCard/Card/Row/PageLoader/Flash/ProgressBar) |
 | Shared platform modules | 4 | api.js, auth.jsx, project.jsx, permissions.js |
 | Shared write-flow module | 1 | forms.jsx (FormDrawer + 8 input primitives) |

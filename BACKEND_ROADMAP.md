@@ -1,7 +1,7 @@
 # Rex OS Backend Roadmap
 
 > Single source of truth for backend planning.
-> Last reconciled: **2026-04-12** (post phase 39).
+> Last reconciled: **2026-04-13** (phases 41–44: production credibility sprint).
 > Reflects actual implemented state on the master branch, not aspirational claims.
 
 ---
@@ -15,9 +15,14 @@
 | Routers registered | 64 | `backend/app/routes/__init__.py` (`all_routers`) |
 | HTTP routes (approx) | 250+ | sum of CRUD + summary + admin endpoints across routers |
 | Background jobs | 5 | `backend/app/jobs/*.py` (warranty/insurance/snapshot/aging/session_purge) |
-| Migrations applied | 8 | `migrations/*.sql` (4 foundation + 4 phase-numbered) |
-| Backend test files | 49 | `backend/tests/test_*.py` (phase 40 adds `test_phase40_verification.py`) |
-| Tests collected | 577 | `pytest --collect-only` (569 pre-phase-40 + 8 phase 40 verification tests) |
+| Schema migrations applied | 8 | `migrations/*.sql` driven by `app/migrate.py::MIGRATION_ORDER` |
+| Optional demo seed | 1 | `migrations/rex2_demo_seed.sql` (gated by `REX_DEMO_SEED`, not in `MIGRATION_ORDER`) |
+| Rate limiting | slowapi | `app/rate_limit.py` — `POST /api/auth/login` at `REX_LOGIN_RATE_LIMIT` (default `10/minute`) |
+| Error tracking | sentry-sdk | optional, gated by `REX_SENTRY_DSN` in `main.py` |
+| Ops endpoints | 3 | `GET /api/health`, `/api/ready`, `/api/version` (`ops.py`) |
+| CI | GitHub Actions | `.github/workflows/ci.yml` (pytest + vite build), `deployed-smoke.yml` (browser + curl against deployed URL) |
+| Backend test files | 52 | `backend/tests/test_*.py` (+ phase 41 `test_demo_seed_smoke.py`, phase 42 `test_proxy_headers_regression.py`, phase 44 `test_version_endpoint.py`) |
+| Tests passing | **583** | `pytest` — 577 phase-40 baseline + 5 proxy/version regression + 1 demo-seed smoke |
 | Full suite runtime | ~94s | Down from ~1079s at phase 39 — phase 40 eliminated legacy test pollution from the dev DB |
 | Deployment | live | Railway (`rex-os-api-production.up.railway.app`) + Postgres + apscheduler |
 

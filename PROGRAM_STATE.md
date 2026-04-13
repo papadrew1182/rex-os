@@ -1,10 +1,9 @@
 # Rex OS Program State
 
 > Auditable reconciliation of what's actually shipped vs what the older docs claimed.
-> Last reconciled: **2026-04-13** (phase 40 finish-line pass — test pollution
-> properly eliminated, legacy docs re-scrubbed, AI roadmap re-ratified,
-> production re-verified live after `pool_pre_ping` + CORS + `DATABASE_URL`
-> service-reference fixes). Previous pass: **2026-04-12**.
+> Last reconciled: **2026-04-13** (phases 41–44: production-credibility sprint —
+> demo seed, CI guardrails, S3 storage cutover, rate limiting + Sentry + version
+> endpoint). Previous pass: **2026-04-13** (phase 40 finish-line).
 > Source of truth: master branch + production Railway deployment.
 
 ---
@@ -36,15 +35,23 @@ with no UI) say so. AI features have their own copy of this ladder in
 - Frontend: https://rex-os.vercel.app (Vercel, Vite + React)
 - Backend: https://rex-os-api-production.up.railway.app (Railway, FastAPI + Postgres)
 
-The product covers 30 page families across 7 backend domains, with full CRUD on the operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead + Critical Path + Health), background job runner with 5 production jobs, generic notification infrastructure, admin operations UI, file preview, and CSV/print export. **575+ backend tests collected** (phase 40 finish-line pass may add a handful more during pollution fixes), real-backend integration coverage on the high-value flows, mocked Playwright smoke for frontend write paths.
+The product covers 30 page families across 7 backend domains, with full CRUD on the operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead + Critical Path + Health), background job runner with 5 production jobs, generic notification infrastructure, admin operations UI, file preview, and CSV/print export. **583 backend tests passing** in 95s (577 phase-40 baseline + 5 proxy/version regression tests + 1 demo-seed smoke test). Real-backend integration coverage on the high-value flows, mocked Playwright smoke for frontend write paths, and a separate deployed-smoke workflow that hits the real Railway backend with curl + Playwright.
 
-**Production sanity check (2026-04-13 live):**
+**Production sanity check (2026-04-13 live, phase-40 baseline):**
 - `GET /api/health` → `{"status":"ok"}` ✅
 - `GET /api/ready` → `{"status":"ready","checks":{"db":{"ok":true},"storage":{"ok":true,"backend":"local"}}}` ✅
 - CORS preflight from `https://rex-os.vercel.app` → `access-control-allow-origin: https://rex-os.vercel.app` ✅
 - Login flow working in browser after today's `pool_pre_ping` + `DATABASE_URL` service-reference + `REX_CORS_ORIGINS` fixes.
 
-**The 39 nominal "phases" of work do exist** in the git history and the code on disk. This document audits which of them were genuinely shipped vs which are partial, deferred, or excluded. It is the authoritative answer to "is X done."
+**New in phase 41–44 (not yet flipped in production env):**
+- `/api/version` endpoint exposing `{service, version, commit, build_time, environment}`.
+- `POST /api/auth/login` rate-limited via slowapi (`REX_LOGIN_RATE_LIMIT`, default `10/minute`).
+- Optional backend Sentry via `REX_SENTRY_DSN` (off when unset).
+- Optional demo data via `REX_DEMO_SEED` (Bishop Modern, gated, off by default).
+- S3 / R2 / MinIO storage cutover available via `REX_STORAGE_BACKEND=s3` — **must be flipped in production to stop relying on Railway ephemeral disk**.
+- `.github/workflows/ci.yml` gates every push + PR on backend pytest + frontend vite build.
+
+**The 43 nominal "phases" of work now exist** in the git history and the code on disk. This document audits which of them were genuinely shipped vs which are partial, deferred, or excluded. It is the authoritative answer to "is X done."
 
 ---
 
@@ -93,6 +100,10 @@ Confidence levels:
 | 38 | Schedule P2 fields | ✅ shipped | High | Migration 005 adds start_variance_days / finish_variance_days / free_float_days; ScheduleHealth tables + detail panel + CSV/Print exports updated |
 | 39 | Remaining P2 parity batch | ✅ shipped | High | Migration 005 also adds projects lat/lng, companies mobile/website, observations contributing_*, closeout_checklist_items spec_*, om_manuals table; routes + schemas + tests; new OmManuals page |
 | 40 | Real-backend verification + doc refresh + clean close | ✅ shipped | High | **Phase 40 finish-line pass (2026-04-13):** (1) `test_phase40_verification.py` added — 8 real-backend tests covering phase 38/39 field roundtrip via `rollback_client`; per-domain notification `action_path` literal audit (warranty / insurance / aging / schedule drift); cross-domain routing consistency; `upsert_notification` → API round-trip; advisory-lock stability on sequential `session_purge` runs; `NotificationResponse` schema drift guard; **dynamic aging_alerts end-to-end** with a throwaway project triggering all three per-category notifications; O&M manual list+get surface verification. (2) 5 legacy docs reconciled: `DEPLOY.md` (migration count 7→8 + known production gotchas), `FIELD_DECISIONS.md`, `FIELD_PARITY_BACKLOG.md`, `FIELD_PARITY_MATRIX.md`, `SCREEN_TO_DATA_MAP.md`. (3) `AI_ROADMAP.md` restructured to the verification ladder with honest "zero AI in production" framing. (4) **Full backend suite: 577 passed in 94s** (569 existing + 8 phase 40). (5) **Frontend build green**: 80 modules, 508 KB raw / 122 KB gzip. (6) Production sanity check verified live — `/api/health`, `/api/ready`, CORS preflight, login flow. |
+| 41 | Demo data / canonical project seed | ✅ shipped | High | `migrations/rex2_demo_seed.sql` adds ~200 representative rows for Bishop Modern across RFIs, punch, submittals, commitments, change events + line items, prime contract, billing periods, pay apps + lien waivers, daily logs + manpower, inspections + items, tasks, meetings + action items, observations, safety incidents, drawings + revisions, specs, correspondence, photos, attachments, warranties + claims + alerts, insurance certificates, O&M manuals, a 12-activity schedule with open/complete/critical/drifting/constrained states, and one active `schedule_constraint`. **Gated at the Python layer** by `REX_DEMO_SEED` in `app/migrate.py::apply_demo_seed()` — NOT part of `MIGRATION_ORDER`, so production can run `REX_AUTO_MIGRATE` without ever touching demo rows. `tests/test_demo_seed_smoke.py` applies the entire seed inside a rollback transaction and asserts ≥1 row in every target table. |
+| 42 | CI + deploy guardrails | ✅ shipped | High | `.github/workflows/ci.yml` runs backend pytest against a real Postgres service container (applies migrations first) plus the frontend `vite build` on every push + PR. `.github/workflows/deployed-smoke.yml` runs Playwright + curl-based proxy/redirect invariants against a deployed URL (manual dispatch or 6-hour cron). `tests/test_proxy_headers_regression.py` locks in the `ProxyHeadersMiddleware` fix from commit `2671b23` (middleware presence + `X-Forwarded-Proto` scope update + slash-redirect https preservation); the deployed-smoke curl step asserts no redirect downgrades `https→http` against the live backend. |
+| 43 | Production file storage cutover | ✅ shipped | High | `boto3>=1.34` added to `backend/requirements.txt`. The `S3StorageAdapter` in `backend/app/services/storage.py` was already fully implemented (boto3, S3/R2/MinIO, env-configured, healthcheck via `head_bucket`). `DEPLOY.md §1f` documents the `REX_STORAGE_BACKEND=s3` cutover with `REX_S3_BUCKET` / `REX_S3_REGION` / `REX_S3_ENDPOINT_URL` + `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` and the `/api/ready` verification step. Local adapter retained as the dev default. |
+| 44 | Minimum production hardening | ✅ shipped | High | **Rate limiting:** `app/rate_limit.py` owns the shared slowapi `Limiter`; `POST /api/auth/login` is decorated with `@limiter.limit(LOGIN_RATE_LIMIT)` (default `10/minute`, override via `REX_LOGIN_RATE_LIMIT`). **Error tracking:** `sentry-sdk[fastapi]` added; `main.py` initializes Sentry before app construction when `REX_SENTRY_DSN` is set (Starlette + FastAPI integrations, `send_default_pii=False`, release picked up from `REX_RELEASE` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA`). **Release visibility:** new `GET /api/version` returns `{service, version, commit, build_time, environment}` resolved at import time from the same env chain. **Frontend version:** `vite.config.js` injects `__REX_GIT_SHA__` and `__REX_BUILD_TIME__` at build time from `VERCEL_GIT_COMMIT_SHA` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA`; `frontend/src/version.js` exposes them as `GIT_SHA` / `BUILD_TIME` / `VERSION_INFO`, and `main.jsx` sets `window.__REX_VERSION__` (read-only) so support can read the running build from a browser console. |
 
 ---
 
