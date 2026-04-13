@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "startCommand": "cd backend && export LD_LIBRARY_PATH=$(find /nix/store -maxdepth 3 -name 'libstdc++.so*' -printf '%h\\n' | sort -u | tr '\\n' ':')$LD_LIBRARY_PATH && .venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT",
+    "startCommand": "cd backend && export LD_LIBRARY_PATH=$(find /nix/store -maxdepth 3 -name 'libstdc++.so*' -printf '%h\\n' | sort -u | tr '\\n' ':')$LD_LIBRARY_PATH && .venv/bin/uvicorn main:app --host 0.0.0.0 --port $PORT --proxy-headers --forwarded-allow-ips=*",
     "healthcheckPath": "/api/health",
     "healthcheckTimeout": 100,
     "restartPolicyType": "ON_FAILURE",
