@@ -1,0 +1,77 @@
+name: Deployed Smoke
+
+# Manual / scheduled smoke of a deployed Rex OS. Separate from the main CI
+# workflow because it talks to a real running backend + frontend. Uses the
+# browser smoke (Playwright) plus the backend proxy/redirect regression
+# checks against the deployed URL.
+#
+# Trigger manually from the Actions tab and supply `deployed_url`:
+#   https://rex-os.up.railway.app
+# or the Vercel preview.
+on:
+  workflow_dispatch:
+    inputs:
+      deployed_url:
+        description: 'Deployed URL to smoke (e.g. https://rex-os.up.railway.app)'
+        required: true
+        type: string
+  schedule:
+    # Every 6h against the production target below. Safe to disable if noisy.
+    - cron: '17 */6 * * *'
+
+jobs:
+  smoke:
+    name: Browser smoke against deployed URL
+    runs-on: ubuntu-latest
+
+    env:
+      REX_E2E_URL: ${{ github.event.inputs.deployed_url || vars.REX_E2E_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Install Playwright browsers
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright smoke against deployed URL
+        working-directory: frontend
+        env:
+          REX_E2E_URL: ${{ env.REX_E2E_URL }}
+        run: npx playwright test --reporter=list
+
+      - name: Verify proxy / slash-redirect invariants against deployed backend
+        if: env.REX_E2E_URL != ''
+        run: |
+          set -e
+          URL="${REX_E2E_URL%/}"
+          echo "Probing $URL"
+
+          # 1. /api/health must be reachable and return 200
+          code=$(curl -s -o /dev/null -w '%{http_code}' "$URL/api/health")
+          echo "health: $code"
+          [ "$code" = "200" ] || { echo "health not OK"; exit 1; }
+
+          # 2. Hitting a trailing-slash route without slash should either
+          #    succeed or redirect to an https:// Location — NEVER http://.
+          #    This is the exact regression class we had under Railway.
+          loc=$(curl -s -o /dev/null -D - -w '' "$URL/api/projects" | tr -d '\r' | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' || true)
+          if [ -n "$loc" ]; then
+            echo "redirect location: $loc"
+            case "$loc" in
+              http://*) echo "scheme downgraded to http"; exit 1 ;;
+              https://*) echo "scheme preserved" ;;
+              *) echo "relative / empty location — OK" ;;
+            esac
+          fi
