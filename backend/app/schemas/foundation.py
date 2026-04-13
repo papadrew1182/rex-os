@@ -25,6 +25,8 @@ class ProjectCreate(BaseModel):
     contract_value: float | None = None
     square_footage: float | None = None
     description: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class ProjectUpdate(BaseModel):
@@ -41,6 +43,8 @@ class ProjectUpdate(BaseModel):
     contract_value: float | None = None
     square_footage: float | None = None
     description: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
 
 
 class ProjectResponse(BaseModel):
@@ -60,6 +64,8 @@ class ProjectResponse(BaseModel):
     contract_value: float | None
     square_footage: float | None
     description: str | None
+    latitude: float | None
+    longitude: float | None
     created_at: datetime
     updated_at: datetime
 
@@ -84,6 +90,8 @@ class CompanyCreate(BaseModel):
     insurance_carrier: str | None = None
     bonding_capacity: float | None = None
     notes: str | None = None
+    mobile_phone: str | None = None
+    website: str | None = None
 
 
 class CompanyUpdate(BaseModel):
@@ -102,6 +110,8 @@ class CompanyUpdate(BaseModel):
     insurance_carrier: str | None = None
     bonding_capacity: float | None = None
     notes: str | None = None
+    mobile_phone: str | None = None
+    website: str | None = None
 
 
 class CompanyResponse(BaseModel):
@@ -123,6 +133,8 @@ class CompanyResponse(BaseModel):
     insurance_carrier: str | None
     bonding_capacity: float | None
     notes: str | None
+    mobile_phone: str | None
+    website: str | None
     created_at: datetime
     updated_at: datetime
 

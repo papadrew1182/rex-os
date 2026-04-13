@@ -299,6 +299,23 @@ export default function Observations() {
             </Card>
           )}
 
+          {(selected.contributing_behavior || selected.contributing_condition) && (
+            <Card title="Root Cause" style={{ marginBottom: 12 }}>
+              {selected.contributing_behavior && (
+                <div style={{ marginBottom: selected.contributing_condition ? 8 : 0 }}>
+                  <div className="rex-muted" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Contributing Behavior</div>
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--rex-text-muted)" }}>{selected.contributing_behavior}</p>
+                </div>
+              )}
+              {selected.contributing_condition && (
+                <div>
+                  <div className="rex-muted" style={{ fontSize: 11, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: 3 }}>Contributing Condition</div>
+                  <p style={{ margin: 0, fontSize: 13, color: "var(--rex-text-muted)" }}>{selected.contributing_condition}</p>
+                </div>
+              )}
+            </Card>
+          )}
+
           <Card title="Attachments">
             {attachments === null ? (
               <p className="rex-muted" style={{ margin: 0, fontSize: 12 }}>Loading attachments…</p>
@@ -360,6 +377,8 @@ export default function Observations() {
         </div>
         <TextArea label="Description" name="description" value={form.values.description} onChange={form.setField} rows={3} required />
         <TextArea label="Corrective Action" name="corrective_action" value={form.values.corrective_action} onChange={form.setField} rows={3} />
+        <TextArea label="Contributing Behavior" name="contributing_behavior" value={form.values.contributing_behavior} onChange={form.setField} rows={2} />
+        <TextArea label="Contributing Condition" name="contributing_condition" value={form.values.contributing_condition} onChange={form.setField} rows={2} />
         <Field label="Location" name="location" value={form.values.location} onChange={form.setField} />
         <Select label="Assigned To" name="assigned_to" value={form.values.assigned_to} onChange={form.setField} options={peopleOptions} />
         <Select label="Assigned Company" name="assigned_company_id" value={form.values.assigned_company_id} onChange={form.setField} options={companyOptions} />

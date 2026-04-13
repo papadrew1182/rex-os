@@ -1,4 +1,11 @@
-"""Background job runner with DB-backed run history and in-process locking."""
+"""Background job runner with DB-backed run history and Postgres advisory locks.
+
+Cross-instance safe: each job is protected by pg_try_advisory_xact_lock so
+that two Railway instances cannot run the same job simultaneously. The lock is
+transaction-scoped — held on a dedicated connection for the duration of the
+job and released automatically when that transaction commits or rolls back.
+No pool-leak risk; no explicit pg_advisory_unlock needed.
+"""
 
 import logging
 import os
@@ -8,7 +15,7 @@ from datetime import datetime, timezone
 from typing import Awaitable, Callable
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, text as sql_text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import async_session_factory
@@ -16,13 +23,19 @@ from app.models.foundation import JobRun
 
 log = logging.getLogger("rex.jobs")
 
-# In-process guard: tracks which job_keys are currently executing in this process.
-# This is the primary concurrency guard for single-process deployments (dev, test, typical prod).
-_RUNNING_JOBS: set[str] = set()
-
 
 # A job function takes an AsyncSession and returns a summary string.
 JobFunc = Callable[[AsyncSession], Awaitable[str]]
+
+
+def _job_lock_key(job_key: str) -> int:
+    """Stable signed 32-bit int for pg_try_advisory_lock from a job_key string."""
+    h = 0
+    for c in job_key:
+        h = (h * 31 + ord(c)) & 0xFFFFFFFF
+    if h >= 2**31:
+        h -= 2**32
+    return h
 
 
 @dataclass
@@ -71,16 +84,14 @@ async def run_job_now(
     triggered_by: str = "manual",
     triggered_by_user_id: UUID | None = None,
 ) -> tuple[bool, str | None, UUID | None]:
-    """Execute a job. Returns (triggered, skipped_reason, run_id).
+    """Execute a job under a Postgres transaction-level advisory lock.
 
-    Uses an in-process guard (_RUNNING_JOBS) as the primary concurrency
-    control. This works correctly for single-process deployments (dev, test,
-    typical prod). For multi-process deployments, the DB 'running' status
-    provides visibility, but cross-process deduplication is best handled via
-    the scheduler's coalesce+max_instances=1 config.
-
-    Uses a fresh session so it can be called both from the scheduler and
-    from HTTP handlers safely.
+    Cross-instance safe: if another Railway instance is currently running the
+    same job, this call records a 'skipped' run and returns immediately. The
+    lock (pg_try_advisory_xact_lock) is held for the duration of a single
+    transaction on a dedicated connection and is released automatically when
+    that transaction commits or rolls back — no explicit unlock needed and
+    no pool-leak risk.
     """
     job = JOB_REGISTRY.get(job_key)
     if job is None:
@@ -88,83 +99,102 @@ async def run_job_now(
     if not job.enabled:
         return False, "Job is disabled", None
 
-    # In-process concurrency guard
-    if job_key in _RUNNING_JOBS:
-        log.info("job_skipped reason=already_running job_key=%s", job_key)
-        async with async_session_factory() as session:
-            run = JobRun(
-                job_key=job_key,
-                status="skipped",
-                triggered_by=triggered_by,
-                triggered_by_user_id=triggered_by_user_id,
-                summary="Skipped: job already running in this process",
-                finished_at=datetime.now(timezone.utc),
-                duration_ms=0,
+    lock_key = _job_lock_key(job_key)
+
+    # Use pg_try_advisory_xact_lock (transaction-scoped) so the lock is
+    # released automatically when the transaction ends — whether by commit,
+    # rollback, or connection loss. This avoids session-level lock leaks in
+    # the connection pool: no explicit pg_advisory_unlock is needed.
+    #
+    # We hold an open connection (lock_conn) with an open transaction for the
+    # entire job duration. The lock is held for exactly that span, then freed
+    # when the transaction commits/rolls back as the context exits.
+    from app.database import engine
+
+    async with engine.connect() as lock_conn:
+        async with lock_conn.begin():
+            # pg_try_advisory_xact_lock is transaction-scoped: the lock is held
+            # for as long as this transaction is open, and released automatically
+            # when the transaction commits or rolls back. No explicit unlock
+            # needed, and no pool-leak risk.
+            result = await lock_conn.execute(
+                sql_text("SELECT pg_try_advisory_xact_lock(:k)"), {"k": lock_key}
             )
-            session.add(run)
-            await session.commit()
-            return False, "Job already running", run.id
+            acquired = bool(result.scalar())
 
-    _RUNNING_JOBS.add(job_key)
-    run_id: UUID | None = None
-    try:
-        # Phase 1: record "running" row
-        async with async_session_factory() as session:
-            run = JobRun(
-                job_key=job_key,
-                status="running",
-                triggered_by=triggered_by,
-                triggered_by_user_id=triggered_by_user_id,
-            )
-            session.add(run)
-            await session.commit()
-            await session.refresh(run)
-            run_id = run.id
-            started = run.started_at or datetime.now(timezone.utc)
+            if not acquired:
+                log.info("job_skipped reason=lock_held job_key=%s", job_key)
+                # Persist the skipped run for visibility — use a separate session.
+                async with async_session_factory() as session:
+                    run = JobRun(
+                        job_key=job_key,
+                        status="skipped",
+                        triggered_by=triggered_by,
+                        triggered_by_user_id=triggered_by_user_id,
+                        summary="Skipped: another instance holds the advisory lock",
+                        finished_at=datetime.now(timezone.utc),
+                        duration_ms=0,
+                    )
+                    session.add(run)
+                    await session.commit()
+                    return False, "Lock held by another runner", run.id
 
-        log.info("job_started job_key=%s run_id=%s triggered_by=%s", job_key, run_id, triggered_by)
+            # We hold the lock for the duration of this transaction context.
+            run_id: UUID | None = None
 
-        # Phase 2: run the job function in a fresh session
-        async with async_session_factory() as session:
-            try:
-                summary = await job.fn(session)
+            # Phase 1: record running row (separate session)
+            async with async_session_factory() as session:
+                run = JobRun(
+                    job_key=job_key,
+                    status="running",
+                    triggered_by=triggered_by,
+                    triggered_by_user_id=triggered_by_user_id,
+                )
+                session.add(run)
                 await session.commit()
-                finished = datetime.now(timezone.utc)
-                duration = int((finished - started).total_seconds() * 1000)
-                run.status = "succeeded"
-                run.finished_at = finished
-                run.duration_ms = duration
-                run.summary = (summary or "")[:2000]
-            except Exception as exc:  # noqa: BLE001
-                await session.rollback()
-                finished = datetime.now(timezone.utc)
-                duration = int((finished - started).total_seconds() * 1000)
-                tb = traceback.format_exc()
-                log.error("job_failed job_key=%s run_id=%s error=%r", job_key, run_id, exc)
-                run.status = "failed"
-                run.finished_at = finished
-                run.duration_ms = duration
-                run.error_excerpt = (str(exc) + "\n\n" + tb)[:4000]
+                await session.refresh(run)
+                run_id = run.id
+                started = run.started_at or datetime.now(timezone.utc)
 
-        # Phase 3: persist final status in its own session
-        async with async_session_factory() as session:
-            final_run = await session.get(JobRun, run_id)
-            if final_run is not None:
-                final_run.status = run.status
-                final_run.finished_at = run.finished_at
-                final_run.duration_ms = run.duration_ms
-                if run.status == "succeeded":
-                    final_run.summary = run.summary
-                else:
-                    final_run.error_excerpt = run.error_excerpt
-                await session.commit()
+            log.info("job_started job_key=%s run_id=%s triggered_by=%s", job_key, run_id, triggered_by)
 
-        if run.status == "succeeded":
-            log.info("job_succeeded job_key=%s run_id=%s duration_ms=%d", job_key, run_id, run.duration_ms)
-        return True, None, run_id
+            # Phase 2: run the job function in a fresh session
+            final_status = "succeeded"
+            final_summary = ""
+            final_error = None
+            async with async_session_factory() as session:
+                try:
+                    summary = await job.fn(session)
+                    await session.commit()
+                    final_summary = (summary or "")[:2000]
+                except Exception as exc:  # noqa: BLE001
+                    await session.rollback()
+                    tb = traceback.format_exc()
+                    log.error("job_failed job_key=%s run_id=%s error=%r", job_key, run_id, exc)
+                    final_status = "failed"
+                    final_error = (str(exc) + "\n\n" + tb)[:4000]
 
-    finally:
-        _RUNNING_JOBS.discard(job_key)
+            finished = datetime.now(timezone.utc)
+            duration = int((finished - started).total_seconds() * 1000)
+
+            # Phase 3: persist final status (separate session)
+            async with async_session_factory() as session:
+                final_run = await session.get(JobRun, run_id)
+                if final_run is not None:
+                    final_run.status = final_status
+                    final_run.finished_at = finished
+                    final_run.duration_ms = duration
+                    if final_status == "succeeded":
+                        final_run.summary = final_summary
+                    else:
+                        final_run.error_excerpt = final_error
+                    await session.commit()
+
+            if final_status == "succeeded":
+                log.info("job_succeeded job_key=%s run_id=%s duration_ms=%d", job_key, run_id, duration)
+            # The `async with lock_conn.begin()` context commits here,
+            # releasing the xact advisory lock automatically.
+            return True, None, run_id
 
 
 # ── Scheduler bootstrap ───────────────────────────────────────────────────

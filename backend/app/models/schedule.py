@@ -98,6 +98,9 @@ class ScheduleActivity(Base):
     location: Mapped[str | None] = mapped_column(Text)
     notes: Mapped[str | None] = mapped_column(Text)
     sort_order: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("0"))
+    start_variance_days: Mapped[int | None] = mapped_column(Integer)
+    finish_variance_days: Mapped[int | None] = mapped_column(Integer)
+    free_float_days: Mapped[int | None] = mapped_column(Integer)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )

@@ -48,6 +48,8 @@ class Project(Base):
     contract_value: Mapped[float | None] = mapped_column(Numeric)
     square_footage: Mapped[float | None] = mapped_column(Numeric)
     description: Mapped[str | None] = mapped_column(Text)
+    latitude: Mapped[float | None] = mapped_column(Numeric)
+    longitude: Mapped[float | None] = mapped_column(Numeric)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )
@@ -82,6 +84,8 @@ class Company(Base):
     insurance_carrier: Mapped[str | None] = mapped_column(Text)
     bonding_capacity: Mapped[float | None] = mapped_column(Numeric)
     notes: Mapped[str | None] = mapped_column(Text)
+    mobile_phone: Mapped[str | None] = mapped_column(Text)
+    website: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=text("now()")
     )

@@ -7,6 +7,7 @@ import {
   Field, DateField, TextArea, Select, WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
+import { AlertCallout } from "../AlertCallout";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 const fmt = (n) => n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -193,7 +194,8 @@ export default function RfiManagement() {
         <h1 className="rex-h1">RFI Management</h1>
         <WriteButton onClick={openCreate}>+ New RFI</WriteButton>
       </div>
-      <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
+      <p className="rex-muted" style={{ marginBottom: 12 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
+      <AlertCallout notificationTypes={["aging_summary_rfi"]} title="Active alerts on this project" />
 
       <div className="rex-grid-4" style={{ marginBottom: 24 }}>
         <StatCard label="Total RFIs" value={summary.total} />

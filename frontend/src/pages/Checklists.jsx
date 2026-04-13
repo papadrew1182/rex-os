@@ -124,6 +124,8 @@ export default function Checklists() {
                           </div>
                           <div style={{ fontSize: 11, color: "var(--rex-text-faint)" }}>
                             {item.category}{item.due_date && <span style={{ marginLeft: 8 }}>Due {fmtDate(item.due_date)}</span>}
+                            {item.spec_division && <span style={{ marginLeft: 8, fontFamily: "monospace" }}>Div {item.spec_division}</span>}
+                            {item.spec_section && <span style={{ marginLeft: 4, fontFamily: "monospace" }}>{item.spec_section}</span>}
                           </div>
                         </div>
                         <Badge status={item.status} />

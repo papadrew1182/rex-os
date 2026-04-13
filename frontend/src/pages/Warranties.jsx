@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { AlertCallout } from "../AlertCallout";
 import {
   FormDrawer, useFormState,
   Field, NumberField, DateField, TextArea, Select, Checkbox, WriteButton, cleanPayload,
@@ -207,9 +208,10 @@ export default function Warranties() {
         <h1 className="rex-h1">Warranties</h1>
         <WriteButton onClick={openCreate}>+ New Warranty</WriteButton>
       </div>
-      <p className="rex-muted" style={{ marginBottom: 20 }}>
+      <p className="rex-muted" style={{ marginBottom: 12 }}>
         Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong>
       </p>
+      <AlertCallout notificationTypes={["warranty_expiry"]} title="Active alerts on this project" />
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
         <StatCard label="Total Warranties" value={summary.total} />

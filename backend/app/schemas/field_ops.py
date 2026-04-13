@@ -287,6 +287,8 @@ class ObservationCreate(BaseModel):
     assigned_company_id: UUID | None = None
     due_date: date | None = None
     created_by: UUID | None = None
+    contributing_behavior: str | None = None
+    contributing_condition: str | None = None
 
 
 class ObservationUpdate(BaseModel):
@@ -299,6 +301,8 @@ class ObservationUpdate(BaseModel):
     assigned_company_id: UUID | None = None
     due_date: date | None = None
     closed_date: date | None = None
+    contributing_behavior: str | None = None
+    contributing_condition: str | None = None
 
 
 class ObservationResponse(BaseModel):
@@ -318,6 +322,8 @@ class ObservationResponse(BaseModel):
     due_date: date | None
     closed_date: date | None
     created_by: UUID | None
+    contributing_behavior: str | None
+    contributing_condition: str | None
     created_at: datetime
     updated_at: datetime
 

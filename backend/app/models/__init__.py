@@ -21,7 +21,7 @@ from app.models.document_management import (
 )
 from app.models.closeout import (
     CloseoutChecklist, CloseoutChecklistItem, CloseoutTemplate, CloseoutTemplateItem,
-    CompletionMilestone, Warranty, WarrantyAlert, WarrantyClaim,
+    CompletionMilestone, OmManual, Warranty, WarrantyAlert, WarrantyClaim,
 )
 
 __all__ = [
@@ -45,5 +45,5 @@ __all__ = [
     "Rfi", "Specification", "Submittal", "SubmittalPackage",
     # Closeout & Warranty
     "CloseoutChecklist", "CloseoutChecklistItem", "CloseoutTemplate", "CloseoutTemplateItem",
-    "CompletionMilestone", "Warranty", "WarrantyAlert", "WarrantyClaim",
+    "CompletionMilestone", "OmManual", "Warranty", "WarrantyAlert", "WarrantyClaim",
 ]

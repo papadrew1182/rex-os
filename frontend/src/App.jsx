@@ -29,6 +29,7 @@ import Meetings from "./pages/Meetings";
 import Observations from "./pages/Observations";
 import SafetyIncidents from "./pages/SafetyIncidents";
 import Warranties from "./pages/Warranties";
+import OmManuals from "./pages/OmManuals";
 import InsuranceCertificates from "./pages/InsuranceCertificates";
 import Notifications from "./pages/Notifications";
 import AdminJobs from "./pages/AdminJobs";
@@ -74,6 +75,7 @@ function Shell() {
           <SidebarItem to="/correspondence">Correspondence</SidebarItem>
           <div className="rex-sidebar-group">Closeout &amp; Warranty</div>
           <SidebarItem to="/warranties">Warranties</SidebarItem>
+          <SidebarItem to="/om-manuals">O&amp;M Manuals</SidebarItem>
           <div className="rex-sidebar-group">Compliance</div>
           <SidebarItem to="/insurance">Insurance Certificates</SidebarItem>
           <div className="rex-sidebar-group">Project</div>
@@ -133,6 +135,7 @@ function Shell() {
                 <Route path="/observations" element={<Observations />} />
                 <Route path="/safety" element={<SafetyIncidents />} />
                 <Route path="/warranties" element={<Warranties />} />
+                <Route path="/om-manuals" element={<OmManuals />} />
                 <Route path="/insurance" element={<InsuranceCertificates />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/admin/jobs" element={<AdminJobs />} />

@@ -60,6 +60,7 @@ from app.routes.change_event_line_items import router as change_event_line_items
 from app.routes.insurance_certificates import router as insurance_certificates_router
 from app.routes.admin_jobs import router as admin_jobs_router
 from app.routes.notifications import router as notifications_router
+from app.routes.om_manuals import router as om_manuals_router
 
 all_routers = [
     # Ops
@@ -95,6 +96,7 @@ all_routers = [
     warranties_router, warranty_claims_router, warranty_alerts_router,
     completion_milestones_router,
     closeout_readiness_router,
+    om_manuals_router,
     # Insurance
     insurance_certificates_router,
     # Jobs & Notifications

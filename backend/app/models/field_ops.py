@@ -165,6 +165,8 @@ class Observation(Base):
     due_date: Mapped[date | None] = mapped_column(Date)
     closed_date: Mapped[date | None] = mapped_column(Date)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), ForeignKey("rex.people.id"))
+    contributing_behavior: Mapped[str | None] = mapped_column(Text)
+    contributing_condition: Mapped[str | None] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
     updated_at: Mapped[datetime] = mapped_column(TIMESTAMP(timezone=True), nullable=False, server_default=text("now()"))
 

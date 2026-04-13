@@ -84,7 +84,7 @@ async def insurance_refresh_job(db: AsyncSession) -> str:
                 body=body,
                 source_type="insurance_certificate",
                 source_id=c.id,
-                action_path="/#/insurance",
+                action_path="/#/insurance?status=expired" if tier == "expired" else "/#/insurance?status=expiring_soon",
                 dedupe_key=dedupe,
             )
             notif_created += 1

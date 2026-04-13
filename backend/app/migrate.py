@@ -42,6 +42,9 @@ MIGRATION_ORDER: list[str] = [
     "003_phase21_p1_batch.sql",
     # Phase 31-32: job_runs + notifications tables
     "004_phase31_jobs_notifications.sql",
+    # Phase 38-39: schedule depth fields, project geo, company extras,
+    # observation root cause, closeout spec linkage, om_manuals table
+    "005_phase38_phase39_p2_batch.sql",
 ]
 
 def _find_migrations_dir() -> Path:

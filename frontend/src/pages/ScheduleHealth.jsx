@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash, ProgressBar } from "../ui";
+import { AlertCallout } from "../AlertCallout";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -77,7 +78,7 @@ function downloadCsv(filename, rows, headers) {
 }
 
 function exportActivitiesCsv(activities, project) {
-  const headers = ["wbs_code", "activity_number", "name", "start_date", "end_date", "actual_start_date", "actual_finish_date", "baseline_start", "baseline_end", "duration_days", "percent_complete", "variance_days", "float_days", "is_critical", "status"];
+  const headers = ["wbs_code", "activity_number", "name", "start_date", "end_date", "actual_start_date", "actual_finish_date", "baseline_start", "baseline_end", "duration_days", "percent_complete", "variance_days", "start_variance_days", "finish_variance_days", "free_float_days", "float_days", "is_critical", "status"];
   const rows = activities.map(a => ({
     ...a,
     is_critical: a.is_critical ? "CRITICAL" : "",
@@ -87,7 +88,7 @@ function exportActivitiesCsv(activities, project) {
 }
 
 function exportCriticalCsv(activities, project) {
-  const headers = ["wbs_code", "activity_number", "name", "end_date", "actual_finish_date", "percent_complete", "variance_days", "float_days", "is_critical"];
+  const headers = ["wbs_code", "activity_number", "name", "end_date", "actual_finish_date", "percent_complete", "variance_days", "float_days", "free_float_days", "is_critical"];
   const rows = activities.map(a => ({
     ...a,
     is_critical: a.is_critical ? "CRITICAL" : "NEAR-CRITICAL",
@@ -132,7 +133,7 @@ function renderPrintTable(activities, tab) {
   }
   if (tab === "critical") {
     return `<table>
-      <thead><tr><th>Activity</th><th>WBS</th><th>Planned End</th><th>Actual End</th><th>% Comp</th><th>Variance</th><th>Float</th><th>Status</th></tr></thead>
+      <thead><tr><th>Activity</th><th>WBS</th><th>Planned End</th><th>Actual End</th><th>% Comp</th><th>Variance</th><th>Float</th><th>Free Float</th><th>Status</th></tr></thead>
       <tbody>
         ${activities.map(a => `
           <tr>
@@ -143,6 +144,7 @@ function renderPrintTable(activities, tab) {
             <td>${a.percent_complete != null ? Math.round(a.percent_complete) + "%" : "—"}</td>
             <td class="${(a.variance_days || 0) > 0 ? "crit" : ""}">${a.variance_days != null ? (a.variance_days > 0 ? "+" + a.variance_days : a.variance_days) + "d" : "—"}</td>
             <td>${a.float_days ?? "—"}</td>
+            <td class="${a.free_float_days === 0 ? "crit" : ""}">${a.free_float_days != null ? a.free_float_days + "d" : "—"}</td>
             <td class="${a.is_critical ? "crit" : ""}">${a.is_critical ? "CRITICAL" : "NEAR"}</td>
           </tr>
         `).join("")}
@@ -151,7 +153,7 @@ function renderPrintTable(activities, tab) {
   }
   // Activities (default)
   return `<table>
-    <thead><tr><th>WBS</th><th>Activity #</th><th>Name</th><th>Start</th><th>End</th><th>% Comp</th><th>Variance</th><th>Float</th><th>Status</th></tr></thead>
+    <thead><tr><th>WBS</th><th>Activity #</th><th>Name</th><th>Start</th><th>End</th><th>% Comp</th><th>Variance</th><th>Start Var</th><th>Finish Var</th><th>Free Float</th><th>Float</th><th>Status</th></tr></thead>
     <tbody>
       ${activities.map(a => `
         <tr>
@@ -162,6 +164,9 @@ function renderPrintTable(activities, tab) {
           <td>${fmtDate(a.end_date)}</td>
           <td>${a.percent_complete != null ? Math.round(a.percent_complete) + "%" : "—"}</td>
           <td class="${(a.variance_days || 0) > 0 ? "crit" : ""}">${a.variance_days != null ? (a.variance_days > 0 ? "+" + a.variance_days : a.variance_days) + "d" : "—"}</td>
+          <td class="${(a.start_variance_days || 0) > 0 ? "crit" : ""}">${a.start_variance_days != null ? (a.start_variance_days > 0 ? "+" + a.start_variance_days : a.start_variance_days) + "d" : "—"}</td>
+          <td class="${(a.finish_variance_days || 0) > 0 ? "crit" : ""}">${a.finish_variance_days != null ? (a.finish_variance_days > 0 ? "+" + a.finish_variance_days : a.finish_variance_days) + "d" : "—"}</td>
+          <td class="${a.free_float_days === 0 ? "crit" : ""}">${a.free_float_days != null ? a.free_float_days + "d" : "—"}</td>
           <td>${a.float_days ?? "—"}</td>
           <td>${deriveStatus(a)}</td>
         </tr>
@@ -636,6 +641,9 @@ function DetailPanel({ activity, onClose, peopleMap, companiesMap, costCodesMap 
           <Row label="Baseline End" value={fmtDate(activity.baseline_end)} />
           <Row label="Variance" value={activity.variance_days != null ? `${activity.variance_days}d` : "—"} />
           <Row label="Float" value={activity.float_days != null ? `${activity.float_days}d` : "—"} />
+          <Row label="Start Variance" value={activity.start_variance_days != null ? (activity.start_variance_days > 0 ? `+${activity.start_variance_days}d` : `${activity.start_variance_days}d`) : "—"} />
+          <Row label="Finish Variance" value={activity.finish_variance_days != null ? (activity.finish_variance_days > 0 ? `+${activity.finish_variance_days}d` : `${activity.finish_variance_days}d`) : "—"} />
+          <Row label="Free Float" value={activity.free_float_days != null ? `${activity.free_float_days}d` : "—"} />
         </Card>
         <Card title="Assignment">
           <Row label="Company" value={companyName} />
@@ -816,6 +824,9 @@ function ActivitiesView({ filteredActivities, openDetail }) {
                 <SortTh k="percent_complete" label="% Complete" right />
                 <SortTh k="variance_days" label="Variance" right />
                 <SortTh k="float_days" label="Float" right />
+                <SortTh k="start_variance_days" label="Start Var" right />
+                <SortTh k="finish_variance_days" label="Finish Var" right />
+                <SortTh k="free_float_days" label="Free Float" right />
                 <th>Critical</th>
                 <th>Status</th>
               </tr>
@@ -837,6 +848,15 @@ function ActivitiesView({ filteredActivities, openDetail }) {
                     <td style={{ textAlign: "right" }}>{a.percent_complete != null ? `${Math.round(a.percent_complete)}%` : "—"}</td>
                     <td style={{ textAlign: "right", color: vColor, fontWeight: variance > 0 ? 700 : 400 }}>{variance != null ? (variance > 0 ? `+${variance}d` : `${variance}d`) : "—"}</td>
                     <td style={{ textAlign: "right" }}>{a.float_days ?? "—"}</td>
+                    <td style={{ textAlign: "right", color: a.start_variance_days == null ? "" : a.start_variance_days > 5 ? "var(--rex-red)" : a.start_variance_days > 0 ? "var(--rex-amber)" : "var(--rex-green)", fontWeight: a.start_variance_days > 0 ? 700 : 400 }}>
+                      {a.start_variance_days != null ? (a.start_variance_days > 0 ? `+${a.start_variance_days}d` : `${a.start_variance_days}d`) : "—"}
+                    </td>
+                    <td style={{ textAlign: "right", color: a.finish_variance_days == null ? "" : a.finish_variance_days > 5 ? "var(--rex-red)" : a.finish_variance_days > 0 ? "var(--rex-amber)" : "var(--rex-green)", fontWeight: a.finish_variance_days > 0 ? 700 : 400 }}>
+                      {a.finish_variance_days != null ? (a.finish_variance_days > 0 ? `+${a.finish_variance_days}d` : `${a.finish_variance_days}d`) : "—"}
+                    </td>
+                    <td style={{ textAlign: "right", color: a.free_float_days == null ? "" : a.free_float_days > 5 ? "var(--rex-red)" : a.free_float_days > 0 ? "var(--rex-amber)" : "var(--rex-green)" }}>
+                      {a.free_float_days != null ? `${a.free_float_days}d` : "—"}
+                    </td>
                     <td>{a.is_critical ? <span className="rex-badge rex-badge-red">CRITICAL</span> : <span className="rex-badge rex-badge-gray">—</span>}</td>
                     <td>{statusBadge(a)}</td>
                   </tr>
@@ -1028,6 +1048,7 @@ function CriticalView({ filteredActivities, openDetail }) {
                 <th style={{ textAlign: "right" }}>% Complete</th>
                 <th style={{ textAlign: "right" }}>Variance</th>
                 <th style={{ textAlign: "right" }}>Float</th>
+                <th style={{ textAlign: "right" }}>Free Float</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -1049,6 +1070,9 @@ function CriticalView({ filteredActivities, openDetail }) {
                     <td style={{ textAlign: "right" }}>{a.percent_complete != null ? `${Math.round(a.percent_complete)}%` : "—"}</td>
                     <td style={{ textAlign: "right", color: vColor, fontWeight: variance > 0 ? 700 : 400 }}>{variance != null ? (variance > 0 ? `+${variance}d` : `${variance}d`) : "—"}</td>
                     <td style={{ textAlign: "right" }}>{a.float_days ?? "—"}</td>
+                    <td style={{ textAlign: "right", color: a.free_float_days === 0 ? "var(--rex-red)" : "inherit", fontWeight: a.free_float_days === 0 ? 700 : 400 }}>
+                      {a.free_float_days != null ? `${a.free_float_days}d` : "—"}
+                    </td>
                     <td>{a.is_critical ? <span className="rex-badge rex-badge-red">CRITICAL</span> : <span className="rex-badge rex-badge-amber">NEAR</span>}</td>
                   </tr>
                 );
@@ -1221,6 +1245,7 @@ export default function ScheduleHealth() {
     <div>
       <h1 className="rex-h1" style={{ marginBottom: 4 }}>Schedule Workbench</h1>
       <p className="rex-muted" style={{ marginBottom: 12 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
+      <AlertCallout notificationTypes={["schedule_drift"]} title="Active alerts on this project" />
 
       {/* ── Persistent Toolbar ── */}
       <div className="rex-card" style={{ marginBottom: 12, padding: "12px 14px" }}>

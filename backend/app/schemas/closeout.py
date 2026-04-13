@@ -96,19 +96,26 @@ class CloseoutChecklistItemCreate(BaseModel):
     status: ChecklistItemStatus = "not_started"
     assigned_company_id: UUID | None = None; assigned_person_id: UUID | None = None
     due_date: date | None = None; notes: str | None = None; sort_order: int = 0
+    spec_division: str | None = None
+    spec_section: str | None = None
 
 class CloseoutChecklistItemUpdate(BaseModel):
     status: ChecklistItemStatus | None = None
     assigned_company_id: UUID | None = None; assigned_person_id: UUID | None = None
     due_date: date | None = None; completed_date: date | None = None
     completed_by: UUID | None = None; notes: str | None = None; sort_order: int | None = None
+    spec_division: str | None = None
+    spec_section: str | None = None
 
 class CloseoutChecklistItemResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID; checklist_id: UUID; category: str; item_number: int; name: str; status: str
     assigned_company_id: UUID | None; assigned_person_id: UUID | None
     due_date: date | None; completed_date: date | None; completed_by: UUID | None
-    notes: str | None; sort_order: int; created_at: datetime; updated_at: datetime
+    notes: str | None; sort_order: int
+    spec_division: str | None
+    spec_section: str | None
+    created_at: datetime; updated_at: datetime
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -380,3 +387,46 @@ class WarrantyStatusRefreshResponse(BaseModel):
     total_warranties: int
     updated_count: int
     by_status: dict[str, int]
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# O&M Manuals
+# ═══════════════════════════════════════════════════════════════════════════
+
+OmManualStatus = Literal["pending", "partial", "received", "approved", "n_a"]
+
+
+class OmManualCreate(BaseModel):
+    project_id: UUID
+    spec_section: str
+    spec_title: str | None = None
+    required_count: int = 1
+    received_count: int = 0
+    status: OmManualStatus = "pending"
+    vendor_company_id: UUID | None = None
+    notes: str | None = None
+
+
+class OmManualUpdate(BaseModel):
+    spec_section: str | None = None
+    spec_title: str | None = None
+    required_count: int | None = None
+    received_count: int | None = None
+    status: OmManualStatus | None = None
+    vendor_company_id: UUID | None = None
+    notes: str | None = None
+
+
+class OmManualResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    project_id: UUID
+    spec_section: str
+    spec_title: str | None
+    required_count: int
+    received_count: int
+    status: str
+    vendor_company_id: UUID | None
+    notes: str | None
+    created_at: datetime
+    updated_at: datetime

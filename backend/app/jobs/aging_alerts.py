@@ -70,41 +70,71 @@ async def aging_alerts_job(db: AsyncSession) -> str:
 
         recipients = await get_project_user_ids(db, p.id)
 
-        # Emit ONE summary notification per project (low noise)
-        parts = []
+        # RFI aging summary
         if overdue_rfis:
-            parts.append(f"{len(overdue_rfis)} overdue RFI{'s' if len(overdue_rfis) != 1 else ''}")
+            for user_id in recipients:
+                dedupe = f"aging:rfi:{p.id}"
+                keep_keys.add(dedupe)
+                await upsert_notification(
+                    db,
+                    user_account_id=user_id,
+                    project_id=p.id,
+                    domain="field_ops",
+                    notification_type="aging_summary_rfi",
+                    severity="warning",
+                    title=f"{len(overdue_rfis)} overdue RFI{'s' if len(overdue_rfis) != 1 else ''}: {p.name}",
+                    body=f"{len(overdue_rfis)} RFI{'s' if len(overdue_rfis) != 1 else ''} past due_date",
+                    source_type="project",
+                    source_id=p.id,
+                    action_path="/#/rfis?status=open",
+                    dedupe_key=dedupe,
+                    metadata={"overdue_rfi_count": len(overdue_rfis)},
+                )
+                notif_count += 1
+
+        # Submittal aging summary
         if overdue_subs:
-            parts.append(f"{len(overdue_subs)} overdue submittal{'s' if len(overdue_subs) != 1 else ''}")
+            for user_id in recipients:
+                dedupe = f"aging:submittal:{p.id}"
+                keep_keys.add(dedupe)
+                await upsert_notification(
+                    db,
+                    user_account_id=user_id,
+                    project_id=p.id,
+                    domain="field_ops",
+                    notification_type="aging_summary_submittal",
+                    severity="warning",
+                    title=f"{len(overdue_subs)} overdue submittal{'s' if len(overdue_subs) != 1 else ''}: {p.name}",
+                    body=f"{len(overdue_subs)} submittal{'s' if len(overdue_subs) != 1 else ''} past due_date",
+                    source_type="project",
+                    source_id=p.id,
+                    action_path="/#/submittals?status=submitted",
+                    dedupe_key=dedupe,
+                    metadata={"overdue_submittal_count": len(overdue_subs)},
+                )
+                notif_count += 1
+
+        # Punch aging summary
         if aged_punches:
-            parts.append(f"{len(aged_punches)} aged punch item{'s' if len(aged_punches) != 1 else ''}")
-
-        body = "Project " + p.name + " has: " + ", ".join(parts)
-        severity = "warning" if (overdue_rfis or overdue_subs) else "info"
-
-        for user_id in recipients:
-            dedupe = f"aging:{p.id}:summary"
-            keep_keys.add(dedupe)
-            await upsert_notification(
-                db,
-                user_account_id=user_id,
-                project_id=p.id,
-                domain="field_ops",
-                notification_type="aging_summary",
-                severity=severity,
-                title=f"Aging items: {p.name}",
-                body=body,
-                source_type="project",
-                source_id=p.id,
-                action_path="/#/rfis",  # most actionable landing
-                dedupe_key=dedupe,
-                metadata={
-                    "overdue_rfi_count": len(overdue_rfis),
-                    "overdue_submittal_count": len(overdue_subs),
-                    "aged_punch_count": len(aged_punches),
-                },
-            )
-            notif_count += 1
+            for user_id in recipients:
+                dedupe = f"aging:punch:{p.id}"
+                keep_keys.add(dedupe)
+                await upsert_notification(
+                    db,
+                    user_account_id=user_id,
+                    project_id=p.id,
+                    domain="field_ops",
+                    notification_type="aging_summary_punch",
+                    severity="info",
+                    title=f"{len(aged_punches)} aged punch item{'s' if len(aged_punches) != 1 else ''}: {p.name}",
+                    body=f"{len(aged_punches)} punch item{'s' if len(aged_punches) != 1 else ''} open over {AGING_THRESHOLD_DAYS} days",
+                    source_type="project",
+                    source_id=p.id,
+                    action_path="/#/punch-list?status=open",
+                    dedupe_key=dedupe,
+                    metadata={"aged_punch_count": len(aged_punches)},
+                )
+                notif_count += 1
 
     cleared = await resolve_notifications_by_dedupe_prefix(
         db, dedupe_prefix="aging:", keep_keys=keep_keys,

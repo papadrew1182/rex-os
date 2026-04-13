@@ -50,6 +50,54 @@ def anyio_backend():
     return "asyncio"
 
 
+# ── Advisory lock cleanup (test-session startup) ───────────────────────────
+#
+# When a pytest process is interrupted or asyncpg connections are not cleanly
+# closed (common on Windows), session-level advisory locks can linger on
+# PostgreSQL backend connections from a previous test run. This fixture
+# terminates those stale backends at the start of each test session.
+#
+# pg_terminate_backend requires pg_signal_backend or superuser. If the DB
+# user lacks that privilege, the termination is skipped silently.
+
+@pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
+async def _terminate_stale_lock_backends():
+    """Kill PG backends holding any advisory locks (from prior test runs)."""
+    from app.database import engine
+    from sqlalchemy import text as _t
+
+    try:
+        async with engine.connect() as conn:
+            # Find any backends holding advisory locks other than our own connection.
+            result = await conn.execute(
+                _t(
+                    "SELECT DISTINCT pid FROM pg_locks "
+                    "WHERE locktype = 'advisory' "
+                    "  AND pid <> pg_backend_pid()"
+                )
+            )
+            pids = [row[0] for row in result.fetchall()]
+            for pid in pids:
+                try:
+                    await conn.execute(
+                        _t("SELECT pg_terminate_backend(:pid)"), {"pid": pid}
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+            if pids:
+                import logging as _logging
+                _logging.getLogger("rex.tests").info(
+                    "terminated %d stale backend(s) holding advisory locks: %s",
+                    len(pids),
+                    pids,
+                )
+            await conn.commit()
+    except Exception:  # noqa: BLE001
+        pass  # Best-effort; never block tests due to cleanup failure
+
+    yield
+
+
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def client():
     transport = ASGITransport(app=app)

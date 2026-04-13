@@ -88,7 +88,7 @@ async def schedule_snapshot_job(db: AsyncSession) -> str:
                 body=f"Schedule '{sched.name}' has worst critical drift of {worst_drift}d.",
                 source_type="schedule",
                 source_id=sched.id,
-                action_path="/#/schedule",
+                action_path="/#/schedule?tab=critical",
                 dedupe_key=dedupe,
             )
             notif_count += 1

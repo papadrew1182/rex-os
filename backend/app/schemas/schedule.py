@@ -85,6 +85,9 @@ class ScheduleActivityCreate(BaseModel):
     location: str | None = None
     notes: str | None = None
     sort_order: int = 0
+    start_variance_days: int | None = None
+    finish_variance_days: int | None = None
+    free_float_days: int | None = None
 
 
 class ScheduleActivityUpdate(BaseModel):
@@ -111,6 +114,9 @@ class ScheduleActivityUpdate(BaseModel):
     location: str | None = None
     notes: str | None = None
     sort_order: int | None = None
+    start_variance_days: int | None = None
+    finish_variance_days: int | None = None
+    free_float_days: int | None = None
 
 
 class ScheduleActivityResponse(BaseModel):
@@ -141,6 +147,9 @@ class ScheduleActivityResponse(BaseModel):
     location: str | None
     notes: str | None
     sort_order: int
+    start_variance_days: int | None
+    finish_variance_days: int | None
+    free_float_days: int | None
     created_at: datetime
     updated_at: datetime
 

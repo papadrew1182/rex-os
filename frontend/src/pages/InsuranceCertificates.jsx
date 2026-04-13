@@ -4,6 +4,7 @@ import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
 import { FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select, WriteButton, cleanPayload } from "../forms";
 import { usePermissions } from "../permissions";
 import { FilePreviewDrawer } from "../preview";
+import { AlertCallout } from "../AlertCallout";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 const fmt = (n) => n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
@@ -148,7 +149,8 @@ export default function InsuranceCertificates() {
           <WriteButton onClick={openCreate}>+ New Certificate</WriteButton>
         </div>
       </div>
-      <p className="rex-muted" style={{ marginBottom: 20 }}>Vendor insurance compliance tracking. Status auto-computes from expiry date when refreshed.</p>
+      <p className="rex-muted" style={{ marginBottom: 12 }}>Vendor insurance compliance tracking. Status auto-computes from expiry date when refreshed.</p>
+      <AlertCallout notificationTypes={["insurance_expiry"]} title="Active alerts on this project" />
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
         <StatCard label="Total Certificates" value={summary?.total ?? certs.length} />

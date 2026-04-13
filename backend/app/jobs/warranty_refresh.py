@@ -87,7 +87,7 @@ async def warranty_refresh_job(db: AsyncSession) -> str:
                 body=body_text,
                 source_type="warranty",
                 source_id=w.id,
-                action_path=f"/#/warranties",
+                action_path=f"/#/warranties?status=expired" if tier == "expired" else "/#/warranties?status=expiring_soon",
                 dedupe_key=dedupe,
             )
             notif_created += 1
