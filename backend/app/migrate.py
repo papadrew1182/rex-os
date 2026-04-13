@@ -47,6 +47,14 @@ MIGRATION_ORDER: list[str] = [
     "005_phase38_phase39_p2_batch.sql",
 ]
 
+# ── Optional demo data (Phase 41) ─────────────────────────────────────────
+#
+# Intentionally NOT part of MIGRATION_ORDER. Gated by REX_DEMO_SEED at the
+# Python layer so production can safely run schema migrations without ever
+# touching the demo data set. Applied via ``apply_demo_seed()`` below.
+
+DEMO_SEED_FILE: str = "rex2_demo_seed.sql"
+
 def _find_migrations_dir() -> Path:
     """Locate the migrations directory robustly across local + container layouts.
 
@@ -169,6 +177,38 @@ async def apply_migrations(
             break  # stop on first failure
 
     return results
+
+
+async def apply_demo_seed(
+    *,
+    migrations_dir: Path | None = None,
+) -> MigrationResult:
+    """Apply the optional demo data seed (Bishop Modern) if enabled.
+
+    Gated at the Python layer (not MIGRATION_ORDER) so production deploys
+    can safely run schema migrations without pulling in demo rows. The
+    underlying SQL file is idempotent (``ON CONFLICT DO NOTHING``) so
+    re-running is safe.
+    """
+    import db as legacy_db
+
+    base = migrations_dir or MIGRATIONS_DIR
+    path = base / DEMO_SEED_FILE
+    if not path.is_file():
+        log.warning("Demo seed file not found: %s", path)
+        return MigrationResult(DEMO_SEED_FILE, "missing")
+
+    sql = path.read_text(encoding="utf-8")
+    pool = await legacy_db.get_pool()
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute(sql)
+        log.info("Demo seed applied: %s", DEMO_SEED_FILE)
+        return MigrationResult(DEMO_SEED_FILE, "ok")
+    except Exception as exc:
+        detail = str(exc).splitlines()[0]
+        log.error("Demo seed FAILED: %s — %s", DEMO_SEED_FILE, detail)
+        return MigrationResult(DEMO_SEED_FILE, "error", detail)
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────
