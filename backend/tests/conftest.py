@@ -16,6 +16,12 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 _TEST_STORAGE_DIR = tempfile.mkdtemp(prefix="rex_test_storage_")
 os.environ["REX_STORAGE_PATH"] = _TEST_STORAGE_DIR
 
+# Disable slowapi login rate limiting under pytest so the ~20 login hits
+# across the suite don't trip the production 10/minute limiter. Must be
+# set BEFORE ``from main import app`` because ``app.rate_limit`` reads the
+# env var at module-import time.
+os.environ.setdefault("REX_LOGIN_RATE_LIMIT", "100000/minute")
+
 from main import app  # noqa: E402
 from app.database import engine, get_db  # noqa: E402
 from app.dependencies import get_current_user  # noqa: E402

@@ -1,13 +1,14 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from pydantic import BaseModel, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.dependencies import get_current_user
 from app.models.foundation import UserAccount
+from app.rate_limit import LOGIN_RATE_LIMIT, limiter
 from app.services import auth as auth_svc
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -50,7 +51,14 @@ class LogoutAllResponse(BaseModel):
 
 
 @router.post("/login", response_model=LoginResponse)
-async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit(LOGIN_RATE_LIMIT)
+async def login(
+    request: Request,
+    data: LoginRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    # ``request`` is required by slowapi's limiter (key_func=get_remote_address).
+    # It is intentionally unused in the body.
     user, token = await auth_svc.login(db, data.email, data.password)
     return LoginResponse(
         token=token,

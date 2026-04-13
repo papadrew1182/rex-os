@@ -6,9 +6,12 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import db
+from app.rate_limit import limiter
 from app.routes import all_routers
 
 load_dotenv()
@@ -18,6 +21,38 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 log = logging.getLogger(__name__)
+
+
+# ── Sentry (Phase 44) ──────────────────────────────────────────────────────
+#
+# Optional backend error tracking. Gated by REX_SENTRY_DSN so local/dev and
+# any deploy without a DSN stay silent (no background network, no startup
+# slowdown). Must initialize BEFORE ``FastAPI()`` so Sentry's integrations
+# can hook ASGI send/receive.
+
+_sentry_dsn = os.getenv("REX_SENTRY_DSN", "").strip()
+if _sentry_dsn:
+    try:
+        import sentry_sdk
+        from sentry_sdk.integrations.fastapi import FastApiIntegration
+        from sentry_sdk.integrations.starlette import StarletteIntegration
+
+        sentry_sdk.init(
+            dsn=_sentry_dsn,
+            integrations=[StarletteIntegration(), FastApiIntegration()],
+            traces_sample_rate=float(os.getenv("REX_SENTRY_TRACES", "0.0")),
+            environment=os.getenv("ENVIRONMENT", "production"),
+            release=(
+                os.getenv("REX_RELEASE")
+                or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+                or os.getenv("GITHUB_SHA")
+                or None
+            ),
+            send_default_pii=False,
+        )
+        log.info("sentry initialized dsn_host=%s", _sentry_dsn.split("@")[-1].split("/")[0])
+    except Exception as exc:  # noqa: BLE001
+        log.error("sentry init failed error=%r", exc)
 
 MIGRATE_SECRET = os.getenv("MIGRATE_SECRET", "rex-migrate-2026")
 FRONTEND_DIST = os.path.join(os.path.dirname(__file__), "..", "frontend", "dist")
@@ -43,6 +78,20 @@ async def lifespan(app: FastAPI):
         except Exception as exc:  # noqa: BLE001
             log.error("auto_migrate exception error=%r", exc)
 
+    # Optional demo data seed for canonical Bishop Modern project.
+    # Independent from REX_AUTO_MIGRATE so production can run schema
+    # migrations without importing demo rows.
+    if os.getenv("REX_DEMO_SEED", "").lower() in ("1", "true", "yes"):
+        try:
+            from app.migrate import apply_demo_seed
+            log.info("REX_DEMO_SEED enabled — applying demo data")
+            res = await apply_demo_seed()
+            log.info("demo_seed complete file=%s status=%s", res.filename, res.status)
+            if res.status == "error":
+                log.error("demo_seed failed detail=%s", res.detail)
+        except Exception as exc:  # noqa: BLE001
+            log.error("demo_seed exception error=%r", exc)
+
     # Start background job scheduler if enabled
     try:
         from app.jobs import start_scheduler
@@ -60,6 +109,11 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Rex OS", version="0.2.0", lifespan=lifespan)
+
+# Rate limiter (Phase 44). The Limiter instance lives in app.rate_limit so
+# routers can decorate individual endpoints without importing this module.
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
 # ── CORS ────────────────────────────────────────────────────────────────────

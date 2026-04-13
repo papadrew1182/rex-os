@@ -12,6 +12,7 @@
   that could leak connection details.
 """
 
+import os
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
@@ -24,6 +25,19 @@ from app.services.storage import StorageConfigError, get_storage
 router = APIRouter(prefix="/api", tags=["ops"])
 
 
+# Backend build identity. Resolved once at import time so ``/api/version`` is
+# cheap and doesn't re-read env on every call.
+_BACKEND_VERSION = "0.2.0"
+_BACKEND_COMMIT = (
+    os.getenv("REX_RELEASE")
+    or os.getenv("RAILWAY_GIT_COMMIT_SHA")
+    or os.getenv("GITHUB_SHA")
+    or "dev"
+)
+_BACKEND_BUILD_TIME = os.getenv("REX_BUILD_TIME", "")
+_BACKEND_ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
+
+
 @router.get("/health")
 async def health() -> dict:
     """Liveness: process is up and event loop is responsive.
@@ -33,6 +47,29 @@ async def health() -> dict:
     return {
         "status": "ok",
         "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+
+
+@router.get("/version")
+async def version() -> dict:
+    """Release identity for the running backend.
+
+    Used by operators + the deployed-smoke workflow to verify *which* build
+    is actually serving traffic. Intentionally unauthenticated and cheap so
+    it works from curl at any time.
+
+    Populated from platform-provided env vars at import time:
+      - ``REX_RELEASE`` (explicit override)
+      - ``RAILWAY_GIT_COMMIT_SHA`` (Railway builds)
+      - ``GITHUB_SHA`` (GitHub Actions)
+      - falls back to ``dev``
+    """
+    return {
+        "service": "rex-os-backend",
+        "version": _BACKEND_VERSION,
+        "commit": _BACKEND_COMMIT,
+        "build_time": _BACKEND_BUILD_TIME,
+        "environment": _BACKEND_ENVIRONMENT,
     }
 
 
