@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 import db
 from app.routes import all_routers
@@ -84,6 +85,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Trust X-Forwarded-Proto from Railway's edge so FastAPI emits https:// slash
+# redirects instead of http:// ones. Required because uvicorn's default
+# --forwarded-allow-ips is 127.0.0.1 only, and Railway's edge proxies from a
+# different internal IP. Without this, HTTPS frontends silently fail on any
+# endpoint that triggers FastAPI's trailing-slash redirect.
+app.add_middleware(ProxyHeadersMiddleware, trusted_hosts="*")
 
 
 # Ops endpoints (/api/health, /api/ready) are mounted via app.routes.ops
