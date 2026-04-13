@@ -1,7 +1,50 @@
 # Rex OS Field Parity Backlog
 
-> Audit Date: 2026-04-11
+> Original audit date: 2026-04-11
+> Last reconciled: **2026-04-12** (phase 40 reconciliation pass)
 > Derived from: FIELD_PARITY_MATRIX.md, FIELD_DECISIONS.md, SCREEN_TO_DATA_MAP.md
+
+---
+
+## CURRENT STATE (Post-Phase 40)
+
+**Parity-class backlog is empty except for one deferred major item.**
+
+- **P0 items**: 0 open (none were ever opened in the audit).
+- **P1 items**: 0 open — all 11 closed across phases 3, 4, 5, and 21.
+- **Practical P2 items (P2-1 through P2-8)**: 0 open — all 8 closed across
+  phases 21 (P1/P2 batch), 31–34 (notifications/alerts), and 38/39 (schedule
+  variance + free float, project lat/lng, company mobile/website, observation
+  contributing fields, closeout checklist spec fields, O&M manual tracker).
+- **P2-9 bonus / performance system**: **deferred major work** — explicitly out
+  of scope until a product design pass. Not tracked as "open" here because
+  closing it is a multi-sprint product redesign, not a parity fix.
+
+The sections below are preserved as audit history for how each P1/P2 item was
+actually closed. They should be read as a "completed work log," not an
+active backlog.
+
+---
+
+## STATUS UPDATE — 2026-04-12 (Phase 38/39)
+
+### All practical P2 items CLOSED ✅
+
+Migration `005_phase38_phase39_p2_batch.sql` closed the remaining P2 items:
+
+| Item | Closure |
+|---|---|
+| P2-1 projects.latitude/longitude | ✅ Phase 39 (migration 005 + `Project` model + `/api/projects/` CRUD + test_phase38_phase39_p2) |
+| P2-2 observations.contributing_behavior/contributing_condition | ✅ Phase 39 |
+| P2-3 closeout_checklist_items.spec_division/spec_section | ✅ Phase 39 (display-only; edit drawer deferred frontend-side) |
+| P2-4 `om_manuals` table + CRUD + OmManuals page | ✅ Phase 39 |
+| P2-5 companies.mobile_phone/website | ✅ Phase 39 |
+| P2-6 schedule_activities.start_variance_days/finish_variance_days | ✅ Phase 38 |
+| P2-7 schedule_activities.free_float_days | ✅ Phase 38 |
+| P2-8 generic alert/notification infrastructure | ✅ Phases 31–34 (see section below) |
+
+The only remaining P2 item is **P2-9 bonus/performance system**, which is
+deferred major work, not an open backlog item.
 
 ---
 
@@ -14,8 +57,6 @@
   - 5 user-facing API endpoints + admin job-trigger endpoints.
   - Topbar bell (60 s poll) + full Notifications page.
   - Domain-specific alert tables like `warranty_alerts` are preserved as the canonical source; `rex.notifications` is the delivery/inbox layer.
-
-All remaining P2 items (P2-1 through P2-7, P2-9) are unchanged.
 
 ---
 
@@ -42,16 +83,16 @@ The following items from the original April 11 audit have been **closed**:
 
 **P1 backlog is now empty.**
 
-### P2 Items: still open
-- P2-1 latitude/longitude on projects (not yet needed)
-- P2-2 contributing_behavior/condition on observations (root cause analysis)
-- P2-3 spec_division/section on closeout_checklist_items
-- P2-4 O&M Manual Tracker table
-- P2-5 mobile_phone/website on companies
-- P2-6 start_variance/finish_variance separation (currently single variance_days)
-- P2-7 free_float on schedule_activities (currently single float_days)
-- P2-8 Notification/alert infrastructure (warranty_alerts exists; general alerts deferred)
-- P2-9 Bonus/performance system (phase 2+ design needed)
+### P2 Items (as of this phase 25 update — see phase 38/39 section above for final state)
+- P2-1 latitude/longitude on projects → **CLOSED in phase 39**
+- P2-2 contributing_behavior/condition on observations → **CLOSED in phase 39**
+- P2-3 spec_division/section on closeout_checklist_items → **CLOSED in phase 39** (display-only; edit drawer deferred)
+- P2-4 O&M Manual Tracker table → **CLOSED in phase 39** (new `om_manuals` table + page)
+- P2-5 mobile_phone/website on companies → **CLOSED in phase 39**
+- P2-6 start_variance/finish_variance separation → **CLOSED in phase 38**
+- P2-7 free_float on schedule_activities → **CLOSED in phase 38**
+- P2-8 Notification/alert infrastructure → **CLOSED in phases 31–34**
+- P2-9 Bonus/performance system → **DEFERRED** major product work (see "Deferred major work" section)
 
 ### Intentionally excluded (Procore mirror baggage)
 - procore_id, synced_at, sync_source, is_deleted, deleted_at on every table
@@ -59,12 +100,31 @@ The following items from the original April 11 audit have been **closed**:
 - Procore internal status/type/reason mapping metadata
 - Procore datagrid_uuid / datagrid_created_at fields
 
-### Sprint progress summary
-- **35 phases completed** (1 audit + 34 build phases)
-- **4 migrations applied** (001 base + 002 phase 4-5 batch + 003 phase 21 batch + 004 phase 31-35 jobs+notifications)
+### Sprint progress summary (phase 25 snapshot — superseded by phase 40)
+- **35 phases completed at time of this update** (1 audit + 34 build phases)
+- **4 migrations applied at time of this update** — superseded: there are now
+  **8 migrations total** (4 `rex2_*` bootstrap files + `002` through `005`
+  phase-numbered batches). See `migrations/` and `BACKEND_ROADMAP.md`.
 - **All P0 + P1 audited gaps closed**
 - **P2-8 also closed** (generic notification/alert infrastructure shipped in phases 32-34)
 - **No mock data anywhere** — every screen reads/writes real backend
+
+### Deferred major work (not an "open P2" item)
+
+- **P2-9 bonus / performance system** — ~12 tables in the original Rex Procore
+  schema (`quarterly_scorecards`, `milestone_bonus_pools`, `buyout_savings`,
+  `ebitda_growth`, `achievements`, `leaderboard_metrics`, etc.). Requires a
+  full product design pass before any engineering work. Not blocking any
+  current product surface. **Intentionally deferred — not tracked as open
+  parity work in this backlog.**
+
+---
+
+> **Reader note (phase 40 reconciliation):** Every P1 and P2 item enumerated
+> below has been **closed** except for P2-9 (bonus/performance system). The
+> detailed descriptions are preserved as audit history so you can see what
+> shipped and how. See the "CURRENT STATE" summary at the top of this file
+> for the active picture.
 
 ---
 
@@ -371,23 +431,47 @@ The following items from the original April 11 audit have been **closed**:
 
 ---
 
-## Backlog Summary
+## Backlog Summary (Historical → Current)
 
-| Priority | Count | Schema Columns | New Tables | Effort |
-|---|---|---|---|---|
-| P0 | 0 | 0 | 0 | None |
-| P1 | 11 | ~18 columns | 1 (change_event_line_items) | Small-medium |
-| P2 | 9 | ~12 columns | 1 (om_manuals) + design work | Medium-large |
+| Priority | Original Count | Remaining Open | Notes |
+|---|---|---|---|
+| P0 | 0 | 0 | None ever opened |
+| P1 | 11 | **0** | All closed phases 3–5, 21 |
+| P2 | 9 | **0 practical, 1 deferred** | P2-1..P2-8 closed phases 21, 31–34, 38, 39 · P2-9 bonus/performance deferred |
 
-### Recommended Execution Order for P1
+### How each P1 closed
 
-1. **P1-1 + P1-2**: closed_by + is_critical_path (punch/submittals) - enables Punch List and Submittal screens
-2. **P1-3 + P1-4**: rfi_manager + submittal_manager - enables RFI and Submittal management
-3. **P1-5 + P1-6**: actual dates + WBS - enriches Schedule Health
-4. **P1-7**: estimated_completion_date on commitments - enables Commitment screen
-5. **P1-8**: forecast_date + percent_complete on milestones - enriches milestone tracking
-6. **P1-9**: insurance detail - enables vendor compliance
-7. **P1-10**: warranty system/manufacturer - enriches warranty management
-8. **P1-11**: CE line items - enables full Change Order workflow
+| Item | Sprint |
+|---|---|
+| P1-1 closed_by on punch_items | Phase 4 |
+| P1-2 is_critical_path on punch_items + submittals | Phase 4 |
+| P1-3 rfi_manager on rfis | Phase 4 |
+| P1-4 submittal_manager_id on submittals | Phase 4 |
+| P1-5 actual_start/actual_finish_date on schedule_activities | Phase 21 |
+| P1-6 wbs_code on schedule_activities | Phase 21 |
+| P1-7 estimated_completion_date on commitments | Phase 3 |
+| P1-8 forecast_date + percent_complete on completion_milestones | Phase 21 |
+| P1-9 Insurance detail → `insurance_certificates` table | Phase 21 |
+| P1-10 system_or_product + manufacturer on warranties | Phase 21 |
+| P1-11 change_event_line_items table | Phase 5 |
 
-All P1 items can be done as a single migration batch or incrementally per screen build.
+### How each practical P2 closed
+
+| Item | Sprint |
+|---|---|
+| P2-1 projects.latitude / longitude | Phase 39 |
+| P2-2 observations contributing_behavior / contributing_condition | Phase 39 |
+| P2-3 closeout_checklist_items spec_division / spec_section | Phase 39 (display-only; edit drawer deferred) |
+| P2-4 O&M manual tracker (`om_manuals` table + CRUD + OmManuals page) | Phase 39 |
+| P2-5 companies.mobile_phone / website | Phase 39 |
+| P2-6 schedule start_variance_days / finish_variance_days | Phase 38 |
+| P2-7 schedule free_float_days | Phase 38 |
+| P2-8 generic notification/alert infrastructure | Phases 31–34 |
+
+### What remains
+
+- **P2-9 Bonus / performance system** — **deferred**, not open. Scope requires
+  a product design pass before any engineering work. See `PROGRAM_STATE.md`
+  "Deferred (intentionally)" section.
+
+Everything else in this backlog is a closed work log, not active todo.

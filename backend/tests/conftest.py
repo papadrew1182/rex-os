@@ -98,6 +98,148 @@ async def _terminate_stale_lock_backends():
     yield
 
 
+# ── Session start pollution scrub ───────────────────────────────────────────
+#
+# The ``client`` fixture is session-scoped and commits directly to the real
+# dev DB. Every earlier test session therefore leaks hundreds of projects,
+# warranties, notifications, etc. When the ``warranty_refresh`` /
+# ``insurance_refresh`` / ``aging_alerts`` jobs then iterate every row in
+# those tables on the next run, the job can take 5+ seconds and eventually
+# cause ``asyncpg`` connection-closed errors under the advisory-lock
+# connection, which surfaces as a flaky ``test_e2e_run_warranty_refresh_job``.
+#
+# To keep the suite honest (and the jobs honest-to-scale) we scrub all
+# non-seed rows from the transactional tables at the start of each pytest
+# session. Only the seeded UUID-prefixed rows survive (foundation data:
+# companies 00000000-, people 10000000-, users 20000000-, roles 30000000-,
+# projects 40000000-, project_members 50000000-, templates a0000*). This
+# runs once per ``pytest`` invocation — never mid-session — so it cannot
+# interfere with in-session fixture ordering.
+
+@pytest_asyncio.fixture(scope="session", autouse=True, loop_scope="session")
+async def _scrub_test_pollution_and_reseed():
+    from app.database import engine
+    from sqlalchemy import text as _t
+
+    # Tables that are purely transactional / created by tests. TRUNCATE CASCADE
+    # is safe because there is no production data on the dev DB and the
+    # foundation tables (below) never reference rows in these tables.
+    transactional_tables = [
+        "rex.notifications",
+        "rex.job_runs",
+        "rex.attachments",
+        "rex.schedule_snapshots",
+        "rex.schedule_constraints",
+        "rex.activity_links",
+        "rex.schedule_activities",
+        "rex.schedules",
+        "rex.budget_snapshots",
+        "rex.budget_line_items",
+        "rex.cost_codes",
+        "rex.commitment_change_orders",
+        "rex.commitment_line_items",
+        "rex.commitments",
+        "rex.pco_cco_links",
+        "rex.change_event_line_items",
+        "rex.change_events",
+        "rex.potential_change_orders",
+        "rex.prime_contracts",
+        "rex.direct_costs",
+        "rex.lien_waivers",
+        "rex.billing_periods",
+        "rex.payment_applications",
+        "rex.correspondence",
+        "rex.submittals",
+        "rex.submittal_packages",
+        "rex.rfis",
+        "rex.specifications",
+        "rex.drawing_revisions",
+        "rex.drawing_areas",
+        "rex.drawings",
+        "rex.meeting_action_items",
+        "rex.meetings",
+        "rex.punch_items",
+        "rex.inspection_items",
+        "rex.inspections",
+        "rex.safety_incidents",
+        "rex.observations",
+        "rex.daily_logs",
+        "rex.manpower_entries",
+        "rex.tasks",
+        "rex.photos",
+        "rex.photo_albums",
+        "rex.om_manuals",
+        "rex.warranty_claims",
+        "rex.warranty_alerts",
+        "rex.warranties",
+        "rex.insurance_certificates",
+        "rex.closeout_checklist_items",
+        "rex.closeout_checklists",
+        "rex.completion_milestones",
+        "rex.sessions",
+        "rex.role_template_overrides",
+    ]
+
+    try:
+        async with engine.connect() as conn:
+            # Single TRUNCATE CASCADE clears all test pollution fast.
+            stmt = (
+                "TRUNCATE "
+                + ", ".join(transactional_tables)
+                + " RESTART IDENTITY CASCADE"
+            )
+            await conn.execute(_t(stmt))
+
+            # Trim non-seed foundation rows (project_members, projects,
+            # user_accounts, people, companies, role_templates). Seeded rows
+            # use UUID prefixes specific to foundation_bootstrap.sql.
+            await conn.execute(_t(
+                "DELETE FROM rex.project_members "
+                "WHERE id::text NOT LIKE '50000000-%'"
+            ))
+            await conn.execute(_t(
+                "DELETE FROM rex.projects "
+                "WHERE id::text NOT LIKE '40000000-%'"
+            ))
+            await conn.execute(_t(
+                "DELETE FROM rex.user_accounts "
+                "WHERE id::text NOT LIKE '20000000-%'"
+            ))
+            await conn.execute(_t(
+                "DELETE FROM rex.people "
+                "WHERE id::text NOT LIKE '10000000-%'"
+            ))
+            await conn.execute(_t(
+                "DELETE FROM rex.companies "
+                "WHERE id::text NOT LIKE '00000000-%'"
+            ))
+            await conn.execute(_t(
+                "DELETE FROM rex.role_templates "
+                "WHERE id::text NOT LIKE '30000000-%'"
+            ))
+            try:
+                await conn.execute(_t(
+                    "DELETE FROM rex.closeout_templates "
+                    "WHERE id::text NOT LIKE 'a0000%'"
+                ))
+            except Exception:  # noqa: BLE001
+                pass
+
+            # Re-seed the milestone rows that rex2_business_seed leaves to the
+            # caller. ``seed_project_milestones`` is ON CONFLICT DO NOTHING so
+            # this is idempotent.
+            await conn.execute(_t(
+                "SELECT rex.seed_project_milestones("
+                "'40000000-0000-4000-a000-000000000001'::uuid, 'multifamily')"
+            ))
+
+            await conn.commit()
+    except Exception:  # noqa: BLE001
+        pass  # Best-effort; never block tests due to scrub failure
+
+    yield
+
+
 @pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def client():
     transport = ASGITransport(app=app)

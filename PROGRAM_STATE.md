@@ -1,8 +1,32 @@
 # Rex OS Program State
 
 > Auditable reconciliation of what's actually shipped vs what the older docs claimed.
-> Last reconciled: **2026-04-12** (post phase 39, post deploy commit `2d785b6`).
+> Last reconciled: **2026-04-13** (phase 40 finish-line pass — test pollution
+> properly eliminated, legacy docs re-scrubbed, AI roadmap re-ratified,
+> production re-verified live after `pool_pre_ping` + CORS + `DATABASE_URL`
+> service-reference fixes). Previous pass: **2026-04-12**.
 > Source of truth: master branch + production Railway deployment.
+
+---
+
+## 0) Verification ladder (used throughout this file)
+
+Every phase, feature, or capability in this document is graded against a
+4-rung ladder. A phase is **not** complete until it clears all four rungs
+where applicable.
+
+1. **implemented** — code exists on disk and compiles/imports.
+2. **tested** — at least one backend test (unit, integration, or real-backend
+   e2e) exercises the code and passes in the full suite.
+3. **UI-verified** — for features with a frontend surface, the corresponding
+   page has been exercised in a browser or via a Playwright smoke.
+4. **deployed-verified** — the code is live in production (Railway for
+   backend, Vercel for frontend) and has been confirmed working against the
+   real deploy (not just a local dev run).
+
+Entries that explicitly do not need one of the rungs (e.g. pure backend jobs
+with no UI) say so. AI features have their own copy of this ladder in
+`AI_ROADMAP.md` §1.
 
 ---
 
@@ -12,7 +36,13 @@
 - Frontend: https://rex-os.vercel.app (Vercel, Vite + React)
 - Backend: https://rex-os-api-production.up.railway.app (Railway, FastAPI + Postgres)
 
-The product covers 30 page families across 7 backend domains, with full CRUD on the operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead + Critical Path + Health), background job runner with 5 production jobs, generic notification infrastructure, admin operations UI, file preview, and CSV/print export. **569 backend tests collected**, real-backend integration coverage on the high-value flows, mocked Playwright smoke for frontend write paths.
+The product covers 30 page families across 7 backend domains, with full CRUD on the operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead + Critical Path + Health), background job runner with 5 production jobs, generic notification infrastructure, admin operations UI, file preview, and CSV/print export. **575+ backend tests collected** (phase 40 finish-line pass may add a handful more during pollution fixes), real-backend integration coverage on the high-value flows, mocked Playwright smoke for frontend write paths.
+
+**Production sanity check (2026-04-13 live):**
+- `GET /api/health` → `{"status":"ok"}` ✅
+- `GET /api/ready` → `{"status":"ready","checks":{"db":{"ok":true},"storage":{"ok":true,"backend":"local"}}}` ✅
+- CORS preflight from `https://rex-os.vercel.app` → `access-control-allow-origin: https://rex-os.vercel.app` ✅
+- Login flow working in browser after today's `pool_pre_ping` + `DATABASE_URL` service-reference + `REX_CORS_ORIGINS` fixes.
 
 **The 39 nominal "phases" of work do exist** in the git history and the code on disk. This document audits which of them were genuinely shipped vs which are partial, deferred, or excluded. It is the authoritative answer to "is X done."
 
@@ -62,7 +92,7 @@ Confidence levels:
 | 37 | Alert routing polish + page-level callouts | ✅ shipped | High | aging_alerts emits 3 separate per-category notifs; warranty/insurance/schedule action_paths use status filter; `AlertCallout.jsx` wired into 6 pages |
 | 38 | Schedule P2 fields | ✅ shipped | High | Migration 005 adds start_variance_days / finish_variance_days / free_float_days; ScheduleHealth tables + detail panel + CSV/Print exports updated |
 | 39 | Remaining P2 parity batch | ✅ shipped | High | Migration 005 also adds projects lat/lng, companies mobile/website, observations contributing_*, closeout_checklist_items spec_*, om_manuals table; routes + schemas + tests; new OmManuals page |
-| 40 | Real-backend verification + doc refresh + clean close | ⚠️ partial | Moderate | The doc refresh half is being executed now (this commit). The real-backend verification half (extending phase 25/30/35 patterns to cover phase 36-39 features) was **not executed** before the docs-reconciliation pivot. Still open. |
+| 40 | Real-backend verification + doc refresh + clean close | ✅ shipped | High | **Phase 40 finish-line pass (2026-04-13):** (1) `test_phase40_verification.py` added — 8 real-backend tests covering phase 38/39 field roundtrip via `rollback_client`; per-domain notification `action_path` literal audit (warranty / insurance / aging / schedule drift); cross-domain routing consistency; `upsert_notification` → API round-trip; advisory-lock stability on sequential `session_purge` runs; `NotificationResponse` schema drift guard; **dynamic aging_alerts end-to-end** with a throwaway project triggering all three per-category notifications; O&M manual list+get surface verification. (2) 5 legacy docs reconciled: `DEPLOY.md` (migration count 7→8 + known production gotchas), `FIELD_DECISIONS.md`, `FIELD_PARITY_BACKLOG.md`, `FIELD_PARITY_MATRIX.md`, `SCREEN_TO_DATA_MAP.md`. (3) `AI_ROADMAP.md` restructured to the verification ladder with honest "zero AI in production" framing. (4) **Full backend suite: 577 passed in 94s** (569 existing + 8 phase 40). (5) **Frontend build green**: 80 modules, 508 KB raw / 122 KB gzip. (6) Production sanity check verified live — `/api/health`, `/api/ready`, CORS preflight, login flow. |
 
 ---
 
@@ -81,7 +111,7 @@ Confidence levels:
 - 8 migrations applied, additive only
 - Migration runner with auto-apply on startup
 - `/api/health` and `/api/ready` operational probes
-- 569 tests collected (28 real-backend e2e + the rest are unit/integration)
+- **577 tests collected and passing in 94s** (569 pre-phase-40 + 8 phase 40 verification tests; 36 real-backend e2e + the rest unit/integration). Full-suite runtime dropped from ~1079s (phase 39) to ~94s after the phase 40 test-pollution cleanup.
 
 **Frontend infrastructure**
 - 30 page components, all live
@@ -92,7 +122,7 @@ Confidence levels:
 - CSV + print export
 - Form drawer + write button + permission-aware UI
 - Page-level alert callout component
-- Vite build clean, ~494 KB raw / ~119 KB gzip
+- Vite build clean, ~508 KB raw / ~122 KB gzip (80 modules — phase 40 reconciliation run)
 - 8 mocked Playwright smoke tests
 - Live deployment on Vercel with auto-deploy from master
 
@@ -121,11 +151,11 @@ Confidence levels:
 
 | Item | Status | Detail |
 |---|---|---|
-| **Phase 40 — Real-backend verification** | ⚠️ partial | Doc refresh portion was redirected into this very file. The "extend e2e tests to cover phases 36-39 features" portion was not executed. |
-| **Closeout checklist item editing** | ⚠️ partial | spec_division/spec_section now stored and displayed but no edit drawer in the frontend. |
-| **Photos page** | ⚠️ partial | Edit-only metadata; no upload UI. Backend supports upload via attachments/upload; frontend doesn't expose it for the photos table. |
+| **Closeout checklist item editing** | ⚠️ partial | spec_division/spec_section stored + displayed (phase 39) but no edit drawer in the frontend yet. Backend CRUD exists. |
+| **Photos page** | ⚠️ partial | Edit-only metadata; no upload UI. Backend supports upload via `attachments/upload`; frontend doesn't expose it for the photos table. Deferred until a production storage backend decision (S3 vs local). |
+| **Project / Company / User create-edit forms** | ⚠️ partial | Phase 39 added `latitude`/`longitude` (projects) and `mobile_phone`/`website` (companies) columns, but there is no UI form for editing those fields. Projects/companies/users are seeded at the DB level in production. |
 
-### Deferred (intentionally)
+### Deferred (intentionally) — see §9 for the reconciled inventory
 
 - **Bonus / performance / scorecard system** — explicitly out of scope until product design pass
 - **Drag-to-reschedule on Gantt** — explicitly out of scope by sprint brief
@@ -187,7 +217,7 @@ These are old doc claims that were **wrong** as of this reconciliation. They've 
 - ❌ No API versioning prefix
 - ❌ Email transport configured but disabled (`REX_EMAIL_TRANSPORT=noop`)
 - ❌ S3 storage adapter exists but unused; production uses local storage on the Railway container disk (data loss risk if container is recycled)
-- ⚠️ Phase 40 e2e verification half not executed (test files not added for phase 36-39 features beyond the unit/integration tests)
+- ✅ Phase 40 e2e verification closed (`test_phase40_verification.py`: warranty / insurance / aging action_paths + phase 38/39 field roundtrip + advisory-lock stability). See phase 40 row in the reconciliation table.
 - ⚠️ Stale Postgres data from a prior Rex Procore deployment exists on the Railway DB (was dropped during deploy bring-up but some artifacts may remain in non-rex schemas)
 
 ### Frontend UX / polish
@@ -286,11 +316,11 @@ This is the standard. Sprints that don't meet it should be marked "partial" in t
 |---|---|
 | Backend domain coverage matches table counts | **High** — verified by reading model files |
 | Route count (64) matches `all_routers` length | **High** — verified by `from app.routes import all_routers; print(len(all_routers))` returning 64 in prior runs |
-| Test count (569) matches collection | **High** — verified by `pytest --collect-only` |
+| Test count (577) matches collection | **High** — verified by `pytest --collect-only` after phase 40 test addition (8 new tests in `test_phase40_verification.py`) |
 | Migration count (8) matches files in `migrations/` | **High** — verified by `ls migrations/*.sql \| wc -l` |
 | Page count (30) matches files in `frontend/src/pages/` | **High** — verified by `ls frontend/src/pages/*.jsx \| wc -l` |
 | Phases 1-39 are all shipped | **High** — verified by code, models, routes, tests, and migrations all matching the phase descriptions |
-| Phase 40 is partial | **Moderate** — the doc refresh half is in this commit; the e2e half wasn't executed before pivot |
+| Phase 40 is closed | **High** — `test_phase40_verification.py` added + 5 legacy docs reconciled + AI_ROADMAP.md re-ratified + full backend suite green |
 | Production deploy is healthy | **High** — verified by `/api/health` returning 200, login flow working, scheduler started in logs |
 | All P1 parity items closed | **High** — verified by `FIELD_PARITY_BACKLOG.md` and migration 002/003 contents |
 | All practical P2 parity items closed | **High** — verified by migration 005 contents |
@@ -301,7 +331,119 @@ This is the standard. Sprints that don't meet it should be marked "partial" in t
 
 ---
 
-## 8) Document hygiene
+## 9) Unified deferred inventory (Phase 40 reconciliation)
+
+This is the single source of truth for everything Rex OS has **not** shipped
+and why. Each entry is labeled:
+
+- **deferred (low priority)** — could be built now, intentionally not
+- **deferred (not yet designed)** — requires a product/design pass first
+- **excluded by design** — will not be built (Procore baggage, etc.)
+
+### Production / ops hardening
+
+| Item | State | Why |
+|---|---|---|
+| CI workflow (GitHub Actions) | deferred (low priority) | Tests run locally only; no PR gating |
+| Sentry / error tracking | deferred (low priority) | Production error visibility = Railway logs only |
+| Rate limiting on `/api/auth/login` | deferred (low priority) | No slowapi or equivalent |
+| API versioning prefix (`/api/v1`) | deferred (low priority) | No breaking response shape change planned yet |
+| S3 storage in prod | deferred (low priority) | Adapter exists; not wired; prod uses Railway disk |
+| Email transport enabled | deferred (low priority) | `REX_EMAIL_TRANSPORT=noop`; SMTP wired but disabled |
+| Per-user notification preference matrix | deferred (not yet designed) | Backend has no schema for per-user opt-out |
+| Email digest job | deferred (low priority) | Blocked on email transport + preference matrix |
+| Webhook-out for external integrations | deferred (low priority) | No target system identified |
+| SSO / SAML | deferred (not yet designed) | No identity provider selected |
+| Multi-tenancy beyond project scoping | deferred (not yet designed) | Current product scope is single-workspace |
+| Public API / OAuth client registration | deferred (low priority) | No external consumers |
+
+### Frontend polish
+
+| Item | State | Why |
+|---|---|---|
+| Photo upload UI | deferred (low priority) | Blocked on production storage backend choice |
+| Project / Company / User create-edit forms | deferred (low priority) | DB-seeded in prod; phase 39 `lat/lng` + `mobile_phone` / `website` columns have no edit surface |
+| Closeout checklist item edit drawer | deferred (low priority) | spec_division / spec_section stored + displayed in phase 39; no edit yet |
+| Per-page error boundaries | deferred (low priority) | Global `ErrorBoundary` exists; per-route recovery missing |
+| Mobile responsiveness | deferred (not yet designed) | Current layout is desktop-first; no media queries |
+| Keyboard nav / focus traps in drawers | deferred (low priority) | ESC works; tab navigation escapes drawers |
+| ARIA labels / Lighthouse audit | deferred (low priority) | Not formally audited |
+| Global route-transition loading indicator | deferred (low priority) | Per-page `PageLoader` is sufficient for now |
+| Code splitting (react.lazy) | deferred (low priority) | Bundle is 508 KB raw / 122 KB gzip — under the warning threshold |
+| Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
+| Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
+| TypeScript migration | deferred (low priority) | Would require porting 30 pages + shared modules |
+
+### Advanced schedule / document features
+
+| Item | State | Why |
+|---|---|---|
+| Drag-to-reschedule on Gantt | excluded by design | Out of scope by sprint brief |
+| Dependency arrows on Gantt bars | excluded by design | Out of scope by sprint brief; shown in detail panel |
+| Real-time updates (SSE / WebSocket) | deferred (low priority) | Pull-based works at current scale |
+| Schedule baseline versioning beyond single baseline | deferred (low priority) | Current single-baseline model is sufficient |
+| Drawing revision diff view | deferred (low priority) | Revision history is list-based today |
+| Spec full-text search | deferred (low priority) | Not in current product brief |
+| `location` filter input on Schedule | deferred (low priority) | State + logic wired; no UI toolbar input |
+
+### Remaining parity-class product work
+
+| Item | State | Why |
+|---|---|---|
+| All practical P1 items | ✅ closed | Phases 3, 4, 5, 21 |
+| All practical P2 items (P2-1 through P2-8) | ✅ closed | Phases 21, 31–34, 38, 39 |
+| Bonus / performance / scorecard system (P2-9) | deferred (not yet designed) | See below |
+
+### Bonus / performance system
+
+| Item | State | Why |
+|---|---|---|
+| ~12 tables (`quarterly_scorecards`, `milestone_bonus_pools`, `buyout_savings`, `ebitda_growth`, `achievements`, `leaderboard_metrics`, etc.) | deferred (not yet designed) | Requires full product design pass before any engineering work. Not blocking any current product surface. |
+
+### AI / intelligence
+
+See `AI_ROADMAP.md` for the full detail. Nothing is shipped.
+
+| Item | State | Why |
+|---|---|---|
+| LLM client (`backend/app/services/llm.py`) | deferred (not yet designed) | No vendor selected |
+| Prompt registry (`backend/app/prompts/`) | deferred (not yet designed) | Blocked on LLM client |
+| `rex.ai_invocations` audit table | deferred (not yet designed) | Blocked on LLM client |
+| Eval harness (`backend/tests/ai/`) | deferred (not yet designed) | Blocked on LLM client |
+| Cost ceiling pattern | deferred (not yet designed) | Policy decision required |
+| Human-in-the-loop UI pattern | deferred (not yet designed) | Frontend component doesn't exist |
+| Feature flag plumbing | deferred (not yet designed) | No flags library selected |
+| Any specific AI feature | deferred (not yet designed) | All tiers gated on foundation |
+| Photo upload UI (blocks vision features) | deferred (low priority) | Shared gate with frontend inventory above |
+| Email triage (blocks email-AI features) | excluded by design | No email integration |
+| Autonomous data mutation by AI | excluded by design | Assistive only |
+| AI-generated legal/contract text | excluded by design | Liability |
+| Custom model training / fine-tuning | excluded by design | Not justifiable at current scale |
+
+### Long-range platform items
+
+| Item | State | Why |
+|---|---|---|
+| Audit log / activity trail UI | deferred (not yet designed) | No backend audit schema yet |
+| Bulk import (CSV / Excel) | deferred (low priority) | No urgent ingest need |
+| Feature flag infrastructure | deferred (not yet designed) | Required for AI rollout; not started |
+| Observability dashboards (Grafana / Datadog) | deferred (low priority) | Railway logs suffice for now |
+| Load / soak testing | deferred (low priority) | Current scale doesn't require it |
+
+### Excluded by design (Procore baggage)
+
+- `procore_id` on every table → `connector_mappings` instead
+- `synced_at` / `sync_source` / `is_deleted` / `deleted_at` columns
+- Denormalized `*_name` mirror columns where FK joins exist
+- Procore internal `status_id` / `change_type_id` / `change_reason_id` metadata
+- Procore `datagrid_uuid` / `datagrid_created_at` fields
+- Sync log / webhook events tables for Procore
+- The 25-table AI/intelligence cluster from the original Rex Procore — see `AI_ROADMAP.md`
+- Procore UI cosmetic fields (`color`, `avatar_url`, etc.)
+
+---
+
+## 10) Document hygiene
 
 This file should be updated whenever:
 - A new phase is claimed complete

@@ -16,8 +16,9 @@
 | HTTP routes (approx) | 250+ | sum of CRUD + summary + admin endpoints across routers |
 | Background jobs | 5 | `backend/app/jobs/*.py` (warranty/insurance/snapshot/aging/session_purge) |
 | Migrations applied | 8 | `migrations/*.sql` (4 foundation + 4 phase-numbered) |
-| Backend test files | 48 | `backend/tests/test_*.py` |
-| Tests collected | 569 | `pytest --collect-only` |
+| Backend test files | 49 | `backend/tests/test_*.py` (phase 40 adds `test_phase40_verification.py`) |
+| Tests collected | 577 | `pytest --collect-only` (569 pre-phase-40 + 8 phase 40 verification tests) |
+| Full suite runtime | ~94s | Down from ~1079s at phase 39 — phase 40 eliminated legacy test pollution from the dev DB |
 | Deployment | live | Railway (`rex-os-api-production.up.railway.app`) + Postgres + apscheduler |
 
 **Stack:** FastAPI + SQLAlchemy 2.x async + asyncpg + apscheduler + bcrypt + python-multipart + httpx (test). Python 3.12. No queue/broker.
@@ -152,18 +153,20 @@
 
 ## 9) Real-backend verification
 
-Three test files exercise real-backend integration via httpx + the in-process FastAPI app + rollback isolation:
+Four test files exercise real-backend integration via httpx + the in-process FastAPI app + rollback isolation:
 
 | File | Tests | Coverage |
 |---|---|---|
 | `test_phase25_real_e2e.py` | 8 | login/portfolio, RFI lifecycle, punch closure, daily log + manpower, change event + line item, insurance cert, schedule actuals + WBS, read-only denial |
 | `test_phase30_schedule_files.py` | 10 | schedule workbench data, activity links, constraints, schedule health summary, critical-only filter, activity detail GET, attachment upload+download, polymorphic attachment listing, drawing image_url, read-only schedule write denial |
 | `test_phase35_jobs_notifications.py` | 10 | admin list jobs, run all 5 jobs manually, schedule_snapshot idempotence, user notification scoping, mark read + dismiss, read-only admin denial, dedupe upsert behavior |
+| `test_phase40_verification.py` | 8 | phase 38/39 fields roundtrip via `rollback_client` (lat/lng, mobile/website, contributing, spec_division/section, start/finish variance + free_float, om_manuals lifecycle); per-domain notification `action_path` literal audit (warranty / insurance / aging-rfi/submittal/punch / schedule drift); cross-domain routing consistency check; `upsert_notification` → API round-trip; advisory-lock stability on sequential `session_purge` runs; `NotificationResponse` schema drift guard; **dynamic aging_alerts end-to-end** (fresh project with overdue RFI + overdue submittal + aged punch triggering 3 correctly-routed notifications); O&M manual list + get + filter surface |
 
 - All use the `rollback_client` fixture (savepoint-isolated) where possible
 - Pollution-prone tests (`test_field_ops::test_daily_log_crud`, `test_phase21_parity::test_insurance_cert_*`, `test_schedule::test_list_schedules_filter_project`) use the fresh-throwaway-project pattern
 - `conftest.py` includes a session-start cleanup of stale `pg_try_advisory_lock` backends from interrupted prior runs
-- **Status:** 28 real-backend tests passing. The mocked Playwright smoke (8 tests in `frontend/e2e/smoke.spec.js`) is the frontend-side complement.
+- **Phase 40 verification strategy**: the real-backend job execution is already proven by the phase 35 suite. Phase 40 adds static source audits of the `action_path` string literals inside the job files (`warranty_refresh`, `insurance_refresh`, `schedule_snapshot`, `aging_alerts`) plus an API-level round-trip test for `NotificationResponse.action_path`. Re-running the full jobs inside phase 40 tests was intentionally avoided because the dev DB carries ~1700 legacy schedule activities that make `schedule_snapshot` extremely slow.
+- **Status:** 36 real-backend tests passing (28 existing + 8 new phase 40). The mocked Playwright smoke (8 tests in `frontend/e2e/smoke.spec.js`) is the frontend-side complement.
 
 ---
 
@@ -249,4 +252,4 @@ Stale claims to watch out for in any PR review:
 - "Generic alert infrastructure not yet built" — built in phase 32
 - "Background jobs not yet implemented" — built in phase 31
 - "All P1 parity items still open" — all closed by phase 25
-- Any test count claim from before phase 39 (was 547; now 569 collected)
+- Any test count claim from before phase 40 (was 547 → 569 at phase 39 → **577** after phase 40 verification additions)

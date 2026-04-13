@@ -14,7 +14,7 @@
 | Page components | 30 | `frontend/src/pages/*.jsx` |
 | App routes (HashRouter) | 30 | `frontend/src/App.jsx` |
 | Stack | React 18 + Vite 5 + react-router 7 | `package.json` |
-| Build output | 78 modules, ~494 KB raw / ~119 KB gzip | `vite build` |
+| Build output | 80 modules, ~508 KB raw / ~122 KB gzip | `vite build` (phase 40 reconciliation run) |
 | Shared components | 7 | ui.jsx (Badge/StatCard/Card/Row/PageLoader/Flash/ProgressBar) |
 | Shared platform modules | 4 | api.js, auth.jsx, project.jsx, permissions.js |
 | Shared write-flow module | 1 | forms.jsx (FormDrawer + 8 input primitives) |
@@ -138,7 +138,7 @@ Admin (admin/VP only): Operations
 - **Closeout checklist items**: spec_division/spec_section are now **displayed** but not editable from the UI. Full edit drawer for individual items is not built.
 
 ### Performance observations
-- Bundle size: 494 KB raw / 119 KB gzip — Vite warns about chunks > 500 KB (we're just under). Consider code-splitting per-page if it grows further.
+- Bundle size: 508 KB raw / 122 KB gzip — Vite warns about chunks > 500 KB (we're now just over). Consider code-splitting per-page (react.lazy on ScheduleHealth is the obvious first candidate).
 - Notification polling (60s) is a fixed cost for every authenticated user — fine for now but should switch to SSE/WebSocket if user count grows.
 - Schedule workbench fetches per-schedule activities sequentially via `Promise.all` — fine for typical projects but could degrade with hundreds of schedules. No pagination currently.
 - File preview blob URLs are revoked on cleanup but not when switching between previews rapidly — minor leak risk.

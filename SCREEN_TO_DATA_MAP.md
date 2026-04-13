@@ -1,7 +1,46 @@
 # Rex OS Screen-to-Data Map
 
-> Audit Date: 2026-04-11
-> Sources: Rex Procore live app, Rex OS frontend, Rex OS backend models
+> Original audit date: 2026-04-11
+> Last reconciled: **2026-04-12** (phase 40 reconciliation pass)
+> Sources: Rex OS frontend (`frontend/src/pages/*.jsx`) + backend models.
+>
+> **Reader note:** This file is a **screen-to-data mapping doc**, not a roadmap.
+> As of phase 39 every screen family enumerated below is **shipped** except
+> where explicitly marked deferred. The "Upcoming Screen Families" headings
+> below are preserved because the data-mapping tables underneath them are still
+> useful as field references, but every screen in that section is now built.
+> See `FRONTEND_ROADMAP.md` for planning and `PROGRAM_STATE.md` for audit status.
+
+---
+
+## Current screen state (Phase 40 snapshot)
+
+**Rex OS ships 30 page components in production.** All screen families listed
+in the original audit are built, except:
+
+| Screen family | State | Notes |
+|---|---|---|
+| All 7 phase-1 closeout slice screens | ✅ shipped | Portfolio, ProjectReadiness, Checklists, Milestones, ScheduleHealth (5 tabs), ExecutionHealth, Attachments |
+| Financials (BudgetOverview, PayApplications, Commitments, ChangeOrders) | ✅ shipped | Full CRUD + summary endpoints |
+| Field Ops (RFIs, PunchList, Submittals, DailyLogs, Inspections, Tasks, Meetings, Observations, SafetyIncidents) | ✅ shipped | 9 pages with FormDrawer CRUD |
+| Document Management (Drawings, Specifications, Correspondence) | ✅ shipped | File preview drawer wired |
+| Photos | ⚠️ partial | Edit-metadata only. **No upload UI** — deferred until storage backend choice in prod |
+| Warranties, InsuranceCertificates, OmManuals | ✅ shipped | Phase 24 + 39 |
+| Notifications, AdminJobs (Operations) | ✅ shipped | Phase 34 |
+| Closeout checklist item editing of spec_division/spec_section | ⚠️ partial | Fields stored + displayed; no edit drawer yet |
+| Project / Company / User create-edit forms | ❌ deferred | Seeded at DB level; phase 39 lat/lng + mobile/website fields have no edit surface |
+
+### Deferred screens (intentionally out of scope)
+
+- Bonus / scorecard / performance dashboards (requires product design)
+- Mobile responsive / mobile native apps
+- OCR / annotation / document AI / BIM / drawing-intelligence screens
+- Per-user notification preference matrix
+- Portfolio map view (lat/lng now stored but no map UI)
+- SSO / SAML login / user provisioning / invite flow
+- Audit log / activity trail UI
+- Bulk import (CSV / Excel)
+- Webhook-out / public API / OAuth-client management
 
 ---
 
@@ -155,7 +194,7 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 | Per-schedule drift details | schedule_activities per schedule | Yes | Yes | |
 | Worst drift activity | MAX(variance_days) | Yes | Yes | |
 
-**Verdict: COMPLETE for current data model.** Missing actual_start/actual_finish separation (P1).
+**Verdict: COMPLETE.** Phase 21 closed the actual_start_date / actual_finish_date / wbs_code gaps. Phase 38 added start_variance / finish_variance / free_float separation. Phase 26 added Gantt + 5-tab workbench.
 
 ---
 
@@ -205,9 +244,19 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 
 ---
 
-## Upcoming Screen Families
+## Screen Family Data Mapping Reference
 
-### 8. Financials Pages (NOT YET BUILT)
+> The sections below were originally an "Upcoming Screen Families" roadmap.
+> **All of these screens are now built and live in production** (see the
+> "Current screen state" section at the top of this file). The data-mapping
+> tables are preserved because they are still useful as a field reference
+> for each screen. The section headings have been updated to ✅ SHIPPED,
+> but individual per-screen "Verdict" lines inside them may still read
+> "DATA MODEL READY. Can build now" — treat those as historical. Every
+> screen in this section is built. The authoritative screen list is the
+> "Screen Readiness Summary" table at the bottom of this file.
+
+### 8. Financials Pages (✅ SHIPPED — see data mapping below)
 
 #### 8a. Budget Overview
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -237,10 +286,10 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 | Invoiced to date | commitments.invoiced_to_date | Yes | Yes | No |
 | Retention rate/held | commitments | Yes | Yes | No |
 | Line items | commitment_line_items | Yes | Yes | No |
-| Estimated completion date | -- | No | -- | P1 gap |
+| Estimated completion date | commitments.estimated_completion_date | Yes | Yes | ✅ closed phase 3 |
 | Scope of work | commitments.scope_of_work | Yes | Yes | No |
 
-**Verdict: DATA MODEL MOSTLY READY.** Minor gap: missing estimated_completion_date.
+**Verdict: SHIPPED.** Original P1 gap closed in phase 3.
 
 #### 8c. Change Order Workflow
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -249,9 +298,10 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 | PCOs per CE | potential_change_orders | Yes | Yes | No |
 | CCOs per commitment | commitment_change_orders | Yes | Yes | No |
 | PCO-to-CCO links | pco_cco_links | Yes | Yes | No |
-| CE line items / RFQ data | -- | No | -- | P1 gap |
+| CE line items / RFQ data | change_event_line_items | Yes | Yes | ✅ closed phase 5 |
 
-**Verdict: DATA MODEL MOSTLY READY.** Gap: CE line items not stored (were JSONB in Procore).
+**Verdict: SHIPPED.** Original P1 gap closed in phase 5 via the normalized
+`change_event_line_items` table (migration `002`).
 
 #### 8d. Pay Applications
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -269,7 +319,7 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 
 ---
 
-### 9. Field Ops Pages (NOT YET BUILT)
+### 9. Field Ops Pages (✅ SHIPPED — see data mapping below)
 
 #### 9a. RFI Management
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -282,9 +332,9 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 | Due date | rfis.due_date | Yes | Yes | No |
 | Cost/schedule impact | rfis | Yes | Yes | No |
 | Drawing reference | rfis.drawing_id FK | Yes | Yes | No |
-| RFI manager | -- | No | -- | P1 gap |
+| RFI manager | rfis.rfi_manager | Yes | Yes | ✅ closed phase 4 |
 
-**Verdict: DATA MODEL MOSTLY READY.** Minor gap: rfi_manager field.
+**Verdict: SHIPPED.** Page ships full FormDrawer CRUD.
 
 #### 9b. Punch List
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -292,10 +342,10 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 | All punch fields | punch_items | Yes | Yes | No |
 | Assignee name | people via assigned_to FK | Yes | Yes | No |
 | Company name | companies via assigned_company_id FK | Yes | Yes | No |
-| is_critical_path | -- | No | -- | P1 gap |
-| closed_by | -- | No | -- | P1 gap |
+| is_critical_path | punch_items.is_critical_path | Yes | Yes | ✅ closed phase 4 |
+| closed_by | punch_items.closed_by | Yes | Yes | ✅ closed phase 4 |
 
-**Verdict: DATA MODEL MOSTLY READY.** Gaps are P1 not P0.
+**Verdict: SHIPPED.** Page ships full FormDrawer CRUD with audit fields.
 
 #### 9c. Daily Log Management
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -320,10 +370,10 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 |---|---|---|---|---|
 | All submittal fields | submittals | Yes | Yes | No |
 | Package grouping | submittal_packages | Yes | Yes | No |
-| Submittal manager | -- | No | -- | P1 gap |
-| is_critical_path | -- | No | -- | P1 gap |
+| Submittal manager | submittals.submittal_manager_id | Yes | Yes | ✅ closed phase 4 |
+| is_critical_path | submittals.is_critical_path | Yes | Yes | ✅ closed phase 4 |
 
-**Verdict: DATA MODEL MOSTLY READY.** Gaps are P1.
+**Verdict: SHIPPED.** Page ships full FormDrawer CRUD.
 
 #### 9f. Task/Action Item Management
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -343,7 +393,7 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 
 ---
 
-### 10. Document Management Pages (NOT YET BUILT)
+### 10. Document Management Pages (✅ SHIPPED — see data mapping below)
 
 #### 10a. Drawing Management
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -375,7 +425,7 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 
 ---
 
-### 11. Additional Upcoming Screens
+### 11. Additional Screens (✅ SHIPPED — see data mapping below)
 
 #### 11a. Photo Gallery
 | Required Field | Source Table(s) | Rex OS Has It? | Complete? | Blocker? |
@@ -405,33 +455,41 @@ With phases 1-25 complete, every screen in the navigation supports real CRUD aga
 
 ---
 
-## Screen Readiness Summary
+## Screen Readiness Summary (Phase 40 reconciliation)
 
-| Screen Family | Data Model Status | Can Build Now? | Gaps |
-|---|---|---|---|
-| Portfolio | Complete | Yes (built) | None |
-| Project Readiness | Complete | Yes (built) | None |
-| Checklists | Complete | Yes (built) | None |
-| Milestones | Complete | Yes (built) | None |
-| Schedule Health | Complete | Yes (built) | actual_start/finish (P1) |
-| Execution Health | Complete | Yes (built) | None |
-| Attachments | Complete | Yes (built) | None |
-| **Budget Overview** | **Complete** | **Yes** | **None** |
-| **Commitment Mgmt** | **Mostly complete** | **Yes** | **estimated_completion_date (P1)** |
-| **Change Orders** | **Mostly complete** | **Yes** | **CE line items (P1)** |
-| **Pay Applications** | **Complete** | **Yes** | **None** |
-| **RFI Management** | **Mostly complete** | **Yes** | **rfi_manager (P1)** |
-| **Punch List** | **Mostly complete** | **Yes** | **is_critical_path, closed_by (P1)** |
-| **Daily Log** | **Complete** | **Yes** | **None** |
-| **Inspections** | **Complete** | **Yes** | **None** |
-| **Submittals** | **Mostly complete** | **Yes** | **submittal_manager, is_critical_path (P1)** |
-| **Tasks** | **Complete** | **Yes** | **None** |
-| **Safety Incidents** | **Complete** | **Yes** | **None** |
-| **Drawings** | **Complete** | **Yes** | **None** |
-| **Specifications** | **Complete** | **Yes** | **None** |
-| **Photos** | **Complete** | **Yes** | **None** |
-| **Meetings** | **Complete** | **Yes** | **None** |
-| **Observations** | **Complete** | **Yes** | **None** |
-| **Correspondence** | **Complete** | **Yes** | **None** |
+| Screen Family | State | Gaps |
+|---|---|---|
+| Portfolio | ✅ shipped | None |
+| Project Readiness | ✅ shipped | None |
+| Checklists | ✅ shipped | Checklist-item edit drawer for spec_division/spec_section deferred |
+| Milestones | ✅ shipped | None |
+| Schedule Health (5 tabs + Gantt) | ✅ shipped | None |
+| Execution Health | ✅ shipped | None |
+| Attachments | ✅ shipped | None |
+| Budget Overview | ✅ shipped | None |
+| Commitment Management | ✅ shipped | None (estimated_completion_date closed phase 3) |
+| Change Orders | ✅ shipped | None (CE line items closed phase 5) |
+| Pay Applications | ✅ shipped | None |
+| RFI Management | ✅ shipped | None (rfi_manager closed phase 4) |
+| Punch List | ✅ shipped | None (closed_by, is_critical_path closed phase 4) |
+| Daily Logs | ✅ shipped | None |
+| Inspections | ✅ shipped | None |
+| Submittals | ✅ shipped | None (submittal_manager, is_critical_path closed phase 4) |
+| Tasks | ✅ shipped | None |
+| Safety Incidents | ✅ shipped | None |
+| Drawings | ✅ shipped | None |
+| Specifications | ✅ shipped | None |
+| Photos | ⚠️ partial | Edit-metadata only — no upload UI (deferred until storage backend choice in prod) |
+| Meetings | ✅ shipped | None |
+| Observations | ✅ shipped | Contributing fields closed phase 39 |
+| Correspondence | ✅ shipped | None |
+| Warranties | ✅ shipped | system_or_product, manufacturer closed phase 21 |
+| Insurance Certificates | ✅ shipped | New domain, phase 24 |
+| O&M Manuals | ✅ shipped | New page, phase 39 |
+| Notifications | ✅ shipped | Phase 34 |
+| Operations (AdminJobs) | ✅ shipped | Phase 34, admin/VP only |
 
-**Key Finding:** The Rex OS data model is remarkably complete. Of 24 screen families assessed, 19 have complete data models and 5 have minor P1 gaps that don't block initial screen builds. No P0 data gaps were found for any screen.
+**Total: 30 page components shipped.** All practical P1 and P2 parity gaps
+closed. Remaining deferred items: photo upload UI, project/company/user
+create-edit forms, closeout checklist item edit drawer, portfolio map view,
+mobile responsiveness. None of these block the current product.

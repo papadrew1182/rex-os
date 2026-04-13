@@ -44,3 +44,4 @@ htmlcov/
 # Local attachment storage (LocalStorageAdapter default root)
 backend_storage/
 backend/backend_storage/
+.vercel

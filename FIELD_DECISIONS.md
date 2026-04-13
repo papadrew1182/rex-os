@@ -1,7 +1,14 @@
 # Rex OS Field Decisions
 
-> Audit Date: 2026-04-11
+> Original audit date: 2026-04-11
+> Last reconciled: **2026-04-12** (phase 40 reconciliation pass)
 > Companion to: FIELD_PARITY_MATRIX.md
+>
+> **Reader note:** Sections 1–5 (Preserve / Rename / Compute / Deprecate / Rex
+> OS-native) remain useful guidance. Section 6 (Missing Fields That Should Be
+> Added) is now **historical** — every P1 and practical P2 item it lists has
+> been closed. See the "Post-audit closure" notes in section 6 for where each
+> shipped.
 
 ---
 
@@ -278,34 +285,44 @@ These fields are Rex OS improvements over Rex Procore.
 
 ## 6. Missing Fields That Should Be Added to Rex OS
 
+> **Historical section (superseded).** All P1 and practical P2 items
+> enumerated below have been **closed** as of phase 39. The tables are
+> preserved so you can see the original audit; annotations show which sprint
+> closed each item.
+
 ### P0 - Blocks Current Product Slice
 | Field | Target Table | Source | Why Needed |
 |---|---|---|---|
 | (none identified) | -- | -- | Current closeout slice fields are complete |
 
-### P1 - Important for Next Slices
-| Field | Target Table | Source | Why Needed |
-|---|---|---|---|
-| is_critical_path (boolean) | punch_items, submittals | Procore | Critical path impact tracking |
-| actual_start_date / actual_finish_date | schedule_activities | Procore tasks | Actual vs planned separation |
-| work_breakdown_structure (text) | schedule_activities | Procore tasks | WBS code for schedule analysis |
-| closed_by (uuid FK) | punch_items | Procore | Punch closure accountability |
-| rfi_manager (uuid FK) | rfis | Procore | RFI workflow management |
-| submittal_manager_id (uuid FK) | submittals | Procore | Submittal workflow management |
-| estimated_completion_date | commitments | Procore | Commitment timeline |
-| forecast_date | completion_milestones | Procore milestone_tracking | Forecast vs scheduled date |
-| percent_complete | completion_milestones | Procore milestone_tracking | Milestone progress |
-| system_or_product (text) | warranties | Procore warranty_items | System identification |
-| manufacturer (text) | warranties | Procore warranty_items | Manufacturer tracking |
-| Insurance detail fields (gl/wc/auto expiry + limits) | companies OR new insurance table | Procore vendors + insurances | Insurance compliance |
+### P1 - Important for Next Slices (**ALL CLOSED**)
+| Field | Target Table | Closure |
+|---|---|---|
+| is_critical_path (boolean) | punch_items, submittals | ✅ Phase 4 (migration `002`) |
+| actual_start_date / actual_finish_date | schedule_activities | ✅ Phase 21 (migration `003`) |
+| work_breakdown_structure (text) | schedule_activities | ✅ Phase 21 — `wbs_code` |
+| closed_by (uuid FK) | punch_items | ✅ Phase 4 |
+| rfi_manager (uuid FK) | rfis | ✅ Phase 4 |
+| submittal_manager_id (uuid FK) | submittals | ✅ Phase 4 |
+| estimated_completion_date | commitments | ✅ Phase 3 |
+| forecast_date | completion_milestones | ✅ Phase 21 |
+| percent_complete | completion_milestones | ✅ Phase 21 |
+| system_or_product (text) | warranties | ✅ Phase 21 |
+| manufacturer (text) | warranties | ✅ Phase 21 |
+| Insurance detail fields (gl/wc/auto) | new `insurance_certificates` table | ✅ Phase 21 — normalized into dedicated table |
 
-### P2 - Lower Priority
-| Field | Target Table | Source | Why Needed |
-|---|---|---|---|
-| latitude / longitude | projects | Procore | Map-based portfolio views |
-| contributing_behavior / contributing_condition | observations | Procore | Root cause analysis |
-| spec_division / spec_section | closeout_checklist_items | Procore closeout_checklist | Spec-based closeout tracking |
-| O&M manual tracking fields | New table or warranties extension | Procore om_manual_tracker | Document completeness |
+### P2 - Lower Priority (**ALL PRACTICAL ITEMS CLOSED**)
+| Field | Target Table | Closure |
+|---|---|---|
+| latitude / longitude | projects | ✅ Phase 39 (migration `005`) |
+| mobile_phone / website | companies | ✅ Phase 39 |
+| contributing_behavior / contributing_condition | observations | ✅ Phase 39 |
+| spec_division / spec_section | closeout_checklist_items | ✅ Phase 39 |
+| O&M manual tracking | new `om_manuals` table | ✅ Phase 39 |
+| start_variance / finish_variance separation | schedule_activities | ✅ Phase 38 |
+| free_float_days | schedule_activities | ✅ Phase 38 |
+| Generic notification/alert infrastructure | new `notifications` + `job_runs` tables | ✅ Phases 31–34 |
+| Bonus / performance system | ~12 new tables | **Deferred major work** (product design required) |
 
 ---
 
@@ -391,3 +408,50 @@ The following fields have moved from "P1 Missing" to "Present in Rex OS" since t
 
 ### Closed P2 items
 - P2-8 generic notification/alert infrastructure ✅
+
+---
+
+## POST-SPRINT UPDATE — 2026-04-12 (Phases 36–39)
+
+### Phase 36 — multi-instance job safety
+- Advisory-lock guard in `backend/app/jobs/runner.py` replaces the in-process
+  set guard. Each job key hashes to a stable 32-bit `pg_try_advisory_xact_lock`
+  so a second replica trying to run the same job noops cleanly.
+- Transaction-scoped locks are released automatically on commit, so no
+  cleanup path is required.
+
+### Phase 37 — per-domain alert routing + page alert surfaces
+- `backend/app/jobs/aging_alerts.py` now emits **three** separate notification
+  rows per project (RFI / submittal / punch), each with a distinct
+  `notification_type` and an `action_path` deep-link like `/#/rfis?status=open`.
+- Frontend `AlertCallout.jsx` reads the notifications table and renders a
+  per-page in-context alert surface filtered by `notification_type` + current
+  project. Wired into Schedule, Warranties, Insurance, RFIs, Submittals, Punch.
+
+### Phase 38 — schedule depth
+- `rex.schedule_activities` additions:
+  - `start_variance_days INT` — planned vs actual start variance
+  - `finish_variance_days INT` — planned vs actual finish variance
+  - `free_float_days INT` — free float from scheduling analysis
+- Wired into the ScheduleHealth Activities / Lookahead / Critical Path tabs
+  and the shared right-side detail panel.
+
+### Phase 39 — remaining P2 parity
+- `rex.projects` → `latitude NUMERIC(9,6)`, `longitude NUMERIC(9,6)`
+  (geo coordinates for future weather / mapping features)
+- `rex.companies` → `mobile_phone TEXT`, `website TEXT`
+- `rex.observations` → `contributing_condition TEXT`, `contributing_behavior TEXT`
+  (root-cause analysis fields)
+- `rex.closeout_checklist_items` → `spec_division TEXT`, `spec_section TEXT`
+  (CSI spec linkage; displayed in Closeout checklists but not yet individually
+  editable from the UI — tracked in FRONTEND_ROADMAP.md)
+- New table `rex.om_manuals` (vendor-supplied operations & maintenance manuals,
+  status CHECK, project + commitment linkage) with full CRUD under
+  `backend/app/routes/om_manuals.py` and a dedicated O&M Manuals page.
+
+### Still intentionally excluded (Procore baggage)
+- Still no `procore_id`, `synced_at`, `is_deleted`, or denormalized `*_name`
+  columns anywhere in `rex.*`. connector_mappings remains the one external-ID
+  bridge.
+- No bonus / quarterly scorecard tables — remains a deferred major work item
+  pending product design.

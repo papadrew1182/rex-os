@@ -1,27 +1,182 @@
 # Rex OS AI Roadmap
 
 > First-pass real AI roadmap.
-> Last reconciled: **2026-04-12**.
-> Reflects actual implemented AI state (which is nothing yet) and converts the scattered "AI / not yet" backlog into a structured plan.
+> Original draft: phase 35.
+> Last reconciled: **2026-04-13** (phase 40 finish-line pass — repo re-audited,
+> no new AI scaffolding since phase 35, roadmap re-ratified).
+>
+> Verification ladder used in this document (consistent with
+> `PROGRAM_STATE.md` §6):
+>   **implemented → backend-tested → UI-verified → deployed-verified**
 
 ---
 
-## 1) Current AI state
+## 0) Phase 40 AI state at a glance
 
-**Nothing AI-driven is in production.**
+| Category | Status |
+|---|---|
+| AI features in production | **Zero.** No LLM calls, no embeddings, no inference, no vector DB, no prompt registry, no AI-driven jobs or UI. |
+| AI platform scaffolding in repo | **Zero.** No `backend/app/services/llm.py`, no `app/prompts/`, no `rex.ai_invocations` table, no `/api/ai/*` routes, no AI client SDK imports. |
+| AI governance primitives | **Zero.** No cost ceiling, no audit log, no eval harness, no human-in-the-loop UI pattern. |
+| Reusable foundations AI could eventually plug into | Background job runner (5 deterministic jobs), notifications fan-out, polymorphic attachments, real-backend test harness, project-scoped RBAC. |
 
-There are no AI-powered features in the shipped Rex OS product as of phase 39. No LLM calls, no embedding generation, no model inference, no inference servers, no scheduled enrichment jobs, no AI-assisted data entry. The Anthropic API key on the Railway service is a leftover from the previous Rex Procore deployment and is **not consumed by any current Rex OS code path**.
+**In short: Rex OS today is a construction management platform with no AI
+capabilities. Saying otherwise would be inaccurate.**
 
-### What is in the repo
+---
+
+## 1) AI state against the verification ladder
+
+### 1a) AI **VERIFIED today**
+
+| Capability | implemented | backend-tested | UI-verified | deployed-verified |
+|---|---|---|---|---|
+| (none) | ❌ | ❌ | ❌ | ❌ |
+
+Nothing AI-driven has cleared even the "implemented" bar.
+
+### 1b) AI **implemented but not strongly verified**
+
+None. There is nothing implemented at all.
+
+The Anthropic API key on the Railway service is a **leftover** from the prior
+Rex Procore deployment. Grepping the Rex OS repo (`backend/app`,
+`frontend/src`) for `anthropic|openai|llm|embedding|ai_invocation` returns
+zero matches outside third-party site-packages. The key should be removed the
+next time someone touches Railway variables.
+
+### 1c) AI **unknowns**
+
+These are questions that must be answered **before** any AI feature can be
+scoped. They are not engineering questions; they are policy/product questions
+that block all AI work.
+
+- **Which LLM vendor is approved for construction-project data?** Unknown.
+  No vendor selection has been made. Construction data contains PII (names,
+  addresses, employee IDs, photos with people in them).
+- **What is the cost ceiling per job / per day / per user?** Unknown.
+- **Who signs off on the first AI feature going live?** Unknown.
+- **What is the retention policy for LLM inputs / outputs?** Unknown.
+- **Where does telemetry on AI calls live?** Unknown — no Sentry, no
+  OpenTelemetry, no audit table.
+- **Is "assistive" the only allowed paradigm, or are any autonomous writes
+  allowed?** Unknown. The default position (and this document's
+  recommendation) is: **assistive only, no autonomous writes, ever**.
+
+### 1d) Deferred AI ledger
+
+All entries below are deferred — none are scheduled, resourced, or designed.
+They are catalogued here only so a future sprint that wants to ship AI has a
+starting list instead of a blank page. Order is rough by value, not by
+feasibility. See section 2 for a feasibility split by data readiness.
+
+**Tier L (assistive, no new data required)**
+- Daily log narrative generator (manpower + tasks + weather → work summary draft)
+- Meeting prep packets (open RFIs + schedule drift + action items → markdown brief)
+- Vendor risk scoring (pure SQL, no LLM)
+- Cost benchmarks (pure SQL, no LLM)
+
+**Tier M (moderate data gap)**
+- Weather forecast integration (lat/lng now in DB; external API + daily job)
+- Insurance cert OCR extraction
+- Spec QA via embedding + retrieval
+- Submittal auto-review against spec sections
+- RFI auto-draft from drawings + specs + similar past RFIs
+- Schedule risk prediction from historical snapshots
+- Recovery plan suggestions when a milestone is flagged at-risk
+- Delay claim evidence assembly
+
+**Tier H (blocked on significant new infra)**
+- Photo safety scan (blocked on photo upload UI + vision LLM pipeline)
+- Drawing intelligence (blocked on drawing processing pipeline)
+- Voice daily log / voice commands (blocked on voice capture + STT)
+- Email triage (blocked on email integration)
+
+**Permanently out of scope**
+- Autonomous data mutation
+- AI-generated legal / contract text
+- Predictive bidding with liability implications
+- Replacing humans on safety decisions
+- Custom model training / fine-tuning
+- Generic "chat with your construction app"
+- Bonus / scorecard / performance AI (the underlying system is itself deferred)
+
+### 1e) AI panel / UX hardening still needed
+
+There is no AI surface in the frontend today. Before any user-facing AI
+feature can ship, the frontend needs:
+
+1. **AI suggestion drawer pattern** — a reusable `FormDrawer`-style component
+   that shows the AI's proposed change, the inputs it saw, the confidence
+   (if applicable), and accept / reject affordances. No "auto-apply" path.
+2. **Inline AI callout component** — a non-blocking banner for read-only
+   suggestions (e.g. "Meeting prep packet available for this meeting").
+3. **AI invocation history panel** — per-record "AI suggestions for this
+   item" log so users can see what was suggested and what happened.
+4. **Cost / status surface in AdminJobs** — per-job AI budget usage, recent
+   invocation list, failure mode breakdown.
+5. **Opt-out toggle in user settings** — because not all users will want
+   assistive AI in their workflow, and regulated users may be forbidden.
+6. **Feature flag plumbing** — every AI feature must be flag-gated so it can
+   be disabled without a redeploy.
+
+None of these components exist. The existing `forms.jsx`, `notifications.jsx`,
+and `AlertCallout.jsx` patterns are the right style base, but the AI surface
+itself needs to be designed from scratch.
+
+### 1f) Required foundation before any real AI rollout
+
+These are the prerequisites that must be **shipped and verified** (not just
+started) before the first AI feature can be turned on in production. They
+are not AI features themselves — they are engineering and governance
+primitives.
+
+| # | Foundation item | Status |
+|---|---|---|
+| 1 | **CI workflow** — at minimum `pytest tests/ -q` and `npx vite build` on every PR | ❌ not built |
+| 2 | **Sentry (or equivalent) error tracking** on backend + frontend | ❌ not built |
+| 3 | **LLM client module** (`backend/app/services/llm.py`) with vendor abstraction | ❌ not built |
+| 4 | **Prompt registry** — versioned prompt templates in `backend/app/prompts/` with load-by-version semantics | ❌ not built |
+| 5 | **Cost ceiling pattern** — per-job and per-day caps with a `status="failed"` budget-exceeded path | ❌ not built |
+| 6 | **`rex.ai_invocations` audit table** — every LLM call logs prompt version, model, input hash, output, cost, user, outcome | ❌ not built |
+| 7 | **Human-in-the-loop UI pattern** — see §1e | ❌ not built |
+| 8 | **Eval harness** — test fixture + assertion framework in `backend/tests/ai/` for prompt/output regression | ❌ not built |
+| 9 | **Feature flag plumbing** (backend + frontend) | ❌ not built |
+| 10 | **Photo upload UI + storage backend** (only required for vision-based features) | ❌ not built (deferred) |
+| 11 | **Vendor selection + PII policy approval** | ❌ not done |
+| 12 | **Telemetry plumbing** (success rate, avg cost, avg latency per feature) | ❌ not built |
+
+**No AI feature should ship until items 1–9 are complete.** Item 10 only
+blocks photo/vision features. Items 11–12 gate production rollout.
+
+### Summary
+
+| Verification level | Count |
+|---|---|
+| AI features implemented | 0 |
+| AI features backend-tested | 0 |
+| AI features UI-verified | 0 |
+| AI features deployed-verified | 0 |
+| Foundation items shipped | 0 of 12 |
+
+If a future reader finds this doc and expects to find "phase X is the AI
+phase," the honest answer is: **no AI phase exists yet.** The work starts
+with foundation items 1–9, not with a feature.
+
+---
+
+## 2) What's already in the repo that AI could eventually use
 
 - **Background job runner** — built in phase 31 with apscheduler + Postgres advisory locks. Currently runs 5 deterministic jobs (warranty/insurance refresh, schedule snapshot, aging alerts, session purge). This is the natural execution surface for any future AI enrichment job.
 - **Notification infrastructure** — built in phase 32. Dedupe-aware, project-scoped, fan-out helpers. The natural delivery surface for any AI-generated alert or recommendation.
 - **Polymorphic attachments** — `source_type`/`source_id` on attachments + a download endpoint. The natural entry point for any document-intelligence feature that needs to read uploaded files.
-- **Real-backend test harness** — phases 25/30/35 prove that anything we build can be tested against the live HTTP stack in isolation.
+- **Real-backend test harness** — phases 25/30/35/40 prove that anything we build can be tested against the live HTTP stack in isolation. The eval harness (foundation item 8) can extend this pattern.
+- **Project-scoped RBAC** — `assert_project_access`, `get_readable_project_ids`, `enforce_project_read`. Any AI feature that reads project data must honor these helpers. Project-scoped retrieval is mandatory for prompt-injection safety.
 
-These four are the foundation for any AI work. Nothing else AI-related is wired.
+These are enabling, not prerequisite. They won't on their own make AI
+feasible — the 12 foundation items in §1f still have to ship first.
 
-### What is explicitly out of the repo
+### Explicitly NOT in the repo
 
 - No vector database
 - No embedding pipeline
@@ -32,10 +187,11 @@ These four are the foundation for any AI work. Nothing else AI-related is wired.
 - No model evaluation harness
 - No telemetry on AI inputs/outputs
 - No cost/budget guardrails
+- No `rex.ai_invocations` audit table
 
 ---
 
-## 2) Candidate AI capabilities by domain
+## 3) Candidate AI capabilities by domain
 
 These come from the original parity audit (`FIELD_PARITY_MATRIX.md`) where the previous Rex Procore had ~25 AI/intelligence tables. None are in Rex OS by design — they were intentionally deferred. This list catalogs **what could be built**, not what's planned.
 
@@ -90,7 +246,7 @@ These come from the original parity audit (`FIELD_PARITY_MATRIX.md`) where the p
 
 ---
 
-## 3) Dependencies before any AI work is worthwhile
+## 4) Dependencies before any AI work is worthwhile
 
 Before building any AI feature, these foundations need to be in place:
 
@@ -107,7 +263,7 @@ None of these foundations exist yet.
 
 ---
 
-## 4) Safety / governance constraints
+## 5) Safety / governance constraints
 
 Before any AI feature goes live, the following must be agreed:
 
@@ -122,7 +278,7 @@ These are policy decisions, not engineering ones. They block all AI work until d
 
 ---
 
-## 5) Data readiness assumptions
+## 6) Data readiness assumptions
 
 Roughly, the AI features divide into 3 data-readiness tiers:
 
@@ -149,7 +305,7 @@ These need: LLM client, prompt registry, cost ceiling, human-in-the-loop UI. The
 
 ---
 
-## 6) Recommended sequencing
+## 7) Recommended sequencing
 
 ### Phase A — Foundation (must come first, no AI features yet)
 1. CI workflow (frontend build + backend tests on PR)
@@ -192,7 +348,7 @@ These are the "layups" — high product value, low AI risk, no new infrastructur
 
 ---
 
-## 7) What should explicitly remain out of scope
+## 8) What should explicitly remain out of scope
 
 - **Autonomous agents** — no AI feature should mutate data without human review. Period.
 - **Black-box models that can't explain themselves** — every AI output needs to surface its inputs/reasoning so users can sanity-check.
@@ -206,7 +362,7 @@ These are the "layups" — high product value, low AI risk, no new infrastructur
 
 ---
 
-## 8) What an AI feature delivery looks like
+## 9) What an AI feature delivery looks like
 
 Once phase A is complete, every AI feature should follow this template:
 
@@ -223,7 +379,7 @@ This is how you build AI features without building an AI mess. Every shortcut he
 
 ---
 
-## 9) Document hygiene
+## 10) Document hygiene
 
 This file should be updated whenever:
 - Phase A foundations land (LLM client, prompt registry, cost ceiling, audit table)

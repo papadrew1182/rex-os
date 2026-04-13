@@ -1,29 +1,69 @@
 # Rex OS Field Parity Matrix
 
-> Audit Date: 2026-04-11
+> Original audit date: 2026-04-11
+> Last reconciled: **2026-04-12** (phase 40 reconciliation pass)
 > Sources: Rex Procore repo (C:\Users\rober\rex-procore), live app (railway), Rex OS repo (C:\Users\rober\rex-os)
 
-> **Updated 2026-04-12 (Phase 25)** — All P0 items remained at zero. The following P1 items have been **CLOSED** since the original audit:
-> - ✅ punch_items.closed_by (phase 4)
-> - ✅ punch_items.is_critical_path (phase 4)
-> - ✅ submittals.is_critical_path (phase 4)
-> - ✅ submittals.submittal_manager_id (phase 4)
-> - ✅ rfis.rfi_manager (phase 4)
-> - ✅ commitments.estimated_completion_date (phase 3)
-> - ✅ change_event_line_items table (phase 5)
-> - ✅ schedule_activities.actual_start_date / actual_finish_date / wbs_code (phase 21)
-> - ✅ completion_milestones.forecast_date / percent_complete (phase 21)
-> - ✅ warranties.system_or_product / manufacturer (phase 21)
-> - ✅ insurance_certificates table (phase 21 — implemented as normalized table option)
-> 
-> **Remaining P1 items**: none currently identified.
-> **Remaining P2 items**: see FIELD_PARITY_BACKLOG.md for the current list.
+> **Phase 40 status banner** — Every "missing" P1 and practical P2 row in the
+> tables below has been **closed**. This matrix should now be read as an
+> audit artifact showing what Rex OS has vs what Rex Procore had. It is no
+> longer an active backlog. The cells still marked `-- | missing` in the
+> tables below are one of:
+>   1. Already closed — see the "Post-audit closure" table in section 0 below.
+>   2. Intentionally excluded Procore baggage (sync columns, denormalized
+>      mirrors, Procore UI cosmetic fields).
+>   3. Deferred major work gated on product design (bonus/performance system).
 
-> **Updated 2026-04-12 (Phase 35)** — Generic notification + background job
-> infrastructure shipped. Closed P2-8 (alert infrastructure) from the
-> original audit. Domain-specific alert tables like warranty_alerts are
-> preserved as the canonical source; the new rex.notifications table is the
-> delivery/inbox layer. No new domain parity fields touched in this sprint.
+---
+
+## 0. Post-audit closure table (Phase 40 reconciliation)
+
+All P1 and practical P2 items are closed. Remaining "missing" cells in the
+tables below are superseded by these closures:
+
+### P1 closures
+
+| Original row (marked `missing`) | Closed in | How |
+|---|---|---|
+| punch_items.closed_by | Phase 4 | Migration `002`, `PunchItem.closed_by` FK |
+| punch_items.is_critical_path | Phase 4 | Migration `002` |
+| submittals.is_critical_path | Phase 4 | Migration `002` |
+| submittals.submittal_manager_id | Phase 4 | Migration `002` |
+| rfis.rfi_manager | Phase 4 | Migration `002` |
+| commitments.estimated_completion_date | Phase 3 | Migration `002` |
+| change_event_line_items table | Phase 5 | Migration `002` |
+| schedule_activities.actual_start_date / actual_finish_date / wbs_code | Phase 21 | Migration `003` |
+| completion_milestones.forecast_date / percent_complete | Phase 21 | Migration `003` |
+| warranties.system_or_product / manufacturer | Phase 21 | Migration `003` |
+| Insurance detail fields (GL/WC/Auto) | Phase 21 | Migration `003` created normalized `insurance_certificates` table |
+
+### P2 closures (phase 38/39 and phases 31–34)
+
+| Original row (marked `missing`) | Closed in | How |
+|---|---|---|
+| projects.latitude / longitude | Phase 39 | Migration `005` |
+| companies.mobile_phone / website | Phase 39 | Migration `005` |
+| observations.contributing_behavior / contributing_condition | Phase 39 | Migration `005` |
+| closeout_checklist_items.spec_division / spec_section | Phase 39 | Migration `005` |
+| O&M manual tracker (table + page) | Phase 39 | Migration `005` — new `om_manuals` table, routes, schemas, page |
+| schedule_activities.start_variance / finish_variance separation | Phase 38 | Migration `005` |
+| schedule_activities.free_float_days | Phase 38 | Migration `005` |
+| Generic alert/notification infrastructure | Phases 31–34 | Migration `004` — `notifications` + `job_runs` tables; dedupe-aware fan-out; 5 jobs; bell + drawer + page |
+
+### Explicitly excluded (Procore baggage — still "missing" by design)
+
+- `procore_id` on every table → replaced by `connector_mappings`
+- `synced_at` / `sync_source` / `is_deleted` / `deleted_at` on every table
+- Denormalized `*_name` mirror columns where FK joins exist
+- Procore UI cosmetic fields (`color`, `avatar_url`, `datagrid_uuid`, etc.)
+- Procore status/type/reason mapping IDs
+
+### Deferred major work
+
+- Bonus / performance system (~12 tables). Still "missing" but **not tracked
+  as open** — requires product design before any engineering work.
+
+---
 
 ---
 
@@ -691,42 +731,61 @@ Rex Procore has no correspondence table (uses email_log + sub_communications). R
 
 ---
 
-## 7. Rex Procore Features NOT in Rex OS (by design or not yet)
+## 7. Rex Procore Features NOT in Rex OS (by design or deferred)
 
-### 7.1 Procore Sync Infrastructure (by design - deprecated)
+### 7.1 Procore Sync Infrastructure (by design — permanently excluded)
 All `procore_id`, `synced_at`, `sync_source`, `is_deleted`, `deleted_at`, `sync_log`, `webhook_events` fields are intentionally excluded. Rex OS is the source of truth.
 
-### 7.2 AI/Intelligence Features (not yet)
+### 7.2 AI / Intelligence Features (deferred — see `AI_ROADMAP.md`)
 - Risk predictions, photo analysis, voice transcription, safety scans, NLP commands, delay claims engine, BIM integration, document generation, drawing AI, cost benchmarks, weather forecasts
+- None are wired in current product. No LLM client, no prompt registry, no audit table. Foundation tier (CI, error tracking, LLM client, cost ceiling, eval harness, human-in-the-loop UI) is the blocker before any AI feature can ship.
 
-### 7.3 Bonus/Performance System (not yet)
+### 7.3 Bonus / Performance System (deferred — gated on product design)
 - Quarterly scorecards, milestone bonus, buyout savings, EBITDA growth, team bonus summary, bonus engine, leaderboard metrics, achievements
+- Explicitly excluded from the current scope. Requires a full product design pass before any engineering work.
 
-### 7.4 Communication Features (not yet)
-- Email log, sub communications, notification preferences, notification digests, daily narratives
+### 7.4 Communication Features
+- **Notifications**: ✅ **SHIPPED in phases 31–34** (generic `notifications` table, bell + drawer + page, dedupe-aware fan-out). Email transport abstraction in place (`noop` in prod; SMTP usable but not configured).
+- **Email digest job / per-user notification preference matrix**: deferred.
+- **Email log / sub communications / daily narrative generation**: deferred.
 
-### 7.5 Compliance/Alert Features (not yet)
-- Inspection templates, inspection compliance, daily log compliance, RFI alert log, punch alert log, insurance alert log, closeout alert log, evidence cure log
+### 7.5 Compliance / Alert Features
+- **Warranty alerts**: ✅ shipped (`warranty_alerts` table + warranty_refresh job).
+- **Insurance alerts**: ✅ shipped (insurance_refresh job + notifications).
+- **RFI / submittal / punch aging alerts**: ✅ shipped (aging_alerts job emits per-category notifications).
+- **Schedule drift alerts**: ✅ shipped (schedule_snapshot job).
+- **Inspection templates / inspection compliance / daily log compliance / evidence cure log / closeout alert log**: deferred.
 
-### 7.6 Preconstruction Features (not yet)
+### 7.6 Preconstruction Features (deferred)
 - Bid packages, bid submissions, bid comparison reports, permits, permit inspections, material tracking
 
-### 7.7 Portal / External Access (not yet)
+### 7.7 Portal / External Access (deferred)
 - Portal users, portal activity log
 
-### 7.8 Process Features (not yet)
+### 7.8 Process / Advanced Features (deferred)
 - Action queue, command history, entity aliases, writeback log, trend baselines, recovery plans, lookahead configs, schedule commitment maps
 
 ---
 
-## Summary Statistics
+## Summary Statistics (Phase 40 reconciliation)
 
 | Metric | Rex Procore | Rex OS | Notes |
 |---|---|---|---|
-| Total tables | ~113 | 57 | Rex OS is normalized and focused |
-| Frontend screens | 43+ | 8 | Rex OS covers closeout slice only |
-| Core domain tables | ~40 | 57 | Rex OS has MORE core domain tables |
-| AI/Intelligence tables | ~25 | 0 | Phase 2+ feature |
-| Sync/Infrastructure tables | ~15 | 1 (connector_mappings) | Intentional simplification |
-| Bonus/Performance tables | ~12 | 0 | Phase 2+ feature |
-| Fields per core entity | ~15-60 (denormalized) | ~10-25 (normalized) | Rex OS is cleaner |
+| Total tables | ~113 | **63 ORM models** | Rex OS is normalized and focused; includes phase 31 `notifications` + `job_runs` and phase 39 `om_manuals` + `insurance_certificates` |
+| Frontend screens (page components) | 43+ | **30** | Rex OS covers Portfolio, Closeout, Schedule workbench (5 tabs), Field Ops (9 pages), Financials (4), Doc Mgmt (5), Compliance, Notifications, Operations |
+| Core domain tables | ~40 | ~60 | Rex OS has more normalized core domain coverage |
+| AI / Intelligence tables | ~25 | 0 | Deferred — see `AI_ROADMAP.md` |
+| Sync / Infrastructure tables | ~15 | 1 (`connector_mappings`) | Intentional simplification |
+| Bonus / Performance tables | ~12 | 0 | Deferred major work — gated on product design |
+| Fields per core entity | ~15–60 (denormalized) | ~10–25 (normalized) | Rex OS is cleaner |
+| Backend routers | — | 64 | `all_routers` in `backend/app/routes/__init__.py` |
+| Backend tests collected | — | **577** (569 pre-phase-40 + 8 phase 40 verification tests) passing in ~94s | `pytest --collect-only` + full run |
+| Migrations applied | — | 8 total | 4 `rex2_*` bootstrap + `002`..`005` phase batches |
+| Background jobs | — | 5 | warranty_refresh, insurance_refresh, schedule_snapshot, aging_alerts, session_purge |
+
+### Screen catalog — all 30 page components are built
+
+The original audit listed 8 Rex OS screens (the closeout slice). As of phase 39
+Rex OS ships 30 page components covering every screen family in
+`SCREEN_TO_DATA_MAP.md`. See that file + `FRONTEND_ROADMAP.md` for the full
+list. Stale "8 screens" claims elsewhere in older docs have been reconciled.

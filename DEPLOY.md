@@ -1,5 +1,14 @@
 # Rex OS Deployment Runbook
 
+> Last reconciled: **2026-04-12** (phase 40 reconciliation pass).
+> Current production topology:
+> - Backend: Railway (`rex-os-api-production.up.railway.app`) — Nixpacks build,
+>   auto-migrate on startup, apscheduler enabled with 5 background jobs.
+> - Frontend: Vercel (`rex-os.vercel.app`) — Vite build, HashRouter, no SPA rewrites.
+> - DB: Railway-managed Postgres in the same project; `rex` schema.
+> - Migrations: **8 total** (4 `rex2_*` bootstrap files + 4 phase-numbered batches
+>   — see `migrations/` and `backend/app/migrate.py::MIGRATION_ORDER`).
+
 Architecture:
 - **Frontend** → Vercel (React + Vite, served from `frontend/`)
 - **Backend** → Railway (FastAPI + uvicorn, served from `backend/`)
@@ -31,7 +40,7 @@ Click your backend service (the one created from the GitHub repo) → **Variable
 
 | Variable | Value | Notes |
 |---|---|---|
-| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | Reference the Postgres service. Railway resolves it automatically. |
+| `DATABASE_URL` | `${{Postgres.DATABASE_URL}}` | Reference the Postgres service. Railway resolves it automatically. **If the project has more than one Postgres service** (e.g. `Postgres` and `Postgres-BzcC`), use the exact service name that holds the live rex schema — `${{Postgres-BzcC.DATABASE_URL}}`. A hardcoded URL string will silently break on the next private-DNS change. |
 | `REX_AUTO_MIGRATE` | `true` | Apply all migrations on startup. |
 | `REX_ENABLE_SCHEDULER` | `true` | Boot the apscheduler with all 5 jobs. |
 | `REX_CORS_ORIGINS` | `https://rex-os.vercel.app,https://rex-os-papadrew1182.vercel.app` | Update after Vercel gives you the real URL in step 2. |
@@ -48,9 +57,16 @@ Click your backend service (the one created from the GitHub repo) → **Variable
 ### 1e. First deploy
 
 Railway auto-deploys on push to the linked branch. The first deploy after setting
-`REX_AUTO_MIGRATE=true` will apply all 7 migrations (`001` → `004` plus the rex2 base files).
+`REX_AUTO_MIGRATE=true` will apply all 8 migrations in order: the 4 `rex2_*` base
+files (schema + canonical DDL + foundation bootstrap + business seed) followed by
+the 4 phase-numbered migrations (`002_field_parity_batch.sql`,
+`003_phase21_p1_batch.sql`, `004_phase31_jobs_notifications.sql`,
+`005_phase38_phase39_p2_batch.sql`). The applied list is hardcoded in
+`backend/app/migrate.py::MIGRATION_ORDER`.
 
 Watch the logs in **Deployments** → **View Logs** for `auto_migrate complete applied=N failed=0`.
+On a healthy boot you should also see `scheduler_started job_count=5`, confirming
+the apscheduler started with all 5 background jobs registered.
 
 ---
 
@@ -98,6 +114,36 @@ If anything is broken:
 - Check Vercel deployment logs for the frontend
 - Hit `https://<railway-url>/api/health` and `/api/ready` to confirm the backend is up
 - Check browser DevTools Network tab for CORS or 401 errors
+
+### Known production gotchas (encountered 2026-04-13)
+
+- **`/api/health` ok but `/api/ready` hanging / 503 with asyncpg
+  `InterfaceError: connection is closed`**
+  Root cause: SQLAlchemy pool handed out a stale connection after Railway's
+  idle killer closed it. Fix lives in `backend/app/database.py` —
+  `pool_pre_ping=True` + `pool_recycle=1800`. If the error ever comes back,
+  confirm those kwargs are still on `create_async_engine`.
+- **New deploys fail startup with `asyncpg TimeoutError` at `db.get_pool()`**
+  while the old deployment keeps serving `/api/health`.
+  Root cause: `DATABASE_URL` points at a Postgres service that no longer
+  resolves (e.g. you created a second Postgres service and the private
+  hostname became ambiguous). Fix: set `DATABASE_URL` to an **explicit**
+  service reference — e.g. `${{Postgres-BzcC.DATABASE_URL}}` — rather than a
+  hardcoded internal hostname string. Verify with `railway variables` that
+  the resolved value matches the Postgres service that actually holds the
+  `rex` schema.
+- **Vercel UI shows "Failed to fetch" on login.**
+  Root cause: `REX_CORS_ORIGINS` on the Railway backend didn't include the
+  Vercel origin (CORS defaults to `localhost:5173,localhost:3000`). Fix: set
+  `REX_CORS_ORIGINS=https://rex-os.vercel.app` on `rex-os-api`. Confirm with
+  a preflight curl:
+  ```
+  curl -i -X OPTIONS \
+    -H "Origin: https://rex-os.vercel.app" \
+    -H "Access-Control-Request-Method: POST" \
+    https://<railway-url>/api/auth/login
+  ```
+  The response must include `access-control-allow-origin: https://rex-os.vercel.app`.
 
 ---
 
