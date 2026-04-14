@@ -17,6 +17,18 @@ on:
         type: string
   schedule:
     # Every 6h against the production target below. Safe to disable if noisy.
+    #
+    # For scheduled runs `github.event.inputs.deployed_url` is always empty,
+    # so the target falls back to the `REX_E2E_URL` *Actions variable* that
+    # must be set at the repo level:
+    #   Settings → Secrets and variables → Actions → Variables → New variable
+    #     name:  REX_E2E_URL
+    #     value: https://rex-os.up.railway.app   (or the current prod URL)
+    # If that variable is unset, the "Require REX_E2E_URL" step below fails
+    # fast with a readable error before Playwright is installed — previously
+    # an unset value silently fell through to playwright.config.js's local
+    # dev default (http://localhost:5173) and produced 14 confusing
+    # ERR_CONNECTION_REFUSED failures.
     - cron: '17 */6 * * *'
 
 # Silence the "Node.js 20 actions are deprecated" warning that GitHub now
@@ -35,6 +47,26 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      # Fail fast BEFORE npm install / playwright download if REX_E2E_URL
+      # is empty. On workflow_dispatch the input is required so this branch
+      # only fires for scheduled runs where the Actions variable is unset.
+      # Without this guard, an unset URL falls through to playwright.config.js's
+      # local dev default (http://localhost:5173) and every test crashes with
+      # ERR_CONNECTION_REFUSED — slow and unreadable.
+      - name: Require REX_E2E_URL
+        run: |
+          if [ -z "${REX_E2E_URL}" ]; then
+            echo "ERROR: REX_E2E_URL is not set."
+            echo ""
+            echo "For scheduled runs, set the 'REX_E2E_URL' Actions variable"
+            echo "in the repo settings: Settings → Secrets and variables →"
+            echo "Actions → Variables → New variable."
+            echo ""
+            echo "Example value: https://rex-os.up.railway.app"
+            exit 1
+          fi
+          echo "Targeting: $REX_E2E_URL"
 
       - name: Set up Node
         uses: actions/setup-node@v4
