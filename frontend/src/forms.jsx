@@ -175,6 +175,36 @@ export function Select({ label, name, value, onChange, options, error, required,
   );
 }
 
+export function FileInput({ label, name, accept, onChange, required, file }) {
+  return (
+    <div className="rex-form-group">
+      <label htmlFor={name}>
+        {label}
+        {required && <span style={{ color: "var(--rex-red)", marginLeft: 4 }}>*</span>}
+      </label>
+      <input
+        id={name}
+        type="file"
+        accept={accept}
+        onChange={(e) => onChange(name, e.target.files?.[0] || null)}
+        style={{
+          padding: "6px 8px",
+          fontSize: 12,
+          background: "#fff",
+          border: "1px solid var(--rex-border-strong)",
+          borderRadius: 6,
+          fontFamily: "inherit",
+        }}
+      />
+      {file && (
+        <span style={{ fontSize: 11, color: "var(--rex-text-muted)" }}>
+          {file.name} · {file.size >= 1048576 ? (file.size / 1048576).toFixed(1) + " MB" : (file.size / 1024).toFixed(1) + " KB"}
+        </span>
+      )}
+    </div>
+  );
+}
+
 export function Checkbox({ label, name, value, onChange }) {
   return (
     <label className="rex-form-group" style={{ flexDirection: "row", alignItems: "center", gap: 8, cursor: "pointer" }}>
