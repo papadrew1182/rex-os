@@ -1,10 +1,10 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
-import { api } from "../api";
+import { api, apiUrl, getToken } from "../api";
 import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
 import {
   FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select,
-  cleanPayload,
+  FileInput, WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
 
@@ -18,6 +18,18 @@ const PHOTO_EDIT_DEFAULT = {
   description: "",
   latitude: null,
   longitude: null,
+};
+
+const PHOTO_UPLOAD_DEFAULT = {
+  file: null,
+  photo_album_id: null,
+  new_album_name: "",
+  taken_at: null,
+  description: "",
+  location: "",
+  latitude: null,
+  longitude: null,
+  tags: "",
 };
 
 function fmtFileSize(bytes) {
@@ -37,12 +49,18 @@ export default function Photos() {
   const [albumFilter, setAlbumFilter] = useState("");
   const [selected, setSelected] = useState(null);
 
-  // Edit-only drawer (no create — photo upload requires multipart)
+  // Edit drawer
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [editing, setEditing] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
   const form = useFormState(PHOTO_EDIT_DEFAULT);
+
+  // Upload drawer — multipart POST /photos/upload
+  const [uploadOpen, setUploadOpen] = useState(false);
+  const [uploadSubmitting, setUploadSubmitting] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
+  const uploadForm = useFormState(PHOTO_UPLOAD_DEFAULT);
 
   const refresh = useCallback(() => {
     if (!selectedId) return;
@@ -136,6 +154,64 @@ export default function Photos() {
     }
   }
 
+  function openUpload() {
+    uploadForm.setAll({ ...PHOTO_UPLOAD_DEFAULT });
+    setUploadError(null);
+    setUploadOpen(true);
+  }
+
+  async function onUpload() {
+    setUploadSubmitting(true);
+    setUploadError(null);
+    try {
+      const v = uploadForm.values;
+      if (!v.file) throw new Error("Please choose a photo file");
+      if (!(v.file instanceof File)) throw new Error("Invalid file");
+      if (!v.file.type?.startsWith("image/")) throw new Error("Only image files are allowed");
+
+      // If user typed a new album name, create it first, then attach its id.
+      let albumId = v.photo_album_id || null;
+      if (!albumId && v.new_album_name?.trim()) {
+        const album = await api("/photo-albums/", {
+          method: "POST",
+          body: { project_id: selectedId, name: v.new_album_name.trim() },
+        });
+        albumId = album?.id;
+      }
+
+      const fd = new FormData();
+      fd.append("project_id", selectedId);
+      fd.append("file", v.file);
+      if (albumId) fd.append("photo_album_id", albumId);
+      if (v.taken_at) fd.append("taken_at", new Date(v.taken_at + "T00:00:00").toISOString());
+      if (v.description) fd.append("description", v.description);
+      if (v.location) fd.append("location", v.location);
+      if (v.latitude != null) fd.append("latitude", String(v.latitude));
+      if (v.longitude != null) fd.append("longitude", String(v.longitude));
+      if (v.tags?.trim()) fd.append("tags", v.tags.trim());
+
+      // Hand-rolled fetch so we preserve Bearer auth while letting the browser
+      // set the multipart boundary header. api() would JSON-encode our body.
+      const token = getToken();
+      const res = await fetch(apiUrl("/photos/upload"), {
+        method: "POST",
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        body: fd,
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: res.statusText }));
+        throw new Error(err.detail || `HTTP ${res.status}`);
+      }
+
+      setUploadOpen(false);
+      refresh();
+    } catch (e) {
+      setUploadError(e.message || String(e));
+    } finally {
+      setUploadSubmitting(false);
+    }
+  }
+
   if (!selectedId) return <p className="rex-muted" style={{ padding: "2rem" }}>Select a project.</p>;
   if (error) return <Flash type="error" message={error} />;
   if (!data) return <PageLoader text="Loading photos..." />;
@@ -150,7 +226,10 @@ export default function Photos() {
 
   return (
     <div>
-      <h1 className="rex-h1" style={{ marginBottom: 4 }}>Photo Gallery</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 4 }}>
+        <h1 className="rex-h1" style={{ margin: 0 }}>Photo Gallery</h1>
+        <WriteButton onClick={openUpload}>+ Upload Photo</WriteButton>
+      </div>
       <p className="rex-muted" style={{ marginBottom: 20 }}>Project: <strong style={{ color: "var(--rex-text-bold)" }}>{project?.name}</strong></p>
 
       <div className="rex-grid-5" style={{ marginBottom: 24 }}>
@@ -287,7 +366,53 @@ export default function Photos() {
         </div>
       )}
 
-      {/* Photo metadata edit drawer (edit-only — no file upload in this sprint) */}
+      {/* Upload photo drawer — multipart to /photos/upload */}
+      <FormDrawer
+        open={uploadOpen}
+        onClose={() => setUploadOpen(false)}
+        title="Upload Photo"
+        subtitle={project?.name}
+        mode="create"
+        onSubmit={onUpload}
+        onReset={uploadForm.reset}
+        dirty={uploadForm.dirty}
+        submitting={uploadSubmitting}
+        error={uploadError}
+      >
+        <FileInput
+          label="Photo File"
+          name="file"
+          accept="image/*"
+          file={uploadForm.values.file}
+          onChange={uploadForm.setField}
+          required
+        />
+        <Select
+          label="Existing Album"
+          name="photo_album_id"
+          value={uploadForm.values.photo_album_id}
+          onChange={uploadForm.setField}
+          options={albumOptions}
+          placeholder="No album / create new below"
+        />
+        <Field
+          label="…or create new album"
+          name="new_album_name"
+          value={uploadForm.values.new_album_name}
+          onChange={uploadForm.setField}
+          placeholder="New album name"
+        />
+        <DateField label="Taken At" name="taken_at" value={uploadForm.values.taken_at} onChange={uploadForm.setField} />
+        <Field label="Location" name="location" value={uploadForm.values.location} onChange={uploadForm.setField} placeholder="e.g. 3rd floor, North elevation" />
+        <div className="rex-form-row">
+          <NumberField label="Latitude" name="latitude" value={uploadForm.values.latitude} onChange={uploadForm.setField} step="0.000001" />
+          <NumberField label="Longitude" name="longitude" value={uploadForm.values.longitude} onChange={uploadForm.setField} step="0.000001" />
+        </div>
+        <TextArea label="Description" name="description" value={uploadForm.values.description} onChange={uploadForm.setField} />
+        <Field label="Tags (comma-separated)" name="tags" value={uploadForm.values.tags} onChange={uploadForm.setField} placeholder="e.g. punch, exterior, rough-in" />
+      </FormDrawer>
+
+      {/* Photo metadata edit drawer */}
       <FormDrawer
         open={drawerOpen}
         onClose={() => setDrawerOpen(false)}

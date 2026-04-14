@@ -100,6 +100,8 @@ class CloseoutChecklistItemCreate(BaseModel):
     spec_section: str | None = None
 
 class CloseoutChecklistItemUpdate(BaseModel):
+    name: str | None = None
+    category: Category | None = None
     status: ChecklistItemStatus | None = None
     assigned_company_id: UUID | None = None; assigned_person_id: UUID | None = None
     due_date: date | None = None; completed_date: date | None = None

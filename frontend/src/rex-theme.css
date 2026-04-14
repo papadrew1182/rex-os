@@ -59,10 +59,22 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .rex-section-label { font-size: 12px; font-weight: 700; color: var(--rex-text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
 
 /* ── Shell ── */
-.rex-shell { display: flex; min-height: 100vh; }
+.rex-shell { display: flex; min-height: 100vh; position: relative; }
 .rex-sidebar {
   width: 220px; background: var(--rex-sidebar-bg); color: var(--rex-sidebar-text);
   flex-shrink: 0; padding-top: 18px; display: flex; flex-direction: column;
+  transition: transform 0.2s ease;
+}
+.rex-sidebar-backdrop { display: none; }
+.rex-topbar-menu {
+  display: none;
+  background: none; border: none; cursor: pointer;
+  font-size: 20px; color: var(--rex-text-muted); padding: 4px 10px;
+  margin-right: 4px; border-radius: 4px;
+}
+.rex-topbar-menu:hover { background: var(--rex-accent-light); color: var(--rex-accent); }
+.rex-topbar-project-select {
+  width: 180px; padding: 5px 8px;
 }
 .rex-sidebar-brand {
   padding: 0 20px 22px; font-family: 'Syne', sans-serif;
@@ -115,7 +127,10 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── Tables ── */
 .rex-table-wrap { border-radius: 8px; border: 1px solid var(--rex-border); overflow: hidden; box-shadow: var(--rex-shadow-sm); }
-.rex-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+/* Inner scroll wrapper — lets the card keep rounded corners while the table
+   scrolls horizontally on narrow viewports instead of breaking the layout. */
+.rex-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+.rex-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 480px; }
 .rex-table thead th {
   background: var(--rex-accent); color: #fff; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 14px; text-align: left;
@@ -269,3 +284,86 @@ select.rex-input { padding-right: 24px; }
 /* ── Notification bell ── */
 .rex-bell:hover { background: var(--rex-accent-light) !important; border-radius: 6px; }
 .rex-gantt-bar-row { position: relative; }
+
+/* ── Closeout checklists split layout — responsive via CSS instead of JS ── */
+.rex-checklists-layout {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 14px;
+}
+@media (max-width: 900px) {
+  .rex-checklists-layout { grid-template-columns: 1fr; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Responsive — Phase 50
+   Goals:
+     • Sidebar collapses below tablet; topbar hamburger reveals it as overlay
+     • Grids degrade gracefully on narrow viewports
+     • Tables scroll horizontally inside their card instead of blowing layout
+     • Drawer clamps to viewport width
+     • Content padding tightens on mobile
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* Tablet and below — hide the 5-up stat grid overflow */
+@media (max-width: 1100px) {
+  .rex-grid-5 { grid-template-columns: repeat(3, 1fr); }
+  .rex-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .rex-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* Below tablet: sidebar becomes an off-canvas overlay */
+@media (max-width: 900px) {
+  .rex-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    z-index: 300;
+    transform: translateX(-100%);
+    box-shadow: 2px 0 16px rgba(0, 0, 0, 0.25);
+  }
+  .rex-shell--sidebar-open .rex-sidebar { transform: translateX(0); }
+  .rex-shell--sidebar-open .rex-sidebar-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 250;
+  }
+  .rex-topbar-menu { display: inline-flex; align-items: center; }
+  .rex-topbar { padding: 0 12px; gap: 8px; }
+  .rex-topbar-project { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
+  .rex-topbar-project-select { width: 140px; }
+  .rex-content { padding: 14px 14px; }
+  .rex-grid-5 { grid-template-columns: repeat(2, 1fr); }
+  .rex-grid-4 { grid-template-columns: repeat(2, 1fr); }
+  .rex-grid-3 { grid-template-columns: 1fr; }
+  .rex-grid-2 { grid-template-columns: 1fr; }
+  .rex-h1 { font-size: 22px; }
+  .rex-h2 { font-size: 18px; }
+  .rex-drawer { width: 100vw !important; max-width: 100vw; padding: 18px 14px; }
+  .rex-search-bar { gap: 6px; }
+  .rex-search-bar .rex-input { min-width: 0; }
+  .rex-detail-panel { padding: 14px 16px; }
+}
+
+/* Phone-sized — collapse stat grids entirely and allow wrapping */
+@media (max-width: 560px) {
+  .rex-grid-5 { grid-template-columns: 1fr 1fr; }
+  .rex-grid-4 { grid-template-columns: 1fr 1fr; }
+  .rex-h1 { font-size: 20px; }
+  .rex-topbar-project { max-width: 28vw; }
+  .rex-topbar-project-select { width: 110px; }
+  .rex-stat-num { font-size: 24px; }
+}
+
+/* Drawer focus ring — keyboard accessibility */
+.rex-drawer button:focus-visible,
+.rex-drawer .rex-input:focus-visible {
+  outline: 2px solid var(--rex-accent);
+  outline-offset: 1px;
+}
+
+/* Prevent topbar from overflowing when project name is long */
+.rex-topbar > * { min-width: 0; }

@@ -3,12 +3,33 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 import { useProject } from "../project";
 import { Badge, ProgressBar, PageLoader, Flash, Spinner } from "../ui";
+import {
+  FormDrawer, useFormState, Field, DateField, TextArea, Select,
+  cleanPayload,
+} from "../forms";
+import { usePermissions } from "../permissions";
 
 const TEMPLATE_STANDARD = "a0000001-0000-0000-0000-000000000001";
+
+const CATEGORY_OPTIONS = ["documentation", "general", "mep", "exterior", "interior"];
+const ITEM_STATUS_OPTIONS = ["not_started", "in_progress", "complete", "n_a"];
+
+const ITEM_DEFAULT = {
+  name: "",
+  category: null,
+  status: "not_started",
+  due_date: null,
+  assigned_person_id: null,
+  assigned_company_id: null,
+  notes: "",
+  spec_division: "",
+  spec_section: "",
+};
 
 export default function Checklists() {
   const { user } = useAuth();
   const { selected: project, selectedId } = useProject();
+  const { canWrite } = usePermissions();
   const isAdmin = user?.is_admin || user?.global_role === "vp";
   const [checklists, setChecklists] = useState([]);
   const [sel, setSel] = useState(null);
@@ -20,6 +41,15 @@ export default function Checklists() {
   const [creating, setCreating] = useState(false);
   const [scDate, setScDate] = useState("2026-06-01");
 
+  // Edit-item drawer
+  const [people, setPeople] = useState([]);
+  const [companies, setCompanies] = useState([]);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [editing, setEditing] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+  const form = useFormState(ITEM_DEFAULT);
+
   const flash = (m) => { setSuccess(m); setTimeout(() => setSuccess(null), 3000); };
   const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "";
 
@@ -30,6 +60,19 @@ export default function Checklists() {
   }, [selectedId]);
 
   useEffect(() => { setSel(null); setItems([]); load(); }, [load]);
+
+  // Load people/companies once — needed for assignment selects in the edit drawer.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([
+      api("/people/?limit=500"),
+      api("/companies/?limit=500"),
+    ]).then(([p, c]) => {
+      if (cancelled) return;
+      setPeople(p); setCompanies(c);
+    }).catch(() => { /* non-fatal — edit drawer still works without these */ });
+    return () => { cancelled = true; };
+  }, []);
 
   const pick = async (cl) => {
     setSel(cl); setItems([]); setItemLoad(true);
@@ -46,7 +89,8 @@ export default function Checklists() {
     finally { setCreating(false); }
   };
 
-  const toggle = async (item) => {
+  const toggle = async (item, e) => {
+    if (e) e.stopPropagation();
     setItemLoad(true); setError(null);
     try {
       const body = { status: item.status === "complete" ? "not_started" : "complete" };
@@ -57,6 +101,49 @@ export default function Checklists() {
     } catch (e) { setError(e.message); }
     finally { setItemLoad(false); }
   };
+
+  function openEditItem(item) {
+    setEditing(item);
+    form.setAll({
+      name: item.name || "",
+      category: item.category || null,
+      status: item.status || "not_started",
+      due_date: item.due_date || null,
+      assigned_person_id: item.assigned_person_id || null,
+      assigned_company_id: item.assigned_company_id || null,
+      notes: item.notes || "",
+      spec_division: item.spec_division || "",
+      spec_section: item.spec_section || "",
+    });
+    setSubmitError(null);
+    setDrawerOpen(true);
+  }
+
+  async function onSubmitItem() {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const payload = cleanPayload(form.values);
+      await api(`/closeout-checklist-items/${editing.id}`, { method: "PATCH", body: payload });
+      setDrawerOpen(false);
+      // Refresh items and checklist rollup
+      if (sel) {
+        const [fi, fc] = await Promise.all([
+          api(`/closeout-checklist-items/?checklist_id=${sel.id}&limit=200`),
+          api(`/closeout-checklists/${sel.id}`),
+        ]);
+        setItems(fi); setSel(fc); load();
+      }
+      flash("Item updated");
+    } catch (e) {
+      setSubmitError(e.message || String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const peopleOptions = people.map((p) => ({ value: p.id, label: `${p.first_name} ${p.last_name}` }));
+  const companyOptions = companies.map((c) => ({ value: c.id, label: c.name }));
 
   if (!selectedId) return <p className="rex-muted">Select a project.</p>;
 
@@ -69,7 +156,7 @@ export default function Checklists() {
       <Flash message={success} />
 
       {isAdmin && (
-        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, background: "var(--rex-accent-lighter)", padding: "10px 14px", borderRadius: 8 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 16, background: "var(--rex-accent-lighter)", padding: "10px 14px", borderRadius: 8, flexWrap: "wrap" }}>
           <span className="rex-section-label">Substantial Completion:</span>
           <input type="date" value={scDate} onChange={(e) => setScDate(e.target.value)} className="rex-input" />
           <button onClick={create} disabled={creating} className="rex-btn rex-btn-primary">
@@ -79,7 +166,7 @@ export default function Checklists() {
       )}
 
       {pageLoad ? <PageLoader text="Loading checklists..." /> : (
-        <div style={{ display: "grid", gridTemplateColumns: "280px 1fr", gap: 14 }}>
+        <div className="rex-checklists-layout">
           {/* Sidebar */}
           <div className="rex-card" style={{ padding: 0, overflow: "hidden", maxHeight: 550, overflowY: "auto" }}>
             {checklists.length === 0 ? (
@@ -110,15 +197,27 @@ export default function Checklists() {
                 {itemLoad && items.length === 0 ? <PageLoader text="Loading items..." /> : items.length === 0 ? <p className="rex-muted">No items.</p> : (
                   <div className="rex-card" style={{ padding: 0 }}>
                     {items.map((item, idx) => (
-                      <div key={item.id} style={{
-                        display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
-                        borderBottom: idx < items.length - 1 ? "1px solid var(--rex-border)" : "none",
-                        background: idx % 2 === 1 ? "var(--rex-bg-stripe)" : "transparent",
-                        opacity: itemLoad ? 0.6 : 1,
-                      }}>
-                        <input type="checkbox" checked={item.status === "complete"} onChange={() => toggle(item)} disabled={itemLoad}
-                          style={{ width: 18, height: 18, accentColor: "var(--rex-accent)", cursor: "pointer", flexShrink: 0 }} />
-                        <div style={{ flex: 1 }}>
+                      <div
+                        key={item.id}
+                        onClick={() => canWrite && openEditItem(item)}
+                        style={{
+                          display: "flex", alignItems: "center", gap: 12, padding: "10px 16px",
+                          borderBottom: idx < items.length - 1 ? "1px solid var(--rex-border)" : "none",
+                          background: idx % 2 === 1 ? "var(--rex-bg-stripe)" : "transparent",
+                          opacity: itemLoad ? 0.6 : 1,
+                          cursor: canWrite ? "pointer" : "default",
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={item.status === "complete"}
+                          onChange={() => {}}
+                          onClick={(e) => toggle(item, e)}
+                          disabled={itemLoad || !canWrite}
+                          aria-label={`Toggle complete for ${item.name}`}
+                          style={{ width: 18, height: 18, accentColor: "var(--rex-accent)", cursor: canWrite ? "pointer" : "not-allowed", flexShrink: 0 }}
+                        />
+                        <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{ fontWeight: 500, textDecoration: item.status === "complete" ? "line-through" : "none", color: item.status === "complete" ? "var(--rex-text-muted)" : "var(--rex-text)" }}>
                             {item.name || `Item ${item.sort_order}`}
                           </div>
@@ -138,6 +237,35 @@ export default function Checklists() {
           </div>
         </div>
       )}
+
+      <FormDrawer
+        open={drawerOpen}
+        onClose={() => setDrawerOpen(false)}
+        title="Edit Checklist Item"
+        subtitle={editing?.name}
+        mode="edit"
+        onSubmit={onSubmitItem}
+        onReset={form.reset}
+        dirty={form.dirty}
+        submitting={submitting}
+        error={submitError}
+      >
+        <Field label="Name" name="name" value={form.values.name} onChange={form.setField} required autoFocus />
+        <div className="rex-form-row">
+          <Select label="Category" name="category" value={form.values.category} onChange={form.setField} options={CATEGORY_OPTIONS} />
+          <Select label="Status" name="status" value={form.values.status} onChange={form.setField} options={ITEM_STATUS_OPTIONS} />
+          <DateField label="Due Date" name="due_date" value={form.values.due_date} onChange={form.setField} />
+        </div>
+        <div className="rex-form-row">
+          <Select label="Assigned Person" name="assigned_person_id" value={form.values.assigned_person_id} onChange={form.setField} options={peopleOptions} placeholder="Unassigned" />
+          <Select label="Assigned Company" name="assigned_company_id" value={form.values.assigned_company_id} onChange={form.setField} options={companyOptions} placeholder="Unassigned" />
+        </div>
+        <div className="rex-form-row">
+          <Field label="Spec Division" name="spec_division" value={form.values.spec_division} onChange={form.setField} placeholder="e.g. 09" />
+          <Field label="Spec Section" name="spec_section" value={form.values.spec_section} onChange={form.setField} placeholder="e.g. 09 21 16" />
+        </div>
+        <TextArea label="Notes" name="notes" value={form.values.notes} onChange={form.setField} rows={3} />
+      </FormDrawer>
     </div>
   );
 }

@@ -1,10 +1,14 @@
+import { useState } from "react";
 import { HashRouter, Routes, Route, Link, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { ProjectProvider, useProject } from "./project";
 import { NotificationProvider, NotificationBell } from "./notifications";
 import ErrorBoundary from "./ErrorBoundary";
+import BuildVersionChip from "./BuildVersionChip";
 import LoginPage from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
+import Companies from "./pages/Companies";
+import People from "./pages/People";
 import ProjectReadiness from "./pages/ProjectReadiness";
 import Checklists from "./pages/Checklists";
 import Milestones from "./pages/Milestones";
@@ -42,14 +46,22 @@ function SidebarItem({ to, children }) {
 
 function Shell() {
   const { user, logout } = useAuth();
+  const location = useLocation();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   if (!user) return <LoginPage />;
 
   return (
     <ProjectProvider>
       <NotificationProvider>
-      <div className="rex-shell">
+      <div className={`rex-shell${sidebarOpen ? " rex-shell--sidebar-open" : ""}`}>
+        {/* Sidebar backdrop — only shown on small screens when toggled */}
+        <div
+          className="rex-sidebar-backdrop"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
         {/* Sidebar */}
-        <aside className="rex-sidebar">
+        <aside className="rex-sidebar" onClick={() => setSidebarOpen(false)}>
           <div className="rex-sidebar-brand">REX OS</div>
           <div className="rex-sidebar-group">Overview</div>
           <SidebarItem to="/">Portfolio</SidebarItem>
@@ -89,6 +101,8 @@ function Shell() {
           {(user.is_admin || user.global_role === "vp") && (
             <>
               <div className="rex-sidebar-group">Admin</div>
+              <SidebarItem to="/companies">Companies</SidebarItem>
+              <SidebarItem to="/people">People &amp; Members</SidebarItem>
               <SidebarItem to="/admin/jobs">Operations</SidebarItem>
             </>
           )}
@@ -101,14 +115,15 @@ function Shell() {
               width: "100%", justifyContent: "center", fontSize: 12, padding: "5px 0",
               color: "var(--rex-sidebar-muted)", borderColor: "rgba(255,255,255,0.15)",
             }}>Sign Out</button>
+            <BuildVersionChip />
           </div>
         </aside>
 
         {/* Main area */}
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-          <Topbar />
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", minWidth: 0 }}>
+          <Topbar onMenuToggle={() => setSidebarOpen((v) => !v)} />
           <div className="rex-content">
-            <ErrorBoundary>
+            <ErrorBoundary routeKey={location.pathname}>
               <Routes>
                 <Route path="/" element={<Portfolio />} />
                 <Route path="/project/:projectId" element={<ProjectReadiness />} />
@@ -139,6 +154,8 @@ function Shell() {
                 <Route path="/insurance" element={<InsuranceCertificates />} />
                 <Route path="/notifications" element={<Notifications />} />
                 <Route path="/admin/jobs" element={<AdminJobs />} />
+                <Route path="/companies" element={<Companies />} />
+                <Route path="/people" element={<People />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
@@ -150,10 +167,18 @@ function Shell() {
   );
 }
 
-function Topbar() {
+function Topbar({ onMenuToggle }) {
   const { projects, selected, selectedId, select } = useProject();
   return (
     <div className="rex-topbar">
+      <button
+        type="button"
+        className="rex-topbar-menu"
+        aria-label="Toggle navigation menu"
+        onClick={onMenuToggle}
+      >
+        <span aria-hidden="true">☰</span>
+      </button>
       {selected && (
         <span className="rex-topbar-project">
           <span style={{ display: "inline-block", width: 7, height: 7, background: "var(--rex-green)", borderRadius: "50%", marginRight: 8 }} />
@@ -163,7 +188,12 @@ function Topbar() {
       )}
       <div className="rex-topbar-right">
         <NotificationBell />
-        <select value={selectedId || ""} onChange={(e) => select(e.target.value)} className="rex-input" style={{ width: 180, padding: "5px 8px" }}>
+        <select
+          value={selectedId || ""}
+          onChange={(e) => select(e.target.value)}
+          className="rex-input rex-topbar-project-select"
+          aria-label="Select project"
+        >
           {projects.map((p) => <option key={p.id} value={p.id}>{p.name}{p.project_number ? ` (${p.project_number})` : ""}</option>)}
         </select>
       </div>
