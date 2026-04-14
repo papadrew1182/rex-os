@@ -1083,5 +1083,85 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ════════════════════════════════════════════════════════════
+-- 20. CLOSEOUT CHECKLISTS + ITEMS
+--     One checklist for Bishop Modern with 6 representative items
+--     across the 5 canonical categories so the Checklists page has
+--     content to render + exercise the item-edit flow on.
+-- ════════════════════════════════════════════════════════════
+
+INSERT INTO rex.closeout_checklists
+    (id, project_id, template_id, substantial_completion_date,
+     total_items, completed_items, percent_complete, created_by)
+VALUES
+    ('60000000-0000-4000-a000-000000000600',
+     '40000000-0000-4000-a000-000000000001',
+     NULL,
+     '2025-11-15',
+     6, 2, 33.33,
+     '10000000-0000-4000-a000-000000000001')
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO rex.closeout_checklist_items
+    (id, checklist_id, category, item_number, name, status,
+     assigned_company_id, assigned_person_id, due_date, completed_date, notes, sort_order)
+VALUES
+    ('60000000-0000-4000-a000-000000000601',
+     '60000000-0000-4000-a000-000000000600',
+     'documentation', 1, 'Owner training package delivered',
+     'complete',
+     '60000000-0000-4000-a000-000000000012',
+     '60000000-0000-4000-a000-000000000022',
+     '2025-10-15', '2025-10-10',
+     'Training session attended by FM staff.',
+     10),
+    ('60000000-0000-4000-a000-000000000602',
+     '60000000-0000-4000-a000-000000000600',
+     'documentation', 2, 'As-built drawings submitted',
+     'in_progress',
+     '00000000-0000-4000-a000-000000000001',
+     '10000000-0000-4000-a000-000000000002',
+     '2025-11-01', NULL,
+     'Architectural in; structural pending.',
+     20),
+    ('60000000-0000-4000-a000-000000000603',
+     '60000000-0000-4000-a000-000000000600',
+     'mep', 3, 'HVAC Test & Balance report',
+     'not_started',
+     '60000000-0000-4000-a000-000000000012',
+     '60000000-0000-4000-a000-000000000022',
+     '2025-11-10', NULL,
+     NULL,
+     30),
+    ('60000000-0000-4000-a000-000000000604',
+     '60000000-0000-4000-a000-000000000600',
+     'exterior', 4, 'Roof warranty letter received',
+     'not_started',
+     '60000000-0000-4000-a000-000000000015',
+     '60000000-0000-4000-a000-000000000025',
+     '2025-11-12', NULL,
+     NULL,
+     40),
+    ('60000000-0000-4000-a000-000000000605',
+     '60000000-0000-4000-a000-000000000600',
+     'interior', 5, 'All punch items closed or deferred',
+     'in_progress',
+     '00000000-0000-4000-a000-000000000001',
+     '10000000-0000-4000-a000-000000000003',
+     '2025-11-14', NULL,
+     '3 of 5 punch items closed; 2 still open.',
+     50),
+    ('60000000-0000-4000-a000-000000000606',
+     '60000000-0000-4000-a000-000000000600',
+     'general', 6, 'Final cleaning complete',
+     'complete',
+     '60000000-0000-4000-a000-000000000018',
+     '60000000-0000-4000-a000-000000000028',
+     '2025-11-13', '2025-11-13',
+     NULL,
+     60)
+ON CONFLICT (id) DO NOTHING;
+
+
+-- ════════════════════════════════════════════════════════════
 -- DEMO SEED COMPLETE
 -- ════════════════════════════════════════════════════════════
