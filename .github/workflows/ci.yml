@@ -2,7 +2,12 @@ name: CI
 
 on:
   push:
-    branches: [main, master]
+    # Main integration branches plus any release/** branch so long-lived
+    # release-prep work gets tested continuously, not only at merge time.
+    # Previous sprint (phases 46-52) built on release/prod-closure for
+    # several days without any CI coverage because the triggers only
+    # covered master — never catch that one again.
+    branches: [main, master, 'release/**']
   pull_request:
     branches: [main, master]
   workflow_dispatch:
