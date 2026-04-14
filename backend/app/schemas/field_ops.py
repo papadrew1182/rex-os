@@ -443,10 +443,18 @@ class PhotoCreate(BaseModel):
 
 
 class PhotoUpdate(BaseModel):
+    # Metadata edit surface — mirrors the Photos.jsx FormDrawer exactly so
+    # every field the user can touch in the UI is persisted on PATCH. Prior
+    # to phase 51 this schema only accepted album/description/tags/location;
+    # filename/taken_at/latitude/longitude were silently dropped by Pydantic.
+    filename: str | None = None
     photo_album_id: UUID | None = None
+    taken_at: datetime | None = None
+    location: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
     description: str | None = None
     tags: Any | None = None
-    location: str | None = None
 
 
 class PhotoResponse(BaseModel):
