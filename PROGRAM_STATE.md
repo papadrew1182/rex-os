@@ -1,10 +1,14 @@
 # Rex OS Program State
 
 > Auditable reconciliation of what's actually shipped vs what the older docs claimed.
-> Last reconciled: **2026-04-13** (phases 41–44: production-credibility sprint —
-> demo seed, CI guardrails, S3 storage cutover, rate limiting + Sentry + version
-> endpoint). Previous pass: **2026-04-13** (phase 40 finish-line).
-> Source of truth: master branch + production Railway deployment.
+> Last reconciled: **2026-04-14** (phases 45–53: frontend polish sprint + demo
+> proving ground + production promotion of phases 41–53 to `main`; the prod
+> promotion landed at `3148f0c`, then `d119663` added a CI-only workflow fix
+> on top with no runtime change).
+> Previous pass: **2026-04-13** (phases 41–44: production credibility sprint).
+> Source of truth: **`main` branch** (currently `d119663`) + production Railway
+> + Vercel deployments.
+> The prior integration branch `master` is deprecated — see `DEPLOY.md §4c`.
 
 ---
 
@@ -32,26 +36,47 @@ with no UI) say so. AI features have their own copy of this ladder in
 ## 1) Current program state summary
 
 **Rex OS is live in production** at:
-- Frontend: https://rex-os.vercel.app (Vercel, Vite + React)
+- Frontend: https://rex-os.vercel.app (Vercel, Vite + React, bundle `index-gT1ItBVr.js`, ~620 KB raw / ~156 KB gzip)
 - Backend: https://rex-os-api-production.up.railway.app (Railway, FastAPI + Postgres)
+- Running on **`main @ d119663`** as of 2026-04-14 (phase 41–53 promotion commit `3148f0c` + one CI-only fix on top, no runtime change)
 
-The product covers 30 page families across 7 backend domains, with full CRUD on the operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead + Critical Path + Health), background job runner with 5 production jobs, generic notification infrastructure, admin operations UI, file preview, and CSV/print export. **583 backend tests passing** in 95s (577 phase-40 baseline + 5 proxy/version regression tests + 1 demo-seed smoke test). Real-backend integration coverage on the high-value flows, mocked Playwright smoke for frontend write paths, and a separate deployed-smoke workflow that hits the real Railway backend with curl + Playwright.
+A separate **demo environment** was stood up 2026-04-14 under the same Railway
+project (`Rex OS` / environment `demo`) + a separate Vercel project (`rex-os-demo`)
+as the proving ground for the phase 46–53 promotion. It remains live and
+should be used for any future release flight. See `DEPLOY.md §7`.
 
-**Production sanity check (2026-04-13 live, phase-40 baseline):**
-- `GET /api/health` → `{"status":"ok"}` ✅
-- `GET /api/ready` → `{"status":"ready","checks":{"db":{"ok":true},"storage":{"ok":true,"backend":"local"}}}` ✅
-- CORS preflight from `https://rex-os.vercel.app` → `access-control-allow-origin: https://rex-os.vercel.app` ✅
-- Login flow working in browser after today's `pool_pre_ping` + `DATABASE_URL` service-reference + `REX_CORS_ORIGINS` fixes.
+The product covers **32 page families** across 7 backend domains (phase 48
+added the Companies and People & Members admin pages), with full CRUD on the
+operational entities, a 5-tab Schedule workbench (Gantt + Activities + Lookahead +
+Critical Path + Health), background job runner with 5 production jobs, generic
+notification infrastructure, admin operations UI, file preview, CSV/print export,
+and (post phase 46–53) per-route error boundaries, BuildVersionChip, frontend
+Sentry (code-ready), photo upload UI, admin project/company/people/membership
+surfaces, closeout checklist item edit drawer, and responsive layout at 900px
++ 560px. **589 backend tests passing** (phase 51 added 6 photos PATCH
+round-trip tests). **14 mocked Playwright e2e tests** (phase 52 added 6 for
+the phase 46–50 surfaces). Real-backend integration coverage on the high-value
+flows, plus a demo-environment browser flight that covered the phase 46–53
+surfaces end-to-end before promotion.
 
-**New in phase 41–44 (not yet flipped in production env):**
-- `/api/version` endpoint exposing `{service, version, commit, build_time, environment}`.
-- `POST /api/auth/login` rate-limited via slowapi (`REX_LOGIN_RATE_LIMIT`, default `10/minute`).
-- Optional backend Sentry via `REX_SENTRY_DSN` (off when unset).
-- Optional demo data via `REX_DEMO_SEED` (Bishop Modern, gated, off by default).
-- S3 / R2 / MinIO storage cutover available via `REX_STORAGE_BACKEND=s3` — **must be flipped in production to stop relying on Railway ephemeral disk**.
-- `.github/workflows/ci.yml` gates every push + PR on backend pytest + frontend vite build.
+**Production sanity check (2026-04-14 post-promotion, currently `d119663`):**
+- `GET /api/health` → `{"status":"ok"}` ✅ **deployed-verified**
+- `GET /api/ready` → `{"status":"ready","checks":{"db":{"ok":true},"storage":{"ok":true,"backend":"local"}}}` ✅ **deployed-verified**
+- `GET /api/version` → `{"service":"rex-os-backend","version":"0.2.0","commit":"d119663b139abb7deb0af28e7f820295872fa549","environment":"production"}` ✅ **deployed-verified**
+- CORS preflight from `https://rex-os.vercel.app` → `access-control-allow-origin: https://rex-os.vercel.app` ✅ **deployed-verified**
+- Login as foundation admin (`aroberts@exxircapital.com`) ✅ **deployed-verified**
+- `/api/projects/` returns 4 foundation projects (Bishop Modern + 3 Jungle) ✅ **deployed-verified**
+- `/api/companies/` returns **only** foundation companies (Rex Construction, Exxir Capital) — **zero demo-seed pollution**, proving `REX_DEMO_SEED` is off on prod ✅
+- Core operational endpoints (rfis, commitments, change-events, punch-items, submittals, schedule-activities, photos) all return 200 under auth ✅
+- **Vercel prod bundle `index-gT1ItBVr.js` confirmed to contain** the phase 46–50 user-visible strings (`Build Identity`, `Show build identity`, `New Project`, `New Company`, `People & Project Members`, `Project Memberships`, `Upload Photo`, `Photo Gallery`) ✅ **deployed-verified**
 
-**The 43 nominal "phases" of work now exist** in the git history and the code on disk. This document audits which of them were genuinely shipped vs which are partial, deferred, or excluded. It is the authoritative answer to "is X done."
+**What's still NOT activated in production** (code-ready, ops step pending):
+- **S3/R2 file storage** — `REX_STORAGE_BACKEND` unset on prod (= `local`). Phase 43 adapter is demo-safe. The cutover is blocked on a demo S3 round-trip first per `DEPLOY.md §1f`.
+- **Backend Sentry** — `REX_SENTRY_DSN` unset on prod. Phase 44 code path exists but no DSN has been configured.
+- **Frontend Sentry** — `VITE_SENTRY_DSN` unset on the Vercel prod project. Phase 46 `sentry.js` is wired but no-op without a DSN.
+- **Real-browser sanity pass on the post-promotion prod build** — API-level smoke is green but the final "click through the live prod UI once" check was still open as of this reconciliation pass. Not blocking prod use.
+
+**The 53 nominal "phases" of work now exist** in the git history and the code on disk. This document audits which of them were genuinely shipped vs which are partial, deferred, or excluded. It is the authoritative answer to "is X done."
 
 ---
 
@@ -104,6 +129,16 @@ Confidence levels:
 | 42 | CI + deploy guardrails | ✅ shipped | High | `.github/workflows/ci.yml` runs backend pytest against a real Postgres service container (applies migrations first) plus the frontend `vite build` on every push + PR. `.github/workflows/deployed-smoke.yml` runs Playwright + curl-based proxy/redirect invariants against a deployed URL (manual dispatch or 6-hour cron). `tests/test_proxy_headers_regression.py` locks in the `ProxyHeadersMiddleware` fix from commit `2671b23` (middleware presence + `X-Forwarded-Proto` scope update + slash-redirect https preservation); the deployed-smoke curl step asserts no redirect downgrades `https→http` against the live backend. |
 | 43 | Production file storage cutover | ✅ shipped | High | `boto3>=1.34` added to `backend/requirements.txt`. The `S3StorageAdapter` in `backend/app/services/storage.py` was already fully implemented (boto3, S3/R2/MinIO, env-configured, healthcheck via `head_bucket`). `DEPLOY.md §1f` documents the `REX_STORAGE_BACKEND=s3` cutover with `REX_S3_BUCKET` / `REX_S3_REGION` / `REX_S3_ENDPOINT_URL` + `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` and the `/api/ready` verification step. Local adapter retained as the dev default. |
 | 44 | Minimum production hardening | ✅ shipped | High | **Rate limiting:** `app/rate_limit.py` owns the shared slowapi `Limiter`; `POST /api/auth/login` is decorated with `@limiter.limit(LOGIN_RATE_LIMIT)` (default `10/minute`, override via `REX_LOGIN_RATE_LIMIT`). **Error tracking:** `sentry-sdk[fastapi]` added; `main.py` initializes Sentry before app construction when `REX_SENTRY_DSN` is set (Starlette + FastAPI integrations, `send_default_pii=False`, release picked up from `REX_RELEASE` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA`). **Release visibility:** new `GET /api/version` returns `{service, version, commit, build_time, environment}` resolved at import time from the same env chain. **Frontend version:** `vite.config.js` injects `__REX_GIT_SHA__` and `__REX_BUILD_TIME__` at build time from `VERCEL_GIT_COMMIT_SHA` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA`; `frontend/src/version.js` exposes them as `GIT_SHA` / `BUILD_TIME` / `VERSION_INFO`, and `main.jsx` sets `window.__REX_VERSION__` (read-only) so support can read the running build from a browser console. |
+| 45 | Docs-layer reconciliation to post phase-44 reality | ✅ shipped | High | Five legacy docs (`DEPLOY.md`, `BACKEND_ROADMAP.md`, `FRONTEND_ROADMAP.md`, `PROGRAM_STATE.md`, `AI_ROADMAP.md`) reconciled to the phase 41–44 state. No code changes. This row predates the phase 46–53 work and its own claims have now been superseded by phase 53's reconciliation pass (the doc you are reading). |
+| 46 | Frontend observability + route error recovery | ✅ shipped | High | **`@sentry/react`** added; **`frontend/src/sentry.js`** owns `initSentry()` / `captureError()` / `isSentryEnabled()`, no-op without `VITE_SENTRY_DSN`. **`ErrorBoundary.jsx`** rewritten: per-route isolation via `routeKey={location.pathname}`, auto-reset on navigation, retry without page reload, Sentry reporting when enabled, Rex-styled panel. **`fetchState.jsx`** introduced `LoadState` + `classifyError` — distinguishes auth vs network vs empty vs server-error on data-heavy pages. `main.jsx` calls `initSentry()` before `ReactDOM.createRoot`. **Implemented** + **tested** (14/14 e2e) + **UI-verified** on demo + **deployed-verified** on prod (bundle contains the new modules). Sentry DSN itself is **not activated** in prod. |
+| 47 | Build/version visibility in the UI | ✅ shipped | High | **`BuildVersionChip.jsx`** — sidebar-bottom chip showing `fe <sha>` + `be <sha>`; click to expand popover with `rex-os-backend v0.2.0 / commit / build_time / environment` from `GET /api/version`. Environment badge shown for non-production values only. **Deployed-verified** on prod — the popover shows the current backend commit (e.g. `be d119663` at time of this reconciliation) when you load `rex-os.vercel.app` and click the chip. |
+| 48 | Foundation / admin edit surfaces | ✅ shipped | High | **48A Portfolio**: admin-only **+ New Project** button + row Edit button with drawer prefilled from `GET /api/projects/{id}`. Full phase-39 field set: name, project_number, status, project_type, address_line1, city, state, zip, start_date, end_date, contract_value, square_footage, description, latitude, longitude. **48B Companies admin page** (new route `/companies`): full CRUD including `trade`, `company_type`, `status`, `phone`, `mobile_phone`, `email`, `website`, address, `license_number`, `insurance_carrier`, `insurance_expiry`, `bonding_capacity`, `notes`. Stat cards for total / active / insurance-expiring / insurance-expired. **48C People & Members admin page** (new route `/people`): person CRUD + detail panel with Project Memberships card that supports **+ Add** (create new `project_members` row) and per-row edit (access_level + is_primary + is_active). Duplicate insert surfaces 409 with friendly "already a member of that project" message. Sidebar group `Admin` gained `Companies` + `People & Members` entries (admin/VP only). **Browser-verified** on demo + **deployed-verified** on prod. |
+| 49 | Photo upload UI | ✅ shipped | High | Backend: new **`POST /api/photos/upload`** multipart route in `backend/app/routes/photos.py` (image-only, `field_only` access), creates a `Photo` row via the existing `get_storage()` adapter. Frontend: **`FileInput`** primitive added to `forms.jsx`; **Photos.jsx** gained an Upload drawer with file input, existing-album select + create-new-album-on-upload, taken_at, location, lat/lng, tags. Submits FormData via a hand-rolled fetch to preserve Bearer auth while letting the browser set the multipart boundary. **Browser-verified** on demo + **deployed-verified** on prod. |
+| 50 | Closeout polish + responsive pass | ✅ shipped | High | **Closeout item edit drawer** (`Checklists.jsx`): clicking a row opens a FormDrawer exposing name, category, status, due_date, assigned_person_id, assigned_company_id, notes, spec_division, spec_section. Required a backend schema expansion — `CloseoutChecklistItemUpdate` gained `name` + `category` (previously only `status`/dates/notes were editable). **Responsive pass** (`rex-theme.css`): media queries at 900px (off-canvas sidebar + hamburger button in topbar + project-select compression + grid degrade) and 560px (5-up stat grids → 2, drawer clamp to viewport, stat number shrink). Stat grids `rex-grid-3/4/5` degrade gracefully. **Partial ARIA labels** added on icon buttons. **Implemented** + **browser-verified** on demo at both breakpoints + **deployed-verified** on prod. |
+| 51 | Photos metadata PATCH blocker fix | ✅ shipped | High | **Root cause:** `PhotoUpdate` schema only accepted `photo_album_id`/`description`/`tags`/`location`; Pydantic silently dropped `filename`/`taken_at`/`latitude`/`longitude` on PATCH, so the Photos metadata edit drawer was lossy end-to-end. **Fix:** expanded `PhotoUpdate` to mirror the UI drawer exactly. **Regression lock:** `backend/tests/test_photo_metadata_patch.py` — 6 focused tests covering upload+PATCH round-trip including partial updates and `YYYY-MM-DD` coercion. Test count bumped 583 → **589**. **Deployed-verified** on prod via the new schema. |
+| 52 | E2E browser coverage for phase 46–50 surfaces | ✅ shipped | High | **`frontend/e2e/phase46_50.spec.js`** — 6 Playwright tests using the same mocked-API pattern as `smoke.spec.js`: BuildVersionChip popover, Portfolio create-project drawer, Companies list + create, People row-click → Project Memberships card → + Add → submit, Photos upload drawer opens + FileInput + cancel, Checklists item edit drawer with spec fields. Combined with the 8 pre-existing smoke tests, the release candidate has **14/14 e2e** passing. Same `page.route` mock strategy — not a real backend, but real headless Chromium rendering + real component tree + real routing. |
+| 53 | Photos bytes route + seed closeout checklists | ✅ shipped | High | New `GET /api/photos/{id}/bytes` for auth-gated raw byte streaming (previously the Photos preview relied on the storage adapter's public URL path, which doesn't work for S3-backed deploys without presigned URLs). `rex2_demo_seed.sql` expanded by ~80 lines to also seed Bishop Modern closeout checklists so the demo proving ground looks complete. Came out of the phase 46–53 demo browser flight — the final bug found and fixed before the prod promotion. **Deployed-verified** on prod as part of the `3148f0c` build. |
+| **Prod promotion** | Promote phases 41–53 to `main` | ✅ complete | High | 2026-04-14: merged `release/prod-closure @ 3c215f0` → `master` (merge commit `8f191f5`) → fast-forward `main` from ancient `2671b23` to `8f191f5` → push → Railway auto-deployed → first-time migrations applied cleanly on prod DB (`db.ok=true` on first `/api/ready`). Additional empty commit `3148f0c` pushed to force Vercel's git webhook to run a real `vite build` (prior "Redeploy" had produced a 0ms no-op serving a pre-phase-46 stub). Final prod state: backend `/api/version` → `3148f0cca461f364165bb81179bb179aa73aa3c6`, `environment=production`. Vercel prod alias `rex-os.vercel.app` serves `index-gT1ItBVr.js` (~620 KB) containing all phase 46–50 UI. Production safety invariants verified via read-only CLI inspection: `ENVIRONMENT=production`, `REX_AUTO_MIGRATE=true`, `REX_ENABLE_SCHEDULER=true`, `REX_DEMO_SEED` unset, `REX_STORAGE_BACKEND` unset (= `local`), `REX_CORS_ORIGINS=https://rex-os.vercel.app`. **First advance of `main` since phase 39 era — all of phases 41–53 landed in a single atomic push.** |
 
 ---
 
@@ -135,13 +170,14 @@ Confidence levels:
 - Page-level alert callout component
 - Vite build clean, ~508 KB raw / ~122 KB gzip (80 modules — phase 40 reconciliation run)
 - 8 mocked Playwright smoke tests
-- Live deployment on Vercel with auto-deploy from master
+- Live deployment on Vercel with auto-deploy from `main`
 
 **Production deployment**
-- Backend: Railway with Postgres, scheduler enabled, auto-migrations
+- Backend: Railway with Postgres, scheduler enabled, auto-migrations, healthcheckTimeout 300s
 - Frontend: Vercel with `VITE_API_URL` pointing at Railway
-- CORS allowlist configured
-- Both auto-deploy on push to master
+- CORS allowlist configured (`REX_CORS_ORIGINS=https://rex-os.vercel.app`)
+- Both platforms auto-deploy on push to `main` (the canonical deploy branch since 2026-04-14)
+- Separate demo environment (Railway env `demo` + Vercel project `rex-os-demo`) exists for release flights
 
 **Parity closure**
 - All P0 items closed (none ever opened in the audit)
@@ -158,13 +194,27 @@ Confidence levels:
   - O&M manual tracker (table + page + CRUD)
 - Generic alert/notification infrastructure (P2-8) closed by phase 32
 
-### Partially complete
+### Partially complete (post phase 53)
 
 | Item | Status | Detail |
 |---|---|---|
-| **Closeout checklist item editing** | ⚠️ partial | spec_division/spec_section stored + displayed (phase 39) but no edit drawer in the frontend yet. Backend CRUD exists. |
-| **Photos page** | ⚠️ partial | Edit-only metadata; no upload UI. Backend supports upload via `attachments/upload`; frontend doesn't expose it for the photos table. Deferred until a production storage backend decision (S3 vs local). |
-| **Project / Company / User create-edit forms** | ⚠️ partial | Phase 39 added `latitude`/`longitude` (projects) and `mobile_phone`/`website` (companies) columns, but there is no UI form for editing those fields. Projects/companies/users are seeded at the DB level in production. |
+| **Full mobile responsiveness** | ⚠️ partial | Phase 50 added responsive layout at 900px (off-canvas sidebar) and 560px (stat-grid collapse + drawer clamp). Behavior below 560px and actual phone-device testing are not formally audited. Not a full mobile redesign. |
+| **Accessibility / ARIA** | ⚠️ partial | Phase 50 added ARIA labels on the most visible icon-only buttons (notification bell, drawer close, topbar menu, admin-row edit buttons, membership + Add button). Keyboard-only navigation, Lighthouse audit, and focus traps in drawers are still open. |
+| **Production observability** | ⚠️ partial | Backend + frontend Sentry are **code-ready** (phase 44, phase 46) but **not activated in prod** — DSNs unset. Ops will need to create demo + prod Sentry projects, set DSNs on demo first, verify events, then flip prod. |
+| **Production S3 storage** | ⚠️ partial | Adapter is code-ready and demo-safe (phase 43). Prod still on `local` storage (ephemeral Railway disk). Flip sequence is in `DEPLOY.md §1f` — demo round-trip is the gate. |
+
+### Newly complete in this sprint (phase 46–53) — previously listed above
+
+- ✅ **Closeout checklist item editing** — shipped phase 50. Full drawer with
+  name / category / status / due_date / assigned_person_id / assigned_company_id
+  / notes / spec_division / spec_section.
+- ✅ **Photos upload UI** — shipped phase 49. Backend `POST /api/photos/upload`
+  multipart + frontend drawer with album create-on-upload. Phase 51 fixed the
+  metadata PATCH blocker; phase 53 added the bytes preview path.
+- ✅ **Project / Company / User create-edit forms** — shipped phase 48.
+  Portfolio create/edit drawer, Companies admin page, People & Members admin
+  page. No email-invite flow (still DB-direct for initial account creation)
+  but existing-user management is full UI.
 
 ### Deferred (intentionally) — see §9 for the reconciled inventory
 
@@ -173,16 +223,13 @@ Confidence levels:
 - **Dependency arrows on Gantt** — explicitly out of scope by sprint brief
 - **OCR / annotation / document AI / BIM** — all explicitly out of scope
 - **Mobile native apps** — out of scope
-- **Photo upload UI** — deferred until storage backend choice in prod
-- **Project / Company create/edit forms** — no UI surface for the new lat/lng + mobile/website fields yet
-- **User invite / provisioning flow** — users are seeded at the DB level
+- **User email-invite / signup flow** — existing users can be edited via the People & Members admin page (phase 48) but new user account creation is still DB-direct
 - **API versioning prefix** — deferred until first breaking response shape change
 - **Per-user notification preference matrix** — backend doesn't expose this yet
 - **Email digest job** — deferred until SMTP is configured in prod
-- **Full mobile responsiveness** — current layout is desktop-first; minimal media queries
-- **CI / GitHub Actions** — tests run locally only
-- **Sentry / error tracking** — production has no error visibility beyond Railway logs
-- **Rate limiting middleware** — none
+- **Full mobile responsiveness** — phase 50 added narrow-desktop adaptation at 900/560px; a proper phone pass is still deferred
+- **Prod Sentry activation (backend + frontend)** — code-ready in phases 44/46; DSNs not yet configured in either prod environment
+- **Prod S3 storage activation** — adapter code-ready in phase 43; demo round-trip is the gate before prod flip
 
 ### Excluded by design (Procore baggage)
 
@@ -202,46 +249,50 @@ These are old doc claims that were **wrong** as of this reconciliation. They've 
 
 | Doc | Stale claim | Reality |
 |---|---|---|
-| `BACKEND_ROADMAP.md` (old) | "488 tests passing" | 569 tests collected as of phase 39 |
+| `BACKEND_ROADMAP.md` (old) | "488 tests passing" | **589** tests as of phase 51 (was 583 through phase 44 → +6 photos PATCH regression tests) |
 | `BACKEND_ROADMAP.md` (old) | "57 tables, ~62 routers, ~247 endpoints" | ~64 models, 64 routers, 250+ endpoints |
 | `BACKEND_ROADMAP.md` (old) | "_RUNNING_JOBS in-process guard" | Replaced by `pg_try_advisory_xact_lock` in phase 36 |
-| `BACKEND_ROADMAP.md` (old) | "No background jobs" listed as a Risk | Background jobs shipped in phase 31 (5 jobs) |
-| `BACKEND_ROADMAP.md` (old) | "No notifications" listed as a Risk | Notifications shipped in phase 32 |
-| `BACKEND_ROADMAP.md` (old) | "Permissions only on subset of routes" listed as a Risk | Closed in sprint E |
-| `BACKEND_ROADMAP.md` (old) | "Read-side listings unscoped" listed as a Risk | Closed in sprint G+H |
-| `FIELD_PARITY_BACKLOG.md` | "P2-8 generic alert/notification infrastructure" listed as open | Closed by phase 32+33+34 |
-| `FIELD_PARITY_BACKLOG.md` | P1 items still open | All P1 closed by phase 25 (and re-confirmed in phase 21) |
-| `FIELD_PARITY_MATRIX.md` | Several P1 fields shown as missing | All shipped in migrations 002, 003, 005 |
-| `SCREEN_TO_DATA_MAP.md` | No screens for Notifications, Operations, OmManuals | All shipped in phases 34, 39 |
-| Multiple docs | "Backend test count = 488" | 569 (phase 39) |
-| Multiple docs | "Frontend bundle = 494 KB" | Still accurate as of phase 39 |
-| Multiple docs | "Photos: full upload UI" | Photos is edit-metadata only; no upload UI |
+| `BACKEND_ROADMAP.md` (old) | "No background jobs / notifications / permissions / read-scoping" | All closed by phases 31–34, sprints E/G/H |
+| `BACKEND_ROADMAP.md` (phase 44 reconciliation) | "No CI" / "No rate limiting" / "No Sentry code path" | CI shipped phase 42, rate limiting phase 44, Sentry code path phase 44 (DSN still unset on prod) |
+| `BACKEND_ROADMAP.md` (phase 44 reconciliation) | "Photo file upload UI is intentionally deferred" | **Shipped phase 49**; metadata PATCH fix shipped phase 51; bytes preview shipped phase 53 |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "30 page components" | **32** after phase 48 added Companies + People & Members |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "8 mocked Playwright tests" | **14** after phase 52 added 6 phase-46–50 surface tests |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "508 KB raw / 122 KB gzip" | **~620 KB raw / ~156 KB gzip** after phase 46–50 added BuildVersionChip, admin pages, upload drawer, error boundary rewrite, responsive CSS, Sentry code |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "No per-route error boundaries" | Shipped phase 46 |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "No create-project / create-company / create-user UI" | Shipped phase 48 (existing-user management); email-invite still deferred |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "No closeout checklist item edit drawer" | Shipped phase 50 |
+| `FRONTEND_ROADMAP.md` (phase 44 reconciliation) | "No mobile responsiveness / no media queries" | Shipped phase 50 partial (900px + 560px breakpoints); full phone pass still deferred |
+| `DEPLOY.md` (phase 44 reconciliation) | "Both platforms watch the `master` branch" | **Both platforms watch `main`** since 2026-04-14 prod promotion |
+| `DEPLOY.md` (phase 44 reconciliation) | "`REX_STORAGE_BACKEND` must be `s3` in prod" | Currently `local` on prod; S3 cutover is a later ops step per demo-round-trip sequence |
+| All docs (pre phase 45) | `PROGRAM_STATE.md` / `FRONTEND_ROADMAP.md` / `BACKEND_ROADMAP.md` referred to `master` as the reconciliation source | **`main` is the canonical source** as of 2026-04-14; `master` is deprecated |
 
 ---
 
 ## 5) Remaining gaps by category
 
 ### Production / ops hardening
-- ❌ No CI workflow
-- ❌ No Sentry / error tracking
-- ❌ No rate limiting on auth endpoints
+- ✅ CI workflow (phase 42)
+- ✅ Rate limiting on `/api/auth/login` (phase 44)
+- ✅ Error tracking code paths — backend (phase 44), frontend (phase 46). **DSNs not yet set in prod.**
 - ❌ No API versioning prefix
 - ❌ Email transport configured but disabled (`REX_EMAIL_TRANSPORT=noop`)
-- ❌ S3 storage adapter exists but unused; production uses local storage on the Railway container disk (data loss risk if container is recycled)
-- ✅ Phase 40 e2e verification closed (`test_phase40_verification.py`: warranty / insurance / aging action_paths + phase 38/39 field roundtrip + advisory-lock stability). See phase 40 row in the reconciliation table.
-- ⚠️ Stale Postgres data from a prior Rex Procore deployment exists on the Railway DB (was dropped during deploy bring-up but some artifacts may remain in non-rex schemas)
+- ⚠️ S3 storage adapter code-ready (phase 43); **production still on `local`** — data loss risk if container is recycled; activation blocked on demo round-trip
+- ⚠️ Backend Sentry DSN — unset on prod; flip sequence in `DEPLOY.md §1f`-style ops checklist
+- ⚠️ Frontend Sentry DSN — unset on Vercel prod project; Vite env is build-time so a redeploy is required after setting
+- ⚠️ Real-browser sanity pass on the post-promotion prod build — API-level verified but final UI click-through still open
 
 ### Frontend UX / polish
-- ❌ No mobile responsiveness (desktop-first, no media queries)
-- ❌ No per-route error boundaries
-- ❌ No keyboard navigation in Gantt
-- ❌ No focus traps in drawers
-- ❌ No accessibility audit (Lighthouse, ARIA labels)
+- ✅ Per-route error boundaries (phase 46)
+- ✅ Project / company / user create-edit forms (phase 48)
+- ✅ Photo upload UI (phase 49)
+- ✅ Closeout checklist item edit drawer (phase 50)
+- ✅ BuildVersionChip showing FE + BE identity (phase 47)
+- ✅ Responsive layout at 900px + 560px (phase 50)
+- ⚠️ Mobile responsiveness is partial — phone-device breakpoint still open
+- ⚠️ Accessibility is partial — ARIA labels on most icon buttons (phase 50) but no Lighthouse pass, no focus traps in drawers, no keyboard nav in Gantt
 - ❌ No global loading indicator between route transitions
 - ❌ No location filter input on Schedule (state exists but no UI)
-- ❌ No project / company / user create-edit forms
-- ❌ No photo upload UI
-- ❌ No closeout checklist item edit drawer (only display)
+- ❌ No user email-invite / signup flow (existing-user management only)
 
 ### Schedule / document advanced features
 - ❌ Drag-to-reschedule on Gantt (deferred by brief)
@@ -304,10 +355,11 @@ Every future sprint claim of "phase complete" requires **all of the following** 
 
 ### Phase complete
 - ✅ Both backend and frontend halves verified
-- ✅ Commit pushed to master + main
-- ✅ Railway deploy succeeded (check `railway logs` for startup errors)
-- ✅ Vercel deploy succeeded
-- ✅ `BACKEND_ROADMAP.md`, `FRONTEND_ROADMAP.md`, `PROGRAM_STATE.md` updated to reflect new state
+- ✅ Commit merged to `main` (the canonical deploy branch — see `DEPLOY.md §4a`). For multi-commit stabilization work, stage on `release/<name>` branch, validate on demo, then merge to `main`.
+- ✅ Railway deploy succeeded (check Deploy Logs for startup errors; expect `/api/version` to show the new commit)
+- ✅ Vercel deploy succeeded — and the new bundle is actually live (hash changed, contains expected user-visible strings; watch out for 0ms no-op redeploys — see `DEPLOY.md §3 Known gotchas`)
+- ✅ BuildVersionChip in the sidebar popover shows the new commit hash
+- ✅ `BACKEND_ROADMAP.md`, `FRONTEND_ROADMAP.md`, `PROGRAM_STATE.md`, `DEPLOY.md` updated to reflect new state
 - ✅ `FIELD_PARITY_BACKLOG.md` updated if any audit item closed
 - ✅ A real-backend e2e test added for the new feature where it makes sense (phases 25/30/35 pattern)
 
@@ -326,19 +378,22 @@ This is the standard. Sprints that don't meet it should be marked "partial" in t
 | Claim category | Confidence |
 |---|---|
 | Backend domain coverage matches table counts | **High** — verified by reading model files |
-| Route count (64) matches `all_routers` length | **High** — verified by `from app.routes import all_routers; print(len(all_routers))` returning 64 in prior runs |
-| Test count (577) matches collection | **High** — verified by `pytest --collect-only` after phase 40 test addition (8 new tests in `test_phase40_verification.py`) |
-| Migration count (8) matches files in `migrations/` | **High** — verified by `ls migrations/*.sql \| wc -l` |
-| Page count (30) matches files in `frontend/src/pages/` | **High** — verified by `ls frontend/src/pages/*.jsx \| wc -l` |
-| Phases 1-39 are all shipped | **High** — verified by code, models, routes, tests, and migrations all matching the phase descriptions |
-| Phase 40 is closed | **High** — `test_phase40_verification.py` added + 5 legacy docs reconciled + AI_ROADMAP.md re-ratified + full backend suite green |
-| Production deploy is healthy | **High** — verified by `/api/health` returning 200, login flow working, scheduler started in logs |
+| Route count (64) matches `all_routers` length | **High** — verified by `from app.routes import all_routers; print(len(all_routers))` returning 64 |
+| Test count (**589**) matches collection | **High** — verified by `pytest --collect-only` post phase 51 (was 583 → +6 photos PATCH tests in `test_photo_metadata_patch.py`) |
+| Backend test file count (**53**) | **High** — `ls backend/tests/test_*.py \| wc -l` = 53 |
+| Migration count (8) matches files in `migrations/` | **High** — verified by `ls migrations/*.sql \| wc -l` (the demo seed file grew in phase 53 but the count didn't) |
+| Page count (**32**) matches files in `frontend/src/pages/` | **High** — `ls frontend/src/pages/*.jsx \| wc -l` = 32 after phase 48 added Companies + People |
+| Playwright test count (**14**) | **High** — smoke.spec.js (8) + phase46_50.spec.js (6) |
+| Phases 1-44 are all shipped | **High** — verified by the reconciliation table |
+| Phases 45–53 are all shipped | **High** — verified by the new rows in the reconciliation table; prod promotion completed 2026-04-14 |
+| Production deploy is healthy at `d119663` | **High** — verified by `/api/health` returning 200, `/api/version.commit=d119663`, `environment=production`, login + projects list working, bundle `index-gT1ItBVr.js` contains phase 46–50 strings. The phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI workflow fix on top with no runtime change. |
+| `REX_DEMO_SEED` is off on prod | **High** — verified by `/api/companies/` returning only foundation companies (Rex Construction + Exxir Capital), no Apex Concrete / Steel Frame / etc. |
 | All P1 parity items closed | **High** — verified by `FIELD_PARITY_BACKLOG.md` and migration 002/003 contents |
 | All practical P2 parity items closed | **High** — verified by migration 005 contents |
 | Bonus system is deferred | **High** — verified by absence of any bonus-related models, routes, or pages |
 | AI features are zero | **High** — verified by absence of LLM client code, prompt registry, AI inference paths |
+| Demo environment exists and is functional | **High** — verified during phase 46–53 proving ground; still live under Railway `demo` env + Vercel `rex-os-demo` project |
 | Stale postgres data still on Railway DB | **Moderate** — observed during deploy bring-up; not re-verified post-fix |
-| Test pollution in dev DB persists | **Moderate** — was an issue in earlier sprints; production DB is unaffected |
 
 ---
 
@@ -355,11 +410,15 @@ and why. Each entry is labeled:
 
 | Item | State | Why |
 |---|---|---|
-| CI workflow (GitHub Actions) | deferred (low priority) | Tests run locally only; no PR gating |
-| Sentry / error tracking | deferred (low priority) | Production error visibility = Railway logs only |
-| Rate limiting on `/api/auth/login` | deferred (low priority) | No slowapi or equivalent |
+| CI workflow (GitHub Actions) | ✅ shipped phase 42 | `.github/workflows/ci.yml` + `deployed-smoke.yml` |
+| Backend Sentry code path | ✅ shipped phase 44 | Gated on `REX_SENTRY_DSN`; **not activated in prod** (no DSN) |
+| Frontend Sentry code path | ✅ shipped phase 46 | Gated on `VITE_SENTRY_DSN`; **not activated in prod** (no DSN, no rebuild) |
+| Rate limiting on `/api/auth/login` | ✅ shipped phase 44 | slowapi at `REX_LOGIN_RATE_LIMIT` (default `10/minute`) |
+| Demo environment for release flights | ✅ shipped phase 46–53 | Separate Railway demo env + Vercel `rex-os-demo` project; was the proving ground for the 2026-04-14 prod promotion |
 | API versioning prefix (`/api/v1`) | deferred (low priority) | No breaking response shape change planned yet |
-| S3 storage in prod | deferred (low priority) | Adapter exists; not wired; prod uses Railway disk |
+| S3 storage in prod | deferred (ops step) | Adapter exists and is demo-safe; prod still on `local`; flip sequence requires demo round-trip first per `DEPLOY.md §1f` |
+| Backend Sentry activation in prod | deferred (ops step) | Code ready; needs demo DSN + one safe event + prod DSN |
+| Frontend Sentry activation in prod | deferred (ops step) | Code ready; Vite env is build-time so requires a Vercel redeploy after setting the DSN |
 | Email transport enabled | deferred (low priority) | `REX_EMAIL_TRANSPORT=noop`; SMTP wired but disabled |
 | Per-user notification preference matrix | deferred (not yet designed) | Backend has no schema for per-user opt-out |
 | Email digest job | deferred (low priority) | Blocked on email transport + preference matrix |
@@ -367,23 +426,28 @@ and why. Each entry is labeled:
 | SSO / SAML | deferred (not yet designed) | No identity provider selected |
 | Multi-tenancy beyond project scoping | deferred (not yet designed) | Current product scope is single-workspace |
 | Public API / OAuth client registration | deferred (low priority) | No external consumers |
+| Real-browser sanity pass on post-promotion prod build | pending (minutes of work) | API-level smoke already green; one human click-through of `rex-os.vercel.app` still open |
 
 ### Frontend polish
 
 | Item | State | Why |
 |---|---|---|
-| Photo upload UI | deferred (low priority) | Blocked on production storage backend choice |
-| Project / Company / User create-edit forms | deferred (low priority) | DB-seeded in prod; phase 39 `lat/lng` + `mobile_phone` / `website` columns have no edit surface |
-| Closeout checklist item edit drawer | deferred (low priority) | spec_division / spec_section stored + displayed in phase 39; no edit yet |
-| Per-page error boundaries | deferred (low priority) | Global `ErrorBoundary` exists; per-route recovery missing |
-| Mobile responsiveness | deferred (not yet designed) | Current layout is desktop-first; no media queries |
+| Photo upload UI | ✅ shipped phase 49 | Multipart drawer + backend `POST /api/photos/upload` + phase 51 metadata PATCH fix + phase 53 bytes preview |
+| Project / Company / User create-edit forms | ✅ shipped phase 48 | Portfolio create drawer + Companies admin page + People & Members admin page; existing-user management is full UI |
+| Closeout checklist item edit drawer | ✅ shipped phase 50 | Full FormDrawer with name / category / status / due_date / assigned_person_id / assigned_company_id / notes / spec_division / spec_section |
+| Per-route error boundaries | ✅ shipped phase 46 | `ErrorBoundary` with `routeKey={location.pathname}` auto-resets on navigation, retry without reload, Sentry reporting |
+| BuildVersionChip in sidebar | ✅ shipped phase 47 | FE + BE commit; click to expand popover with full `/api/version` identity |
+| Responsive layout (900px + 560px) | ✅ shipped phase 50 | Off-canvas sidebar + hamburger + grid collapse + drawer clamp |
+| Mobile responsiveness (phone-sized) | deferred (low priority) | Phase 50 did narrow-desktop + tablet; phone-device breakpoint still open |
 | Keyboard nav / focus traps in drawers | deferred (low priority) | ESC works; tab navigation escapes drawers |
-| ARIA labels / Lighthouse audit | deferred (low priority) | Not formally audited |
+| ARIA labels / Lighthouse audit | deferred (low priority) | Partial ARIA labels added phase 50; Lighthouse pass not done |
+| Email-invite / signup flow for new users | deferred (not yet designed) | Existing-user management shipped phase 48; new-account creation is still DB-direct |
 | Global route-transition loading indicator | deferred (low priority) | Per-page `PageLoader` is sufficient for now |
-| Code splitting (react.lazy) | deferred (low priority) | Bundle is 508 KB raw / 122 KB gzip — under the warning threshold |
+| Code splitting (react.lazy) | deferred (low priority) | Bundle is ~620 KB raw / ~156 KB gzip — over the 500 KB advisory but not blocking |
 | Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
 | Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
-| TypeScript migration | deferred (low priority) | Would require porting 30 pages + shared modules |
+| TypeScript migration | deferred (low priority) | Would require porting 32 pages + shared modules |
+| Frontend source map upload for Sentry | deferred (blocking prod Sentry flip) | Required before frontend Sentry stack traces will be meaningful |
 
 ### Advanced schedule / document features
 

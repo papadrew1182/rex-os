@@ -1,8 +1,10 @@
 # Rex OS Backend Roadmap
 
 > Single source of truth for backend planning.
-> Last reconciled: **2026-04-13** (phases 41–44: production credibility sprint).
-> Reflects actual implemented state on the master branch, not aspirational claims.
+> Last reconciled: **2026-04-14** (phases 41–53: production promotion complete).
+> Reflects actual implemented state on the `main` branch (deployed to production),
+> not aspirational claims. The prior integration branch `master` is deprecated —
+> see `DEPLOY.md §4c`.
 
 ---
 
@@ -16,15 +18,15 @@
 | HTTP routes (approx) | 250+ | sum of CRUD + summary + admin endpoints across routers |
 | Background jobs | 5 | `backend/app/jobs/*.py` (warranty/insurance/snapshot/aging/session_purge) |
 | Schema migrations applied | 8 | `migrations/*.sql` driven by `app/migrate.py::MIGRATION_ORDER` |
-| Optional demo seed | 1 | `migrations/rex2_demo_seed.sql` (gated by `REX_DEMO_SEED`, not in `MIGRATION_ORDER`) |
+| Optional demo seed | 1 | `migrations/rex2_demo_seed.sql` (gated by `REX_DEMO_SEED`, not in `MIGRATION_ORDER`; phase 53 expanded it to also seed closeout checklists) |
 | Rate limiting | slowapi | `app/rate_limit.py` — `POST /api/auth/login` at `REX_LOGIN_RATE_LIMIT` (default `10/minute`) |
-| Error tracking | sentry-sdk | optional, gated by `REX_SENTRY_DSN` in `main.py` |
-| Ops endpoints | 3 | `GET /api/health`, `/api/ready`, `/api/version` (`ops.py`) |
+| Error tracking | sentry-sdk | **implemented + tested**, gated by `REX_SENTRY_DSN` in `main.py`. **Not activated in prod** as of this reconciliation — code-ready only. |
+| Ops endpoints | 3 | `GET /api/health`, `/api/ready`, `/api/version` (`ops.py`). All **deployed-verified** on prod 2026-04-14. |
 | CI | GitHub Actions | `.github/workflows/ci.yml` (pytest + vite build), `deployed-smoke.yml` (browser + curl against deployed URL) |
-| Backend test files | 52 | `backend/tests/test_*.py` (+ phase 41 `test_demo_seed_smoke.py`, phase 42 `test_proxy_headers_regression.py`, phase 44 `test_version_endpoint.py`) |
-| Tests passing | **583** | `pytest` — 577 phase-40 baseline + 5 proxy/version regression + 1 demo-seed smoke |
-| Full suite runtime | ~94s | Down from ~1079s at phase 39 — phase 40 eliminated legacy test pollution from the dev DB |
-| Deployment | live | Railway (`rex-os-api-production.up.railway.app`) + Postgres + apscheduler |
+| Backend test files | 53 | `backend/tests/test_*.py` (+ phase 41 `test_demo_seed_smoke.py`, phase 42 `test_proxy_headers_regression.py`, phase 44 `test_version_endpoint.py`, phase 51 `test_photo_metadata_patch.py`) |
+| Tests passing | **589** | `pytest` — 583 through phase 44 + 6 phase-51 photos PATCH tests (filename/taken_at/lat/lng round-trip) |
+| Full suite runtime | ~104–135s | Varies with local CPU state; bounded by the 5 real-backend e2e suites, not the unit layer |
+| Deployment | **live on `main @ d119663`** | Railway (`rex-os-api-production.up.railway.app`) + Postgres + apscheduler. Phases 41–53 **deployed-verified** on 2026-04-14 at merge commit `3148f0c`; `d119663` is a post-reconciliation CI-only fix on top, no runtime change. |
 
 **Stack:** FastAPI + SQLAlchemy 2.x async + asyncpg + apscheduler + bcrypt + python-multipart + httpx (test). Python 3.12. No queue/broker.
 
@@ -72,7 +74,20 @@
 - `GET /api/attachments/{id}/download` enforces project-scoped `read_only` access and streams the raw file content with proper `Content-Disposition`
 - File preview drawer in frontend (`frontend/src/preview.jsx`) consumes the auth-gated download endpoint, creates blob URLs for inline PDF/image preview, falls back to download for unsupported types
 - Polymorphic attachments via `source_type`/`source_id` columns — used by warranties, correspondence, observations, inspections, RFIs, etc.
-- **Status:** Production-ready for local storage. S3 backend exists but unverified in production. **Photo file upload UI is intentionally deferred** — only metadata edit is exposed in the Photos page.
+- **Phase 49**: added `POST /api/photos/upload` as a dedicated multipart route
+  for the Photos page (image-only, `field_only` project access). Phase 51
+  expanded `PhotoUpdate` to accept `filename`/`taken_at`/`latitude`/`longitude`
+  on PATCH (previously silently dropped — regression-locked by 6 focused
+  tests in `test_photo_metadata_patch.py`). Phase 53 added
+  `GET /api/photos/{id}/bytes` for auth-gated raw byte streaming to power
+  the Photos preview path.
+- **Status:** Production-ready for local storage, **deployed-verified** on
+  2026-04-14 at the promotion commit `3148f0c` (currently `d119663` after
+  a CI-only fix, no runtime change). S3 backend exists, is demo-safe, and is
+  ready to flip whenever the operational sequence in `DEPLOY.md §1f` runs
+  (demo round-trip first, then prod). **Photo file upload UI shipped in
+  phase 49** — metadata edit, upload, and preview are all
+  browser-verified on demo and deployed-verified on prod.
 
 ---
 
@@ -179,17 +194,30 @@ Four test files exercise real-backend integration via httpx + the in-process Fas
 
 - **Railway** (backend + Postgres):
   - Project: `Rex OS` under `exxir's Projects` workspace
-  - Service: `rex-os-api`
-  - Public URL: `https://rex-os-api-production.up.railway.app`
+  - **Environments**: `production` + `demo` (demo added 2026-04-14 as the
+    phase 46–53 proving ground; see `DEPLOY.md §7`)
+  - Production service: `rex-os-api`
+  - Production public URL: `https://rex-os-api-production.up.railway.app`
   - Build: Nixpacks via `nixpacks.toml` at repo root → venv at `backend/.venv`, install via `python -m venv` (Nix-managed Python doesn't ship pip)
   - Start: `cd backend && export LD_LIBRARY_PATH=$(find /nix/store ... libstdc++.so*) && .venv/bin/uvicorn main:app`
-  - Env vars set: `DATABASE_URL`, `REX_AUTO_MIGRATE=true`, `REX_ENABLE_SCHEDULER=true`, `REX_CORS_ORIGINS`, `REX_EMAIL_TRANSPORT=noop`, `MIGRATE_SECRET`
-  - Healthcheck: `/api/health` (cheap, no DB) and `/api/ready` (DB + storage)
-- **Postgres**: Railway-managed; lives in same project; `DATABASE_URL` references via `${{Postgres.DATABASE_URL}}`
-- **Auto-deploy**: GitHub webhook on push to master; the in-flight branch needs an empty commit to wake the webhook if it's stuck (observed during initial bring-up)
-- **Migration on deploy**: `REX_AUTO_MIGRATE=true` triggers `apply_migrations()` from the lifespan hook on startup; idempotent
-- **CORS**: `REX_CORS_ORIGINS` is a comma-separated allowlist; production includes the Vercel domain explicitly
-- **Status:** Live and stable as of 2026-04-12. Multi-instance scheduler safety added in phase 36.
+  - Env vars set on prod: `DATABASE_URL`, `REX_AUTO_MIGRATE=true`, `REX_ENABLE_SCHEDULER=true`, `REX_CORS_ORIGINS`, `REX_EMAIL_TRANSPORT=noop`, `MIGRATE_SECRET`. `REX_DEMO_SEED` explicitly **unset** on prod. `REX_STORAGE_BACKEND` unset on prod (= `local`). `REX_SENTRY_DSN` unset on prod.
+  - Healthcheck: `/api/health` (cheap, no DB) and `/api/ready` (DB + storage).
+    `railway.json` sets `healthcheckTimeout: 300` (was 100 before phase 51)
+    to accommodate first-boot migration runs on fresh databases.
+- **Postgres**: Railway-managed; one per environment. Prod uses
+  `${{Postgres.DATABASE_URL}}`; demo uses `${{Postgres-gpQz.DATABASE_URL}}`
+  (random suffix assigned when the demo Postgres was provisioned).
+- **Auto-deploy**: GitHub webhook on push to `main`. The in-flight branch
+  occasionally needs an empty commit to force Vercel's git webhook to run
+  a genuine build rather than a 0ms no-op redeploy of a stale artifact —
+  observed during the 2026-04-14 promotion, documented in
+  `DEPLOY.md §3 Known gotchas`.
+- **Migration on deploy**: `REX_AUTO_MIGRATE=true` triggers `apply_migrations()` from the lifespan hook on startup; idempotent. First boot of the new prod build on 2026-04-14 applied phases 41–50 migrations cleanly (`db.ok=true` on first `/api/ready`).
+- **CORS**: `REX_CORS_ORIGINS` is a comma-separated allowlist; production includes `https://rex-os.vercel.app`, demo includes the `rex-os-demo-git-master-*` preview alias.
+- **Status:** **Live and stable on `main @ d119663` as of 2026-04-14**
+  (phase 41–53 promotion landed at `3148f0c`; `d119663` is a CI workflow
+  fix on top with no runtime change). Multi-instance scheduler safety from
+  phase 36 still in effect.
 
 ---
 
@@ -197,18 +225,27 @@ Four test files exercise real-backend integration via httpx + the in-process Fas
 
 ### Operational
 - **Email transport**: SMTP wired but disabled. Daily-digest job + per-user preference matrix not built.
-- **Photo file upload**: needs multipart form UI on frontend + storage backend wiring in S3 mode for prod; deferred.
-- **Custom monitoring**: no Sentry / Datadog / PromQL integration. Health/ready probes are the only liveness signal.
-- **Rate limiting**: no per-IP or per-user rate limit middleware.
+- **Photo file upload**: ✅ **shipped phase 49** — `POST /api/photos/upload`
+  multipart route + frontend drawer, deployed-verified 2026-04-14.
+- **Custom monitoring**: Backend Sentry code-ready (phase 44), not activated
+  in prod — `REX_SENTRY_DSN` unset. Activation is an ops step: set DSN on
+  demo first, prove one event in Sentry dashboard, then set on prod.
+- **Rate limiting**: ✅ **shipped phase 44** — slowapi on `POST /api/auth/login`
+  at `REX_LOGIN_RATE_LIMIT` (default `10/minute`).
 - **API versioning**: no `/api/v1` prefix; all routes are unversioned. Acceptable for current scale; not negligible for long-term.
 
 ### Data / parity
 - **Bonus / performance system**: ~12 tables in the original Rex Procore schema (quarterly_scorecards, milestone_bonus_pools, buyout_savings, ebitda_growth, etc.) — **explicitly out of scope** until a product design pass.
-- **Real S3 storage in prod**: implementation exists, not configured.
+- **Real S3 storage in prod**: implementation **code-ready and demo-safe**;
+  not activated on prod. Activation sequence is in `DEPLOY.md §1f` — demo
+  round-trip is the gate, not a deploy step.
 
 ### Test infra
 - **Test pollution**: 3 test files historically polluted PROJECT_BISHOP / COMPANY_REX seed data and were patched to use fresh-throwaway-project per call. Some pollution from earlier sprints still exists in dev DB (~1700 leftover schedules) but doesn't affect tests.
-- **No CI**: tests run locally only; no GitHub Actions workflow.
+- **CI**: ✅ **shipped phase 42** — `.github/workflows/ci.yml` runs backend
+  pytest + frontend vite build on every push and PR.
+  `.github/workflows/deployed-smoke.yml` runs curl + browser invariants
+  against a deployed URL on manual dispatch and a 6-hour cron.
 
 ### Architecture
 - **Multi-instance scheduler safety**: ✅ closed by phase 36 (Postgres advisory locks).
@@ -219,18 +256,29 @@ Four test files exercise real-backend integration via httpx + the in-process Fas
 
 ## 12) Recommended next backend priorities
 
-In rough priority order, **after** the docs-reconciliation pass:
+In rough priority order, **after** the phase 46–53 prod promotion:
 
-1. **CI / GitHub Actions**: minimum `pytest tests/ -q` + `cd frontend && npm run build` on PR. Currently zero automated test enforcement.
-2. **API rate limiting**: `slowapi` or similar; protect `/api/auth/login` from credential stuffing first.
-3. **Sentry or equivalent error tracking**: production has no error visibility beyond Railway log scraping.
-4. **Photo upload UI** + S3 storage wiring (only if there's product demand).
+1. **Demo-first S3 activation**: flip `REX_STORAGE_BACKEND=s3` on the demo
+   environment, round-trip a photo upload, then flip prod. Sequence is in
+   `DEPLOY.md §1f`. Prod will lose attachments on container recycle until
+   this is done — not blocking today (low volume), will be blocking at any
+   real user scale.
+2. **Backend Sentry DSN activation**: set `REX_SENTRY_DSN` on demo, prove
+   one safe event appears in the Sentry dashboard with `environment=demo`,
+   then do the same on prod with a separate DSN and `environment=production`.
+3. **Frontend Sentry activation**: set `VITE_SENTRY_DSN` + `VITE_SENTRY_ENV`
+   on the Vercel demo project, redeploy (Vite env vars are build-time),
+   confirm a deliberate browser event appears in Sentry, then repeat on prod.
+4. **Real-browser sanity pass on prod** at the post-promotion build — walk
+   the Phase 3 checklist from `DEPLOY.md §7d` against
+   `https://rex-os.vercel.app` once, log the verdicts, close the loop.
 5. **Email digest job**: daily summary of unread critical/warning notifications via the existing transport abstraction.
 6. **Notification preference matrix**: per-user opt-out by domain/severity.
 7. **API versioning prefix** (`/api/v1`) before any breaking response shape change.
 8. **Bonus/performance system design pass** (if product wants it).
 
-None of these are blocking the current product. They're the next operational hardening tier.
+Items 1–4 are the remaining ops hardening gaps. None block the current
+product but they close out the ops ladder the sprint brief called out.
 
 ---
 
@@ -257,4 +305,14 @@ Stale claims to watch out for in any PR review:
 - "Generic alert infrastructure not yet built" — built in phase 32
 - "Background jobs not yet implemented" — built in phase 31
 - "All P1 parity items still open" — all closed by phase 25
-- Any test count claim from before phase 40 (was 547 → 569 at phase 39 → **577** after phase 40 verification additions)
+- "No CI" — built in phase 42
+- "No rate limiting" — built in phase 44
+- "Photo upload UI deferred" — shipped in phase 49
+- "Photos metadata PATCH silently drops filename/lat/lng/taken_at" — fixed in phase 51
+- "Project / Company / User create-edit forms deferred" — shipped in phase 48
+- "Closeout checklist item edit drawer deferred" — shipped in phase 50
+- "Per-route error boundaries deferred" — shipped in phase 46
+- "Deploys watch master" — **deploys watch `main`** since 2026-04-14
+- Any test count claim below **589** (was 547 → 569 at phase 39 → 577 after phase 40 → 583 after phases 41–44 → **589** after phase 51 photos PATCH tests)
+- Any page count below **32** (was 30 → **32** after phase 48 added Companies + People)
+- Any bundle size below **~620 KB raw / ~156 KB gzip** (was ~508/122 → **~620/156** after phase 46–50 added BuildVersionChip, fetchState, sentry, Companies, People, FileInput, responsive CSS)

@@ -1,24 +1,51 @@
 # Rex OS Deployment Runbook
 
-> Last reconciled: **2026-04-13** (phases 41–44: production credibility sprint).
+> Last reconciled: **2026-04-14** (phases 41–53: full production promotion complete).
 > Current production topology:
 > - Backend: Railway (`rex-os-api-production.up.railway.app`) — Nixpacks build,
 >   auto-migrate on startup, apscheduler enabled with 5 background jobs,
->   slowapi login rate limiting, optional Sentry via `REX_SENTRY_DSN`.
+>   slowapi login rate limiting, optional Sentry via `REX_SENTRY_DSN`
+>   (code-ready, not activated in prod as of this reconciliation).
 > - Frontend: Vercel (`rex-os.vercel.app`) — Vite build, HashRouter, no SPA rewrites.
 >   Git SHA injected at build time via `VERCEL_GIT_COMMIT_SHA`.
+>   BuildVersionChip in the sidebar surfaces both `/api/version` (backend) and
+>   the injected frontend commit so support can confirm the running build.
 > - DB: Railway-managed Postgres in the same project; `rex` schema.
 > - Schema migrations: **8 total** (4 `rex2_*` bootstrap files + 4 phase-numbered batches
 >   — see `migrations/` and `backend/app/migrate.py::MIGRATION_ORDER`).
 > - Optional demo seed: `migrations/rex2_demo_seed.sql`, gated by `REX_DEMO_SEED`,
 >   NOT in `MIGRATION_ORDER` — applied only when the env var is set.
-> - File storage: `REX_STORAGE_BACKEND` (`local` for dev, **must be `s3` in prod**
->   — see §1f).
+>   **Production has `REX_DEMO_SEED` unset**; demo data never touches prod.
+> - File storage: `REX_STORAGE_BACKEND` — **production is currently `local`**
+>   (ephemeral Railway disk). S3/R2 adapter is **code-ready and demo-safe
+>   but not activated in production** as of this reconciliation. The cutover
+>   is a later operational step; see §1f for the required sequence (demo
+>   round-trip first, then prod).
 > - CI: `.github/workflows/ci.yml` runs backend pytest + frontend `vite build` on
 >   every push + PR. `.github/workflows/deployed-smoke.yml` runs browser + curl
 >   proxy/redirect invariants against a deployed URL (manual dispatch + 6h cron).
 > - Release visibility: `GET /api/version` on the backend returns `{commit, build_time, environment}`;
->   the frontend exposes `window.__REX_VERSION__` for the browser console.
+>   the frontend exposes `window.__REX_VERSION__` for the browser console and
+>   renders the same identity in the sidebar BuildVersionChip popover.
+
+## Post-promotion status (2026-04-14)
+
+- Production promoted from `release/prod-closure @ 3c215f0` through a merge to
+  `master` and fast-forward of `main` to `8f191f5`, plus one empty commit
+  `3148f0c` to force Vercel's git webhook to run a genuine `vite build`
+  (prior deploys had been serving a stale pre-phase-46 bundle via 0ms no-op
+  rebuilds — see "Known production gotchas" below).
+- Railway prod currently runs **`main @ d119663`** (post-reconciliation
+  CI-only fix on top of `3148f0c`, no runtime change) with
+  `REX_AUTO_MIGRATE=true` having successfully applied phases 41–50
+  migrations on first boot at `3148f0c`. `/api/ready` reports `db.ok=true`
+  and `storage.ok=true, backend=local`.
+- Vercel prod currently serves `index-gT1ItBVr.js` (~620 KB raw / ~156 KB gzip,
+  contains all phase 46–50 UI: BuildVersionChip, Companies admin, People &
+  Members admin, Photos upload, Closeout item edit drawer, per-route
+  ErrorBoundary, responsive 900/560px media queries).
+- A separate demo environment was used as the proving ground for this
+  promotion. See §7 "Demo environment" below.
 
 Architecture:
 - **Frontend** → Vercel (React + Vite, served from `frontend/`)
@@ -79,40 +106,59 @@ Watch the logs in **Deployments** → **View Logs** for `auto_migrate complete a
 On a healthy boot you should also see `scheduler_started job_count=5`, confirming
 the apscheduler started with all 5 background jobs registered.
 
-### 1f. File storage (required for production)
+### 1f. File storage (S3 cutover — currently deferred in prod)
 
 Rex OS uses a pluggable storage adapter (`backend/app/services/storage.py`).
-Locally the `local` backend is fine; **in production you must use S3-compatible
-object storage** because Railway containers have ephemeral disks — uploaded
-attachments, warranty letters, lien waivers, and spec PDFs would be lost on
-every redeploy.
+The `local`, `memory`, and `s3` backends are all implemented.
 
-Supported via `REX_STORAGE_BACKEND=s3`:
+**Current production state (as of 2026-04-14):** `REX_STORAGE_BACKEND` is
+**unset** on prod, which resolves to `local` — uploaded files are written to
+the Railway container's ephemeral disk. This is **tolerated temporarily**
+because the current user base is internal, photo/attachment volume is low,
+and the prod promotion of phases 41–53 was explicitly scoped to hold storage
+backend unchanged. `GET /api/ready` on prod confirms
+`storage.ok=true, backend=local`.
+
+**The S3 cutover is the next operational hardening step**, not code work.
+Before flipping prod, the **demo proving-ground sequence is required**:
+
+1. Create a demo-scoped S3 (or R2) bucket
+2. Create a demo-scoped IAM user / API token limited to that bucket
+3. Set `REX_STORAGE_BACKEND=s3` + bucket/region/creds on the **demo** Railway
+   environment first (NOT prod)
+4. Verify `GET /api/ready` on demo reports `backend=s3, ok=true`
+5. Upload a photo via the Photos page on demo, reload, confirm it still
+   previews (this is the proof local disk can't provide)
+6. Only after demo round-trip succeeds, repeat the var set on **prod**
+   with a **separate** prod bucket and prod-scoped IAM credentials
+
+Supported backends via `REX_STORAGE_BACKEND=s3`:
 - AWS S3
-- Cloudflare R2 (recommended for egress cost)
+- Cloudflare R2 (recommended for egress cost — demo buckets are cheap)
 - MinIO / any S3-compatible endpoint
 
-Add these on the Railway backend service:
+Env vars to set when activating (per environment):
 
 | Variable | Example | Notes |
 |---|---|---|
-| `REX_STORAGE_BACKEND` | `s3` | Default is `local` — **must** be set in prod. |
-| `REX_S3_BUCKET` | `rex-os-prod-attachments` | Required when backend is `s3`. Must exist. |
+| `REX_STORAGE_BACKEND` | `s3` | Currently unset on prod (= `local`). |
+| `REX_S3_BUCKET` | `rex-os-prod-attachments` / `rex-os-demo-attachments` | Must exist; **must differ between prod and demo**. |
 | `REX_S3_REGION` | `us-east-1` (AWS) / `auto` (R2) | Default `us-east-1`. |
 | `REX_S3_ENDPOINT_URL` | `https://<acct>.r2.cloudflarestorage.com` | Set for R2 / MinIO. Omit for plain AWS S3. |
 | `AWS_ACCESS_KEY_ID` | — | Standard boto3 env; R2 uses an R2 API token as key. |
-| `AWS_SECRET_ACCESS_KEY` | — | Standard boto3 env. |
+| `AWS_SECRET_ACCESS_KEY` | — | Standard boto3 env. Scope demo and prod to separate keys. |
 
-Verification after deploy:
+Verification after each environment flip:
 1. `GET /api/ready` must report `storage.ok: true` with `backend: "s3"`.
-2. Upload any attachment from the UI (e.g. drop a file in the RFI drawer).
-3. Redeploy the backend and confirm the attachment still previews — this is
-   the exact invariant local disk cannot hold.
+2. Upload any attachment from the UI (e.g. a photo via `/#/photos` → Upload
+   Photo, or any file into an RFI drawer).
+3. Redeploy the backend and confirm the attachment still previews.
 
 If `/api/ready` returns 503 with storage `error: S3 bucket '...' is not reachable`,
 either the bucket name is wrong, the region/endpoint pair does not match, or the
 credentials lack `s3:HeadBucket` permission. Fix the specific error — do not
-fall back to `local` in production.
+fall back to `local` in production **if the S3 flip has already happened**;
+if the flip hasn't happened yet, staying on `local` is the current baseline.
 
 ---
 
@@ -161,7 +207,7 @@ If anything is broken:
 - Hit `https://<railway-url>/api/health` and `/api/ready` to confirm the backend is up
 - Check browser DevTools Network tab for CORS or 401 errors
 
-### Known production gotchas (encountered 2026-04-13)
+### Known production gotchas (2026-04-13 / 2026-04-14)
 
 - **`/api/health` ok but `/api/ready` hanging / 503 with asyncpg
   `InterfaceError: connection is closed`**
@@ -190,18 +236,107 @@ If anything is broken:
     https://<railway-url>/api/auth/login
   ```
   The response must include `access-control-allow-origin: https://rex-os.vercel.app`.
+- **Railway nixpacks container crashes at import time with
+  `sqlalchemy.exc.ArgumentError: Could not parse SQLAlchemy URL from given
+  URL string`** — healthcheck fails 6 times in a row with no app stdout.
+  Root cause: `DATABASE_URL` env var is set to an empty string (usually
+  because a `${{Postgres.DATABASE_URL}}` reference didn't resolve — e.g.
+  the Postgres service in a new environment is named `Postgres-<hash>`,
+  not `Postgres`). Pydantic `BaseSettings` returns `""` as an override
+  (not the default), and SQLAlchemy's `create_async_engine("")` fails at
+  module import before uvicorn can log anything. Fix: copy the
+  `DATABASE_URL` value directly from the Postgres service's own Variables
+  tab and paste it as a literal into the backend service — less elegant
+  than a reference but unambiguous. Verify with
+  `railway variables --service rex-os-api | grep DATABASE_URL` that the
+  value is a real `postgresql://...` string, not blank.
+- **First-time boot on a fresh Postgres times out the healthcheck** even
+  though migrations are running cleanly in the background.
+  Root cause: `REX_AUTO_MIGRATE=true` applies ~2,900 lines of DDL + seed SQL
+  from foundation bootstrap on first boot; this can take 60–90s, leaving
+  almost no margin inside the default 100s healthcheck window.
+  Fix: `railway.json` now sets `healthcheckTimeout: 300` for the prod
+  service — ample for cold starts, still tight enough to catch genuinely
+  stuck containers. Steady-state redeploys remain sub-10s.
+- **Vercel "Redeploy" produces a 0ms no-op build and serves a stale bundle.**
+  Root cause: a dashboard **Redeploy** on an existing deployment record
+  reuses the prior build artifact — if that prior artifact was from before
+  a major frontend change, the "new" deploy silently serves the old UI
+  (observed during the 2026-04-14 prod promotion: Vercel kept serving a
+  391-byte stub referencing `index-DNZpiF_4.js` even after Railway was on
+  the new commit). **Fix:** push an empty commit to the deploy branch —
+  this gives Vercel a fresh git SHA and forces a real `npm install + vite
+  build` via the webhook path:
+  ```
+  git checkout main
+  git commit --allow-empty -m "deploy: force fresh Vercel build"
+  git push origin main
+  ```
+  Verify the fix by fetching `https://rex-os.vercel.app/` and grepping for
+  the script tag — the bundle hash should change, and grepping the new
+  bundle should find user-visible strings like `Build Identity` or
+  `Upload Photo` which are present in phase 46–50 source.
 
 ---
 
-## 4. Future deploys
+## 4. Future deploys — canonical branch is `main`
 
-Both platforms watch the `master` branch and auto-deploy on push:
+### 4a. Production deploy branch
+
+**Both Railway prod (`rex-os-api-production.up.railway.app`) and Vercel
+prod (`rex-os.vercel.app`) watch `main`.** Pushes to `main` auto-deploy
+both backend and frontend in parallel:
 
 ```
-git push origin master
+git push origin main
 ```
 
-Vercel deploys the frontend, Railway deploys the backend, in parallel.
+Railway picks it up via GitHub webhook → Nixpacks build → migrations run
+on boot → zero-downtime container swap. Vercel picks it up via its own
+GitHub webhook → `npm install + vite build` → alias swap. Typical
+end-to-end time is 60–180s for both.
+
+### 4b. Release flow (recommended going forward)
+
+Simple path:
+1. Create a feature branch off `main`
+2. Land changes via PR to `main`
+3. Merge — both platforms auto-deploy
+
+Multi-commit stabilization path (only when a set of changes needs to be
+integrated and browser-verified against a separate environment before
+prod):
+1. Create a `release/<name>` branch off `main`
+2. Land the feature commits on the release branch
+3. Point the **demo** environment (see §7) at the release branch
+4. Verify in demo — real backend, real browser, not mocks
+5. Merge release branch → `main`, push `main`, let auto-deploy handle prod
+
+This is the pattern phases 46–53 used (release branch was
+`release/prod-closure`, demo proved it, then merged to main on
+2026-04-14).
+
+### 4c. Historical `master` branch — deprecated
+
+Prior to 2026-04-14, this repo kept both `main` (deployed) and `master`
+(integration). That split existed for ops history reasons but caused real
+confusion during the phase 46–53 promotion — merges landed on `master`
+but prod watched `main`, and the branches diverged when cherry-picks were
+applied to both.
+
+**Going forward, `master` is redundant.** New work should go through
+`main` only. `master` can be deleted on origin once the next team member
+confirms no local tooling references it — until then it's kept as a
+historical mirror and may fall behind `main` as fast-forwards stop being
+applied to it.
+
+### 4d. Historical `release/prod-closure` branch — deprecated
+
+This branch existed specifically to stage phases 46–52 for the 2026-04-14
+promotion. Its work has been merged to `main` as of commit `8f191f5`
+(release merge) → `3148f0c` (Vercel forced-rebuild empty commit). The
+branch can be deleted on origin. Future release branches should use the
+generic `release/<purpose>` pattern and be deleted after promotion.
 
 ---
 
@@ -236,7 +371,7 @@ This returns a JSON list of every migration file with its applied status.
 | `REX_SMTP_FROM` | if smtp | `rex@localhost` | From address |
 | `REX_DRIFT_CRITICAL_DAYS` | no | `5` | Schedule drift critical threshold |
 | `REX_DRIFT_WARNING_DAYS` | no | `2` | Schedule drift warning threshold |
-| `REX_STORAGE_BACKEND` | yes (prod) | `local` | `local` / `memory` / `s3`. Prod must be `s3`. |
+| `REX_STORAGE_BACKEND` | no | `local` | `local` / `memory` / `s3`. Currently unset on prod (= `local`). S3 cutover is a later step — see §1f. |
 | `REX_STORAGE_PATH` | no | `./backend_storage` | Local backend only. |
 | `REX_S3_BUCKET` | if s3 | — | Bucket name for the s3 adapter. |
 | `REX_S3_REGION` | if s3 | `us-east-1` | AWS region or R2 equivalent. |
@@ -253,4 +388,67 @@ This returns a JSON list of every migration file with its applied status.
 
 | Variable | Required | Default | Description |
 |---|---|---|---|
-| `VITE_API_URL` | yes (prod) | empty | Backend base URL, e.g. `https://rex-os.up.railway.app` |
+| `VITE_API_URL` | yes (prod) | empty | Backend base URL, e.g. `https://rex-os-api-production.up.railway.app` |
+| `VITE_SENTRY_DSN` | no | empty | Enables frontend Sentry when set. Baked at build time — changing requires a Vercel redeploy. Currently unset on prod (code-ready, not activated). |
+| `VITE_SENTRY_ENV` | no | `production` (build `MODE`) | Environment tag for frontend Sentry events. Set to `demo` on the demo Vercel project so the BuildVersionChip shows the environment badge. |
+
+---
+
+## 7. Demo environment
+
+A separate demo environment exists under the same Railway project (`Rex OS`
+under `exxir's Projects`) as the prod backend. It was used as the proving
+ground for the phase 46–53 prod promotion and continues to serve that role
+for future release flights.
+
+### 7a. Topology
+
+- **Railway project**: same `Rex OS` project; **environment: `demo`** (not
+  `production`). Railway's native per-project environment feature gives
+  isolated env vars and its own Postgres service.
+- **Railway services in demo**: `rex-os` (the backend), `Postgres-gpQz`
+  (the Postgres — note the random suffix, see the DATABASE_URL gotcha in §3)
+- **Vercel project**: separate project `rex-os-demo` (not `rex-os`). Preview
+  deploys are served under the git-branch alias pattern
+  `https://rex-os-demo-git-<branch>-<team>.vercel.app`.
+- **Deploy branch**: typically `main` or a `release/<name>` branch being
+  flight-tested. Demo watched `release/prod-closure` for the phase 46–53
+  promotion flight.
+
+### 7b. Demo-specific env var deltas from prod
+
+| Variable | Demo value | Why different |
+|---|---|---|
+| `ENVIRONMENT` | `demo` | Surfaced in `/api/version` and BuildVersionChip badge |
+| `REX_DEMO_SEED` | `true` | **Never set this on prod.** Populates Bishop Modern + full operational data set |
+| `REX_ENABLE_SCHEDULER` | `false` | Demo does not need the 5 background jobs running |
+| `REX_STORAGE_BACKEND` | `local` | Matches prod baseline; S3 can be flipped here first for activation testing |
+| `REX_CORS_ORIGINS` | demo Vercel URL | Must include the `rex-os-demo-*` alias |
+| `REX_JWT_SECRET` | **new value, NOT reused from prod** | Isolated session signing |
+| `MIGRATE_SECRET` | **new value, NOT reused from prod** | Protects `/api/admin/migrate` separately |
+| `DATABASE_URL` | `${{Postgres-gpQz.DATABASE_URL}}` OR the literal URL | Use the **exact** service name — the random `-gpQz` suffix matters |
+
+### 7c. Demo seeded admin credentials
+
+Login as `aroberts@exxircapital.com` / `rex2026!`. These credentials come
+from `rex2_foundation_bootstrap.sql` and are the same on prod (foundation
+bootstrap runs in both environments). Demo additionally has Bishop Modern
+operational data loaded via `rex2_demo_seed.sql`.
+
+### 7d. Verification sequence for a new demo deploy
+
+```
+DEMO=https://rex-os-demo.up.railway.app
+curl -sS $DEMO/api/health
+curl -sS $DEMO/api/ready              # backend=local OR backend=s3 if flipped
+curl -sS $DEMO/api/version            # environment=demo, commit matches branch HEAD
+curl -sS -X POST $DEMO/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"aroberts@exxircapital.com","password":"rex2026!"}'
+# Expect 200 with token
+```
+
+Then open the demo Vercel URL in a browser, log in, and walk the core
+flight (portfolio, schedule, RFIs, photos upload+metadata, people admin,
+BuildVersionChip). **Demo passing all of this is the gate for a prod
+promotion.** Never promote to prod without a clean demo flight first.

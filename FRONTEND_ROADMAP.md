@@ -1,8 +1,11 @@
 # Rex OS Frontend Roadmap
 
 > First-pass real frontend roadmap.
-> Last reconciled: **2026-04-13** (phases 41–44: production credibility sprint).
-> Reflects actual implemented state on the master branch.
+> Last reconciled: **2026-04-14** (phases 41–53: production promotion complete).
+> Reflects actual implemented state on the `main` branch. Production is live
+> at **`main @ d119663`** (phase 41–53 promotion landed at `3148f0c`; `d119663`
+> is a post-reconciliation CI workflow fix with no runtime change). The prior
+> integration branch `master` is deprecated — see `DEPLOY.md §4c`.
 > A screen-data readiness audit is **not** the same thing as this — see `SCREEN_TO_DATA_MAP.md` for that.
 
 ---
@@ -11,24 +14,28 @@
 
 | Metric | Value | Source |
 |---|---|---|
-| Page components | 30 | `frontend/src/pages/*.jsx` |
-| App routes (HashRouter) | 30 | `frontend/src/App.jsx` |
-| Stack | React 18 + Vite 5 + react-router 7 | `package.json` |
-| Build output | 81 modules, ~508 KB raw / ~122 KB gzip | `vite build` (phase 44 run, 1.04s) |
+| Page components | **32** | `frontend/src/pages/*.jsx` (phase 48 added Companies + People & Members) |
+| App routes (HashRouter) | 32 | `frontend/src/App.jsx` |
+| Stack | React 18 + Vite 5 + react-router 7 + @sentry/react 8 | `package.json` — Sentry added phase 46, gated by `VITE_SENTRY_DSN` |
+| Build output | **~311 modules, ~620 KB raw / ~156 KB gzip** | `vite build` 2026-04-14 — phase 46–50 added ~110 KB of new UI (BuildVersionChip, admin pages, photo upload drawer, error boundary rewrite, responsive CSS) |
 | Build identity injection | `__REX_GIT_SHA__`, `__REX_BUILD_TIME__` | `vite.config.js` `define` — sourced from `VERCEL_GIT_COMMIT_SHA` / `RAILWAY_GIT_COMMIT_SHA` / `GITHUB_SHA` at build time |
 | Version module | `frontend/src/version.js` | exports `GIT_SHA`, `BUILD_TIME`, `VERSION_INFO` and `main.jsx` pins them to `window.__REX_VERSION__` (read-only) |
-| CI gates | pytest + vite build + eslint | `.github/workflows/ci.yml` runs on every push + PR |
+| Build version chip | `frontend/src/BuildVersionChip.jsx` (phase 47) | sidebar-bottom chip showing `fe <sha>` + `be <sha>`; click to expand popover with `/api/version` backend identity + environment badge (non-production only) |
+| Sentry integration (frontend) | `frontend/src/sentry.js` (phase 46) | `initSentry()` in `main.jsx`, no-op without `VITE_SENTRY_DSN`. **Code-ready, not activated on prod** as of this reconciliation. |
+| Error boundary | `frontend/src/ErrorBoundary.jsx` (phase 46 rewrite) | Per-route isolation via `routeKey={location.pathname}` — crash on one route contains and auto-resets on navigation; retry without full page reload; Rex-styled panel; Sentry reporting when enabled |
+| Fetch state helper | `frontend/src/fetchState.jsx` (phase 46) | `LoadState` + `classifyError` — distinguishes auth vs network vs empty vs server-error on data-heavy pages |
+| CI gates | pytest + vite build | `.github/workflows/ci.yml` runs on every push + PR (phase 42) |
 | Deployed smoke | Playwright + curl invariants | `.github/workflows/deployed-smoke.yml` (workflow_dispatch + 6h cron) |
 | Shared components | 7 | ui.jsx (Badge/StatCard/Card/Row/PageLoader/Flash/ProgressBar) |
 | Shared platform modules | 4 | api.js, auth.jsx, project.jsx, permissions.js |
-| Shared write-flow module | 1 | forms.jsx (FormDrawer + 8 input primitives) |
+| Shared write-flow module | 1 | forms.jsx (FormDrawer + **9** input primitives — phase 49 added `FileInput`) |
 | Shared file preview module | 1 | preview.jsx (FilePreviewDrawer) |
 | Shared notification module | 1 | notifications.jsx (NotificationProvider + bell + drawer) |
 | Shared alert callout module | 1 | AlertCallout.jsx (per-page alert surface) |
-| CSS theme file | 1 | rex-theme.css (single-file design system, ~10 KB) |
-| Mocked Playwright tests | 8 | `frontend/e2e/smoke.spec.js` |
-| Real-backend e2e | 0 (in-frontend) — covered by backend phase 25/30/35 tests | |
-| Deployment | Vercel | `vercel.json`, `.vercel/project.json` |
+| CSS theme file | 1 | rex-theme.css — phase 50 added responsive media queries at 900px (off-canvas sidebar + hamburger) and 560px (stat grid collapse, drawer clamp to viewport) |
+| Mocked Playwright tests | **14** | `frontend/e2e/smoke.spec.js` (8) + `frontend/e2e/phase46_50.spec.js` (6) — phase 52 added coverage for BuildVersionChip, Portfolio create drawer, Companies, People+Members, Photos upload drawer, Checklist item edit |
+| Real-backend e2e | 0 (in-frontend) — covered by backend phase 25/30/35 tests + demo-env browser flight for phase 46–50 | |
+| Deployment | Vercel | `rex-os` project in `robertsandrewt-3928s-projects` team; serves `https://rex-os.vercel.app`. **Deployed-verified** 2026-04-14 at bundle `index-gT1ItBVr.js`. |
 
 **Stack details:**
 - React 18.3, react-dom 18.3, react-router-dom 7.14
@@ -53,11 +60,12 @@
 | **Compliance** | InsuranceCertificates | ✅ shipped | full CRUD | Global (not project-scoped); auto-status refresh button; expiry color coding |
 | **Financials** | BudgetOverview, PayApplications, Commitments, ChangeOrders | ✅ shipped | full CRUD | Includes nested line items (commitment line items, change event line items) and PCO/CCO display |
 | **Field Ops** | RfiManagement, PunchList, SubmittalManagement, DailyLogs, Inspections, Tasks, Meetings, Observations, SafetyIncidents | ✅ shipped | full CRUD | All have FormDrawer create/edit; nested children for Daily Log manpower entries, Inspection items, Meeting action items; phase 39 contributing fields on Observations |
-| **Document Management** | Drawings, Specifications, Photos, Correspondence, Attachments | ✅ shipped | full CRUD on drawings/specs/correspondence; **Photos: edit-only metadata** (no upload UI) | File preview drawer wired into Drawings, Specifications, Correspondence, Warranties, InsuranceCertificates, Attachments |
+| **Document Management** | Drawings, Specifications, Photos, Correspondence, Attachments | ✅ shipped | full CRUD including **Photos upload + metadata edit + bytes preview** (phases 49, 51, 53) | File preview drawer wired into Drawings, Specifications, Correspondence, Warranties, InsuranceCertificates, Attachments. Photos page has upload drawer with album create-on-upload, taken_at, location, lat/lng, tags. |
 | **Field health views** | ExecutionHealth | ✅ shipped | read-first | Aggregated counts + Tasks by status + Manpower + Inspections + Punch summary |
 | **Inbox / Operations** | Notifications, AdminJobs | ✅ shipped | mark read, dismiss, run job | AdminJobs is admin/VP-only with `<Navigate to="/" replace>` defense in depth |
+| **Admin (phase 48)** | Companies, People & Members | ✅ shipped | full CRUD + project-member create/edit | Admin/VP-only sidebar group. Companies page with insurance/bonding filters + CRUD; People page with detail-panel project-membership management (+ Add button + access-level edit). Both browser-verified on demo + deployed-verified on prod 2026-04-14. |
 
-**Total: 30 page components, all live in production.**
+**Total: 32 page components, all live in production at `main @ d119663`** (phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI-only fix on top with no runtime change).
 
 ---
 
@@ -81,7 +89,7 @@ Document Mgmt:   Drawings · Specifications · Photos · Correspondence
 Closeout & Warranty: Warranties · O&M Manuals
 Compliance:      Insurance Certificates
 Project:         Schedule Health · Execution Health · Checklists · Milestones · Attachments
-Admin (admin/VP only): Operations
+Admin (admin/VP only): Companies · People & Members · Operations
 ```
 
 ### Write-flow layer (`forms.jsx`)
@@ -131,65 +139,83 @@ Admin (admin/VP only): Operations
 
 ## 4) Frontend technical debt / polish backlog
 
-### Known UX gaps
+### Known UX gaps (post phase 53 — what's still open)
 - **`location` filter on Schedule** is wired in shared state and `filteredActivities` logic but has no toolbar input — works programmatically via URL state but not user-settable. Minor.
 - **No route loading indicator** between page transitions — relies on each page's own `<PageLoader>` after data fetch starts.
-- **No global error boundary on the route level** — `ErrorBoundary` exists in `App.jsx` but only wraps the entire `<Routes>` element. A page error shows "Something went wrong" with no per-page recovery.
-- **No "create project" UI** — projects are seeded at the DB level. The new `latitude`/`longitude` fields from phase 39 have no edit surface.
-- **No "create company / vendor" UI** — companies are seeded at the DB level. The new `mobile_phone`/`website` fields from phase 39 have no edit surface either.
-- **No "create user" or invite flow** — user provisioning is DB-direct.
-- **Photos**: no upload UI (deferred). Edit-metadata only.
-- **Closeout checklist items**: spec_division/spec_section are now **displayed** but not editable from the UI. Full edit drawer for individual items is not built.
+- **No "create user" or invite flow** — new user provisioning is still DB-direct. The People & Members admin page can list/edit existing users and manage their project memberships (phase 48), but there's no "invite a new user via email + signup link" flow. Deferred until there's a clear need.
+- **Backend Sentry in prod** — `REX_SENTRY_DSN` unset on prod; backend errors only surface via Railway log scraping. Not a frontend gap but users feel it as "weird bug disappeared."
+- **Frontend Sentry in prod** — `VITE_SENTRY_DSN` unset on the Vercel prod project; frontend runtime exceptions are invisible beyond the browser console.
+- **Real S3 storage in prod** — still `local`. Photo uploads work but live on the ephemeral Railway disk; a container recycle would lose them. See `DEPLOY.md §1f` for the activation sequence.
+- **Real-browser sanity pass on prod post-promotion** — the phase 46–53 build has been API-level verified on prod but the final manual "click through the live prod UI once" check was still open at the time of this reconciliation.
+
+### Closed in phases 46–53 (previously in this list)
+- ✅ **Per-route error boundaries** — shipped phase 46. `ErrorBoundary` now wraps `<Routes>` with `routeKey={location.pathname}` for auto-reset on navigation, retry without reload, Sentry reporting when DSN set.
+- ✅ **Create/edit project drawer** — shipped phase 48A. Portfolio page has admin **+ New Project** button; edit drawer prefills from `GET /api/projects/{id}`, supports all phase-39 fields including lat/lng, contract_value, square_footage.
+- ✅ **Companies admin page** — shipped phase 48B. Full CRUD including phase-39 `mobile_phone` / `website` / `insurance_carrier` / `insurance_expiry` / `bonding_capacity`.
+- ✅ **People & Members admin page** — shipped phase 48C. Person CRUD + per-person project-membership create/edit (picks project, access level, primary flag, active flag); graceful 409 messaging on duplicate membership.
+- ✅ **Photos upload UI** — shipped phase 49. Multipart form against `POST /api/photos/upload` with album create-on-upload, taken_at, description, location, lat/lng, tags. **Phase 51** fixed the metadata PATCH blocker so filename/taken_at/lat/lng survive round-trip. **Phase 53** added `GET /api/photos/{id}/bytes` for the preview path.
+- ✅ **Closeout checklist item edit drawer** — shipped phase 50. Exposes name, category, status, due_date, assigned_person_id, assigned_company_id, notes, spec_division, spec_section.
+- ✅ **BuildVersionChip** — shipped phase 47. Sidebar-bottom chip showing FE + BE commit; click to expand popover with full `/api/version` identity.
+- ✅ **Responsive shell below tablet** — shipped phase 50 (partial). Media queries at 900px (off-canvas sidebar, hamburger menu in topbar) and 560px (5-up stat grids collapse to 2, drawer clamps to viewport width). Not a full mobile redesign — adequate for narrow-viewport sanity.
 
 ### Performance observations
-- Bundle size: 508 KB raw / 122 KB gzip — Vite warns about chunks > 500 KB (we're now just over). Consider code-splitting per-page (react.lazy on ScheduleHealth is the obvious first candidate).
+- Bundle size: **~620 KB raw / ~156 KB gzip** (post phase 46–50). Vite still warns about chunks > 500 KB. Consider code-splitting per-page (react.lazy on ScheduleHealth is the obvious first candidate). Advisory, not blocking.
 - Notification polling (60s) is a fixed cost for every authenticated user — fine for now but should switch to SSE/WebSocket if user count grows.
 - Schedule workbench fetches per-schedule activities sequentially via `Promise.all` — fine for typical projects but could degrade with hundreds of schedules. No pagination currently.
 - File preview blob URLs are revoked on cleanup but not when switching between previews rapidly — minor leak risk.
 
 ### Accessibility / responsiveness
-- **No explicit ARIA labels** on most icon-only buttons (notification bell, drawer close, etc.).
+- **Partial ARIA labels** — phase 50 added labels on key icon-only buttons (notification bell, drawer close, topbar menu, edit buttons in admin tables, membership + Add button). Not comprehensive; keyboard-only navigation hasn't been audited end-to-end.
 - **No keyboard navigation** for the Gantt timeline.
-- **Mobile responsiveness**: untested. The dense table layouts and 220px sidebar would be cramped under 1024px viewport. No media queries currently.
+- **Responsive layout**: phase 50 added media queries at 900px (off-canvas sidebar + hamburger) and 560px (grid collapse + drawer clamp). This is a tablet/narrow-desktop sanity pass, **not** a full mobile redesign. Behavior below 560px is not formally audited. No explicit phone breakpoint.
 - **Color contrast**: not formally audited. The dark purple sidebar and white text pass WCAG AA visually but no Lighthouse run is on file.
 - **Focus traps** in drawers: not implemented. ESC works but tab navigation can escape the drawer.
 
 ### Frontend testing
-- **8 mocked Playwright smoke tests** — all use `page.route` mocks, not a real backend. Coverage:
-  1. Login → portfolio
-  2. Create RFI as admin
-  3. Create punch item as admin
-  4. Create daily log as admin
-  5. Create meeting as admin
-  6. Create change event as admin
-  7. Create correspondence as admin
-  8. Read-only user can't perform write
-- **No real-backend frontend e2e** — instead, the backend test suite has 28 tests (`test_phase25/30/35`) that exercise the full HTTP API end-to-end with rollback isolation.
+- **14 mocked Playwright tests** — all use `page.route` mocks, not a real backend.
+  - `smoke.spec.js` (8): login → portfolio, create RFI/punch/daily-log/meeting/change-event/correspondence, read-only-denied
+  - `phase46_50.spec.js` (6, phase 52): BuildVersionChip popover, Portfolio create drawer submit, Companies list + create, People detail panel + add project membership, Photos upload drawer opens + file input renders + cancel, Checklists item edit drawer opens with spec fields
+- **No real-backend frontend e2e** inside the frontend repo — the backend test suite has 28 tests (`test_phase25/30/35`) that exercise the full HTTP API end-to-end with rollback isolation, and the phase 46–53 flight used the demo environment + a real browser (via the Chrome extension) for the live UI sanity.
 - **No component unit tests** — Vitest is not set up.
 - **No visual regression tests** — no Chromatic or Percy.
 
 ### Build / tooling debt
-- **No CI** — frontend `npm run build` is only enforced manually.
-- **ESLint runs locally only** — no pre-commit or pre-push hook.
+- ✅ **CI**: `.github/workflows/ci.yml` runs backend pytest + frontend `vite build` on every push + PR (phase 42).
+- **ESLint runs locally only** — no pre-commit or pre-push hook. Note: the repo has `npm run lint` in package.json but no `.eslintrc` config file, so the lint script currently fails. Low priority.
 - **No TypeScript** — `package.json` includes `@types/react` and `@types/react-dom` but the project is JavaScript with JSX. TS migration would be a big project, not currently planned.
-- **No source maps in production build** — debugging from Sentry (when added) will need source map upload config.
+- **No source maps in production build** — debugging from Sentry (when activated) will need source map upload config. Plan for this when flipping frontend Sentry on in prod.
 
 ---
 
 ## 5) Recommended next frontend sequence
 
-In rough priority order:
+Items 1–7 from the prior version of this list are all shipped — see
+"Closed in phases 46–53" above. Remaining work in rough priority order:
 
-1. **Per-page error boundaries** — wrap each `<Route>` with a recoverable fallback so one page crashing doesn't kill the entire SPA shell.
-2. **Mobile responsiveness pass** — at minimum add a hamburger sidebar for <1024px viewports and let critical pages (Portfolio, Notifications) reflow. Defer full mobile redesign.
-3. **CI workflow** — `.github/workflows/ci.yml` running `npm run build` and `npm run test:e2e` on PR. Same workflow can run backend pytest.
-4. **Project + Company create/edit forms** — close the loop on phase 39 lat/lng + mobile/website fields.
-5. **Photo upload UI** — multipart form against the existing `/api/attachments/upload` endpoint; only blocked by storage backend choice in prod.
-6. **Closeout checklist item edit drawer** — expose spec_division/spec_section + the rest of the item fields for editing.
-7. **Sentry / error tracking integration** — frontend errors are currently invisible to the team.
-8. **Lighthouse / accessibility audit** — at minimum tab-trap focus in drawers, ARIA labels on icon buttons, color contrast spot checks.
-9. **Code splitting if bundle > 600 KB** — react.lazy on heavy pages (Schedule workbench is the obvious first candidate).
-10. **Component unit tests for the shared infrastructure** — FormDrawer, useFormState, AlertCallout, FilePreviewDrawer. Vitest + react-testing-library.
+1. **Activate frontend Sentry in demo, then prod** — set `VITE_SENTRY_DSN`
+   + `VITE_SENTRY_ENV` on the Vercel demo project, redeploy (Vite env is
+   build-time), prove one deliberate event in the Sentry dashboard, then
+   repeat on prod. Code path (`frontend/src/sentry.js`) is already wired.
+2. **Real-browser sanity pass on prod post-promotion** — walk the core
+   flight against `https://rex-os.vercel.app` once, log verdicts, close
+   the loop. API-level smoke is already green.
+3. **Full mobile responsiveness pass** — phase 50 added narrow-desktop
+   adaptation (900/560px); a proper phone pass would need one more
+   breakpoint + table reflow strategy. Low priority until there's mobile
+   user demand.
+4. **Lighthouse / accessibility audit** — at minimum tab-trap focus in
+   drawers, finish ARIA labels on icon buttons (phase 50 was partial),
+   color contrast spot checks, keyboard-only navigation pass.
+5. **Code splitting** — bundle is ~620 KB; `react.lazy` on ScheduleHealth
+   would shave off significant weight since it pulls in the Gantt. Still
+   advisory, not blocking.
+6. **Source map upload pipeline** — required before flipping frontend
+   Sentry on prod with meaningful stack traces.
+7. **Component unit tests for the shared infrastructure** — FormDrawer,
+   useFormState, AlertCallout, FilePreviewDrawer, BuildVersionChip. Vitest
+   + react-testing-library.
+8. **ESLint config** — `npm run lint` script exists but no `.eslintrc`,
+   so lint currently fails. Add a minimal config or remove the script.
 
 ---
 
@@ -219,10 +245,18 @@ This file should be updated whenever:
 
 **Stale claims to watch out for:**
 - "Read-first" labeling on pages that now have full CRUD (most do as of phase 20)
-- "Photos page is read-only" — partially true: edit-metadata only, no upload
+- "Photos page has no upload" — shipped phase 49
+- "Photos metadata PATCH silently drops filename/lat/lng/taken_at" — fixed phase 51
 - "No file preview" — built in phase 29
 - "Schedule workbench is one tab" — it's 5 tabs now
 - "No notifications" — built in phase 32
 - "No admin operations page" — built in phase 34
+- "No create-project / create-company / create-user UI" — shipped phase 48 (Portfolio + Companies admin + People & Members)
+- "No per-route error boundaries" — shipped phase 46
+- "No responsive media queries" — shipped phase 50 at 900px + 560px
+- "Bundle is ~508 KB" — it's ~620 KB post phase 46–50
+- "8 mocked Playwright tests" — it's 14 post phase 52
+- "30 page components" — it's 32 post phase 48
+- "Deploys watch master" — **deploys watch `main`** since 2026-04-14 (see `DEPLOY.md §4a`)
 
 This is a **planning document**, not a screen catalog. The screen catalog lives at `SCREEN_TO_DATA_MAP.md`.
