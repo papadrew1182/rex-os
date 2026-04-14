@@ -1,0 +1,81 @@
+id,category,label,description,params
+C-1,FINANCIALS,Budget Variance,Budget vs projected cost by cost code,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-10,SCHEDULING,Critical Path Delays,Critical path tasks behind schedule,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-104,TRAINING,Training Status,Your Rex University progress and next recommended lesson,[]
+C-11,SCHEDULING,2-Week Look-Ahead,Superintendent-ready look-ahead narrative,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""START_DATE"", ""type"": ""date"", ""label"": ""Start"", ""default"": ""today""}, {""name"": ""END_DATE"", ""type"": ""date"", ""label"": ""End"", ""default"": ""today+14""}]"
+C-12,SCHEDULING,Resource Conflicts,"Cross-project resource overlaps, next 14 days",[]
+C-13,DIRECTORY,Project Team Roster,Active users with permission flags,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-14,DIRECTORY,Vendor Compliance,Insurance status RED/YELLOW/GREEN,[]
+C-15,EXECUTIVE,Monthly Owner Report,Formal monthly owner/lender report,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""REPORT_MONTH"", ""type"": ""month"", ""label"": ""Report Month"", ""default"": """"}]"
+C-16,PERFORMANCE,Scorecard Preview,Pre-commit scores + payout projections,"[{""name"": ""QUARTER"", ""type"": ""quarter"", ""label"": ""Quarter"", ""default"": """"}, {""name"": ""YEAR"", ""type"": ""year"", ""label"": ""Year"", ""default"": """"}]"
+C-17,PERFORMANCE,Milestone Bonus Status,"Bonus pipeline: earned, pending, holdback",[]
+C-18,PERFORMANCE,Quarterly Review Prep,Full evidence pack for quarterly review,"[{""name"": ""QUARTER"", ""type"": ""quarter"", ""label"": ""Quarter"", ""default"": """"}, {""name"": ""YEAR"", ""type"": ""year"", ""label"": ""Year"", ""default"": """"}]"
+C-19,PROCUREMENT,Buyout & Procurement,Uncommitted scope + long-lead items,"[{""name"": ""PROJECT_NAME"", ""type"": ""project_opt"", ""label"": ""Project (optional)"", ""default"": """"}]"
+C-2,FINANCIALS,Change Event Sweep,Open & unpriced CEs across all projects,[]
+C-20,PROCUREMENT,Schedule Health Dashboard,Portfolio-wide schedule health,[]
+C-21,PROCUREMENT,Inspection Readiness,Upcoming inspections + prerequisite status,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-22,OPERATIONS,Morning Briefing,On-demand briefing with all alerts,[]
+C-23,OPERATIONS,Weekly Agenda Generator,Role-specific weekly meeting agenda,"[{""name"": ""ROLE"", ""type"": ""role"", ""label"": ""Role"", ""default"": """"}]"
+C-24,OPERATIONS,Closeout Readiness,Closeout completeness + blocking items,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-25,OPERATIONS,Documentation Compliance,Process hygiene gaps + scorecard deductions,[]
+C-26,FINANCIAL,Cash Flow Forecast,90-day billing + receivables forecast,[]
+C-27,FINANCIAL,Commitment Reconciliation,Subcontract vs billed discrepancies,"[{""name"": ""PROJECT_NAME"", ""type"": ""project_opt"", ""label"": ""Project (optional)"", ""default"": """"}]"
+C-28,PROJECT MGMT,Submittal SLA Check,Submittals exceeding internal/A&E review SLA,[]
+C-29,PROJECT MGMT,RFI Aging + Overdue,"Open RFIs with age, ball-in-court, cost/sched impact",[]
+C-3,FINANCIALS,Invoice & Lien Compliance,G703 + lien waiver compliance,"[{""name"": ""BILLING_DATE"", ""type"": ""date"", ""label"": ""Billing Date"", ""default"": ""billing""}]"
+C-30,FINANCIAL,PCO Pipeline Status,Open PCOs — flags 14+ days without linked CO package,[]
+C-31,FINANCIAL,Subcontract + PO Execution,Commitment execution status — flags 30+ day delays,[]
+C-32,FINANCIAL,Direct Cost vs Budget,Direct cost actuals vs budget by cost code this month,[]
+C-33,FINANCIAL,Requisition / Invoice Status,Subcontract pay app status — flags past-due requisitions,[]
+C-34,FINANCIAL,Payment App Pipeline,Prime contract owner billing pipeline,[]
+C-35,FINANCIAL,Lien Waiver Compliance,Lien waiver status — flags unsigned past payment date,[]
+C-36,PROJECT MGMT,Meeting Activity,Meeting frequency — flags projects with no meetings in 30 days,[]
+C-37,PROJECT MGMT,Drawing Log Status,Drawing log by discipline — flags stale revisions,[]
+C-38,PROJECT MGMT,Inspection Pass/Fail,Inspection results — flags failures and overdue items,[]
+C-39,PROJECT MGMT,Meeting Minutes & Action Items,Open action items by project — flags meetings with unresolved items,[]
+C-4,FINANCIALS,PCO Summary (30 Days),PCOs created in the last 30 days,[]
+C-40,PROJECT MGMT,Drawing Revision Tracker,Revision activity by discipline — flags obsolete drawings,[]
+C-41,PROJECT MGMT,Form Completion Status,Open forms by project and template — flags overdue items,[]
+C-42,SCHEDULING,Schedule Variance Report,Tasks behind schedule — flags critical path with negative float,[]
+C-43,SCHEDULING,Lookahead Status,Active lookaheads by project — flags gaps in weekly planning,[]
+C-44,SCHEDULING,Field Productivity Trends,Actual production quantities by crew and task code,[]
+C-45,PROJECT MGMT,Photo Documentation Gaps,Photo counts by project — flags locations with no recent coverage,[]
+C-46,PROJECT MGMT,Specification Lookup,Spec sections by division — flags missing or incomplete coverage,[]
+C-47,PROJECT MGMT,Observation Trends,Open observations by type and trade — flags overdue and repeat items,[]
+C-48,PROJECT MGMT,Inspection Summary,Pass/fail rates by project and inspection type — flags failures,[]
+C-49,FINANCIALS,Budget Variance by Cost Code,Cost codes over budget — flags where projected exceeds revised by 10%+,[]
+C-5,PROJECT MGMT,RFI Aging Report,Overdue RFIs across all active projects,[]
+C-50,SCHEDULING,Enriched Lookahead,"Constraint-aware lookahead — flags tasks with open RFIs, pending submittals, missing vendors","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""WEEKS"", ""type"": ""text"", ""label"": ""Weeks (2/3/4/6)"", ""default"": """"}]"
+C-51,SCHEDULING,Schedule vs Billing Check,Compare schedule progress against billing percent — flags overbilling or cash flow gaps,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-52,PROCUREMENT,Procurement Readiness,Upcoming task procurement status — GREEN/YELLOW/RED for committed vs uncommitted scope,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""WEEKS"", ""type"": ""text"", ""label"": ""Weeks ahead"", ""default"": """"}]"
+C-53,PROCUREMENT,Vendor Performance Scorecard,"Cross-wired vendor scorecard: punch items, schedule adherence, billing, insurance","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-54,SCHEDULING,Daily Log vs Schedule Check,Trades that should be active per schedule but show no/low daily log activity,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""DAYS"", ""type"": ""text"", ""label"": ""Lookback days"", ""default"": """"}]"
+C-55,FINANCIALS,Change Exposure Map,Change event exposure mapped to schedule phases — flags high-exposure phases,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-56,SCHEDULING,Punch-Milestone Risk Check,Punch list closeout risk for upcoming milestones — HIGH_RISK/MEDIUM_RISK/ON_TRACK,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-57,OPERATIONS,Generate OAC Briefing Packet,"Pre-meeting briefing for OAC meeting: budget, RFIs, schedule, open items","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-58,OPERATIONS,Sub Coordination Briefing,"Subcontractor coordination meeting prep: trades on site, punch, submittals","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-59,OPERATIONS,Post-Meeting Minutes,"Generate meeting minutes from an agenda — extracts decisions, action items, owners","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""MEETING_TYPE"", ""type"": ""text"", ""label"": ""Meeting Type"", ""default"": """"}]"
+C-6,PROJECT MGMT,Daily Log Summary,Morning field briefing,"[{""name"": ""YESTERDAY_DATE"", ""type"": ""date"", ""label"": ""Date"", ""default"": ""yesterday""}]"
+C-60,EXECUTIVE,Monthly Owner Report,"Formal monthly owner progress report: budget, schedule, issues, photos","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}, {""name"": ""REPORT_MONTH"", ""type"": ""month"", ""label"": ""Report Month"", ""default"": """"}]"
+C-61,OPERATIONS,Pending Decisions Log,Open decisions by owner — flags items with no resolution in 7+ days,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-62,OPERATIONS,Decision Escalation Report,Decisions past due or approaching critical milestones requiring immediate resolution,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-63,OPERATIONS,Lookahead Sync Briefing,"3-week lookahead constraint sync: vendors, RFIs, submittals, change events","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-64,OPERATIONS,Meeting Packet History,List of all generated meeting packets for a project with attachment status,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-65,OPERATIONS,Action Queue Review,Pending Procore write-back actions awaiting approval — approve or reject items,[]
+C-66,OPERATIONS,Write-Back Log,Recent Procore write-back actions executed — success/failure status,[]
+C-67,OPERATIONS,Auto-Queue Review,AI-proposed actions from pattern detection — review and approve for execution,"[{""name"": ""PROJECT_NAME"", ""type"": ""project_opt"", ""label"": ""Project (optional)"", ""default"": """"}]"
+C-68,OPERATIONS,Command Mode,Type what you want done in plain English — Rex parses it into Procore actions,[]
+C-69,EXECUTIVE,Portfolio Snapshot,"Cross-project portfolio view: budget health, schedule, open items, risk ratings",[]
+C-7,PROJECT MGMT,Punch List Analysis,Top deficiency types by trade & location,[]
+C-70,FINANCIALS,Portfolio Cash Flow,90-day cash flow projection across all active projects,[]
+C-71,FINANCIALS,Portfolio Budget Roll-Up,Consolidated budget vs projected vs committed across all projects,[]
+C-72,EXECUTIVE,Portfolio Vendor Rankings,"Top and bottom performing vendors ranked by punch, schedule, billing compliance",[]
+C-73,EXECUTIVE,Portfolio Trend Analysis,"30/60/90-day trend for key metrics: RFIs, punch, budget variance, schedule",[]
+C-74,EXECUTIVE,Risk Prediction Report,"2-4 week forward-looking risk predictions: schedule slips, quality spikes, vendor issues","[{""name"": ""PROJECT_NAME"", ""type"": ""project_opt"", ""label"": ""Project (optional)"", ""default"": """"}]"
+C-75,EXECUTIVE,Active Risk Dashboard,All active risk predictions ranked by severity — CRITICAL/HIGH/MEDIUM/LOW,"[{""name"": ""PROJECT_NAME"", ""type"": ""project_opt"", ""label"": ""Project (optional)"", ""default"": """"}]"
+C-76,OPERATIONS,My Day Briefing,"Personalized daily briefing: alerts, tasks, meetings, weather, top priorities",[]
+C-77,OPERATIONS,Weather Impact Forecast,"7-day weather forecast with work impact: rain, wind, temperature advisories","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-78,PROJECT MGMT,Photo Intelligence Scan,"AI analysis of recent job site photos — flags safety issues, quality defects, progress","[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-79,OPERATIONS,Sub Communication Hub,Send weekly status updates to all active subcontractors with their project data,"[{""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
+C-8,PROJECT MGMT,Submittal SLA Check,Submittals exceeding review SLA,[]
+C-9,PROJECT MGMT,Draft RFI Response,AI-drafted response with drawing/spec refs,"[{""name"": ""RFI_NUMBER"", ""type"": ""text"", ""label"": ""RFI Number"", ""default"": """"}, {""name"": ""PROJECT_NAME"", ""type"": ""project"", ""label"": ""Project"", ""default"": """"}]"
