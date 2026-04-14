@@ -300,7 +300,15 @@ async def rollback_client():
 
     Uses a dedicated ``AsyncClient`` (not the session-scoped one) so the
     override is isolated to this fixture and cannot affect parallel tests.
+
+    Disposes the engine pool before acquiring a connection so any cached
+    asyncpg connections bound to an earlier event loop are dropped first.
+    Without this, CI (where tests execute fast enough for the pool to
+    still hold a live connection from the session-startup fixture) hits
+    "got Future attached to a different loop" at fixture setup. Locally
+    on Windows the timing masks it; on Linux it's deterministic.
     """
+    await engine.dispose()
     async with engine.connect() as connection:
         outer_trans = await connection.begin()
 
