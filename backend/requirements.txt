@@ -1,7 +1,15 @@
 # Rex OS — Backend Dependencies
 # Primary target: Python 3.12+
 # Tested: 3.12, 3.14
-fastapi>=0.115.0
+fastapi>=0.115.0,<0.136
+# Pinned <1.0 because starlette 1.0.0 changed TestClient event-loop
+# semantics in a way that breaks the shared asyncpg pool across tests
+# under pytest-asyncio session-scoped loops (CI run 24369741252).
+# Unpin once conftest owns its own engine per-session cleanly.
+starlette>=0.40,<1.0
+# anyio 4.13 moved loop management in a way that similarly tangles with
+# the session-scoped event loop we rely on in pytest.ini. Hold at 4.12.x.
+anyio>=4.12,<4.13
 uvicorn[standard]>=0.30.6
 asyncpg>=0.29.0
 pydantic>=2.9.2
