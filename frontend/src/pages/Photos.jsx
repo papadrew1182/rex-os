@@ -10,6 +10,22 @@ import { usePermissions } from "../permissions";
 
 const fmtDate = (d) => d ? new Date(d + "T00:00:00").toLocaleDateString() : "—";
 
+// Build a browser-fetchable URL for a Photo's bytes. The column
+// ``storage_url`` is a stable identifier (``local://key``, ``s3://bucket/key``)
+// not an HTTP URL, so we route through the authenticated photo-bytes endpoint
+// that serves from whatever storage backend is active. Token is passed as a
+// query param because <img> can't send custom headers — the server accepts
+// both Authorization header and ?token= for this specific endpoint.
+function photoImageSrc(photo) {
+  if (!photo || !photo.id) return "";
+  if (photo.thumbnail_url && /^https?:\/\//i.test(photo.thumbnail_url)) {
+    return photo.thumbnail_url;
+  }
+  const token = getToken();
+  const url = apiUrl(`/photos/${photo.id}/bytes`);
+  return token ? `${url}?token=${encodeURIComponent(token)}` : url;
+}
+
 const PHOTO_EDIT_DEFAULT = {
   filename: "",
   photo_album_id: null,
@@ -273,9 +289,9 @@ export default function Photos() {
               }}
             >
               <div style={{ aspectRatio: "4/3", background: "var(--rex-bg-stripe)", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                {p.thumbnail_url || p.storage_url ? (
+                {p.id ? (
                   <img
-                    src={p.thumbnail_url || p.storage_url}
+                    src={photoImageSrc(p)}
                     alt={p.filename}
                     style={{ width: "100%", height: "100%", objectFit: "cover" }}
                     onError={(e) => { e.target.style.display = "none"; }}
@@ -316,10 +332,10 @@ export default function Photos() {
             </div>
           </div>
 
-          {(selected.storage_url || selected.thumbnail_url) && (
+          {selected.id && (
             <div style={{ marginBottom: 16, textAlign: "center" }}>
               <img
-                src={selected.storage_url || selected.thumbnail_url}
+                src={photoImageSrc(selected)}
                 alt={selected.filename}
                 style={{ maxHeight: 400, maxWidth: "100%", objectFit: "contain", borderRadius: 6 }}
                 onError={(e) => { e.target.style.display = "none"; }}

@@ -41,6 +41,62 @@ async def test_photo_upload_creates_row(client: AsyncClient):
     assert body["storage_url"]
 
 
+async def test_photo_bytes_endpoint_serves_uploaded_content(real_auth_client: AsyncClient):
+    """Regression: without this route, <img src={storage_url}> would try
+    to fetch a scheme identifier like ``local://...`` and render broken.
+    The bytes endpoint is what makes the Photos page actually display.
+
+    Uses ``real_auth_client`` so header + query auth paths are exercised
+    end-to-end with a real token — the bytes endpoint does manual auth
+    parsing, not ``Depends(get_current_user)``, so the default stub
+    override doesn't apply.
+    """
+    # Get a real token via login
+    r = await real_auth_client.post(
+        "/api/auth/login",
+        json={"email": "aroberts@exxircapital.com", "password": "rex2026!"},
+    )
+    assert r.status_code == 200, r.text
+    token = r.json()["token"]
+    auth_headers = {"Authorization": f"Bearer {token}"}
+
+    # Upload a photo via the upload endpoint so we know the bytes exist.
+    unique_marker = f"BYTES-{_uid()}"
+    body_bytes = b"\xff\xd8\xff\xe0FAKE-JPEG-BYTES-" + unique_marker.encode()
+    files = {"file": ("sample.jpg", body_bytes, "image/jpeg")}
+    data = {"project_id": PROJECT_BISHOP}
+    r = await real_auth_client.post(
+        "/api/photos/upload", data=data, files=files, headers=auth_headers
+    )
+    assert r.status_code == 201, r.text
+    photo = r.json()
+
+    # 1) Header auth path
+    r2 = await real_auth_client.get(
+        f"/api/photos/{photo['id']}/bytes", headers=auth_headers
+    )
+    assert r2.status_code == 200, r2.text
+    assert r2.headers["content-type"].startswith("image/jpeg")
+    assert r2.content == body_bytes
+    assert r2.headers.get("cache-control") == "private, max-age=300"
+    assert "sample.jpg" in r2.headers.get("content-disposition", "")
+
+    # 2) Query-param auth path — what <img src=?token=...> actually uses
+    r3 = await real_auth_client.get(f"/api/photos/{photo['id']}/bytes?token={token}")
+    assert r3.status_code == 200, r3.text
+    assert r3.content == body_bytes
+
+    # 3) No auth → 401
+    r4 = await real_auth_client.get(f"/api/photos/{photo['id']}/bytes")
+    assert r4.status_code == 401
+
+    # 4) Bogus token → 401
+    r5 = await real_auth_client.get(
+        f"/api/photos/{photo['id']}/bytes?token=not-a-real-token"
+    )
+    assert r5.status_code == 401
+
+
 async def test_photo_upload_rejects_non_image(client: AsyncClient):
     files = {"file": ("doc.pdf", b"%PDF-1.4 not really", "application/pdf")}
     data = {"project_id": PROJECT_BISHOP}

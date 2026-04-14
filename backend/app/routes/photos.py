@@ -1,7 +1,8 @@
 import logging
 from datetime import datetime
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.dependencies import (
@@ -16,6 +17,7 @@ from app.models.foundation import UserAccount
 from app.models.field_ops import Photo
 from app.schemas.field_ops import PhotoCreate, PhotoResponse, PhotoUpdate
 from app.services import field_ops as svc
+from app.services import auth as auth_svc
 from app.services.storage import get_storage
 
 log = logging.getLogger("rex.photos")
@@ -69,6 +71,65 @@ async def update_photo(
     row = await svc.get_by_id(db, Photo, row_id)
     await assert_field_write(db, user, row.project_id)
     return await svc.update(db, Photo, row_id, data)
+
+
+@router.get("/{row_id}/bytes")
+async def get_photo_bytes(
+    row_id: UUID,
+    request: Request,
+    token: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+):
+    """Stream the raw photo bytes from whatever storage backend holds them.
+
+    This exists because ``Photo.storage_url`` is a stable identifier
+    (``local://...``, ``s3://bucket/...``) rather than a browser-fetchable
+    URL, so ``<img src={storage_url}>`` in ``Photos.jsx`` produces broken
+    images. Before this endpoint, the Photos page could list and edit
+    photos but never render them.
+
+    Auth contract:
+      - Prefers a standard ``Authorization: Bearer <token>`` header.
+      - Falls back to a ``?token=<token>`` query parameter because
+        ``<img>`` / ``<video>`` elements cannot send custom headers, and
+        it is the pragmatic path for rendering authenticated images in
+        a SPA without adding cookie-based session middleware. Token in
+        query is a known tradeoff — it can land in browser history and
+        referer headers. It is NOT a long-lived credential; revoke via
+        ``POST /api/auth/logout``. A proper cookie-auth path is tracked
+        as a followup.
+    """
+    auth_header = request.headers.get("Authorization") or request.headers.get("authorization")
+    bearer: str | None = None
+    if auth_header and auth_header.lower().startswith("bearer "):
+        bearer = auth_header[7:].strip()
+    if not bearer and token:
+        bearer = token.strip()
+    if not bearer:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    user = await auth_svc.get_user_from_token(db, bearer)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+    row = await svc.get_by_id(db, Photo, row_id)
+    await enforce_project_read(db, user, row.project_id)
+
+    storage = get_storage()
+    try:
+        content = storage.read(row.storage_key)
+    except FileNotFoundError:
+        raise HTTPException(status_code=404, detail="Photo bytes not found in storage")
+
+    return Response(
+        content=content,
+        media_type=row.content_type or "application/octet-stream",
+        headers={
+            # Short-lived cache is fine; photos are immutable once uploaded.
+            "Cache-Control": "private, max-age=300",
+            "Content-Disposition": f'inline; filename="{row.filename}"',
+        },
+    )
 
 
 @router.post("/upload", response_model=PhotoResponse, status_code=201)
