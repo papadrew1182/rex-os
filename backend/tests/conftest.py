@@ -301,39 +301,52 @@ async def rollback_client():
     Uses a dedicated ``AsyncClient`` (not the session-scoped one) so the
     override is isolated to this fixture and cannot affect parallel tests.
 
-    Disposes the engine pool before acquiring a connection so any cached
-    asyncpg connections bound to an earlier event loop are dropped first.
-    Without this, CI (where tests execute fast enough for the pool to
-    still hold a live connection from the session-startup fixture) hits
-    "got Future attached to a different loop" at fixture setup. Locally
-    on Windows the timing masks it; on Linux it's deterministic.
+    Uses a fresh per-test engine with NullPool so the connection is never
+    cached across tests. Without this the shared module-level engine's
+    asyncpg pool holds connections bound to whatever loop created them;
+    the session-autouse fixtures in this file warm the pool on the
+    session loop, and on a fast Linux runner the pool still holds a
+    live-but-stale connection by the time a later ``rollback_client``
+    test acquires — triggering "got Future attached to a different loop"
+    at fixture setup. On Windows the hand-off is slow enough to mask it.
     """
-    await engine.dispose()
-    async with engine.connect() as connection:
-        outer_trans = await connection.begin()
+    from sqlalchemy.ext.asyncio import create_async_engine
+    from sqlalchemy.pool import NullPool
 
-        bound_factory = async_sessionmaker(
-            bind=connection,
-            class_=AsyncSession,
-            expire_on_commit=False,
-            join_transaction_mode="create_savepoint",
-        )
+    from app.config import settings
 
-        async def _override_get_db():
-            async with bound_factory() as session:
-                yield session
+    local_engine = create_async_engine(
+        settings.async_database_url,
+        poolclass=NullPool,
+    )
+    try:
+        async with local_engine.connect() as connection:
+            outer_trans = await connection.begin()
 
-        saved_override = app.dependency_overrides.get(get_db)
-        app.dependency_overrides[get_db] = _override_get_db
+            bound_factory = async_sessionmaker(
+                bind=connection,
+                class_=AsyncSession,
+                expire_on_commit=False,
+                join_transaction_mode="create_savepoint",
+            )
 
-        transport = ASGITransport(app=app)
-        try:
-            async with AsyncClient(transport=transport, base_url="http://test") as ac:
-                yield ac
-        finally:
-            if saved_override is None:
-                app.dependency_overrides.pop(get_db, None)
-            else:
-                app.dependency_overrides[get_db] = saved_override
-            if outer_trans.is_active:
-                await outer_trans.rollback()
+            async def _override_get_db():
+                async with bound_factory() as session:
+                    yield session
+
+            saved_override = app.dependency_overrides.get(get_db)
+            app.dependency_overrides[get_db] = _override_get_db
+
+            transport = ASGITransport(app=app)
+            try:
+                async with AsyncClient(transport=transport, base_url="http://test") as ac:
+                    yield ac
+            finally:
+                if saved_override is None:
+                    app.dependency_overrides.pop(get_db, None)
+                else:
+                    app.dependency_overrides[get_db] = saved_override
+                if outer_trans.is_active:
+                    await outer_trans.rollback()
+    finally:
+        await local_engine.dispose()
