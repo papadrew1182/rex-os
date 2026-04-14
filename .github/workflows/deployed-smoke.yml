@@ -19,6 +19,12 @@ on:
     # Every 6h against the production target below. Safe to disable if noisy.
     - cron: '17 */6 * * *'
 
+# Silence the "Node.js 20 actions are deprecated" warning that GitHub now
+# prints for checkout@v4 / setup-python@v5 / setup-node@v4. Forces those
+# actions to run on Node 24, which they already support.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   smoke:
     name: Browser smoke against deployed URL

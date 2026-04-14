@@ -12,6 +12,12 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# Silence the "Node.js 20 actions are deprecated" warning that GitHub now
+# prints for checkout@v4 / setup-python@v5 / setup-node@v4. Forces those
+# actions to run on Node 24, which they already support.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   backend:
     name: Backend — pytest + migrations
