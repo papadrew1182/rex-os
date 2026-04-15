@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 013 -- connector_exxir schema + starter staging tables
+-- Migration 014 -- connector_exxir schema + starter staging tables
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 007_connector_exxir_stage.sql
--- Real-repo slot: 013
+-- Real-repo slot: 014
 --
 -- Creates the connector_exxir schema and the minimum staging tables
 -- the Exxir adapter needs. Intentionally narrower than the Procore
@@ -16,7 +16,7 @@
 --   source_updated_at / checksum, unique (account_id, source_id).
 --
 -- Idempotent: CREATE SCHEMA / TABLE IF NOT EXISTS.
--- Depends on: 011 (rex.connector_accounts).
+-- Depends on: 012 (rex.connector_accounts).
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS connector_exxir;

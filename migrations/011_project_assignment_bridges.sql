@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 010 -- Project, location, calendar + assignment bridges
+-- Migration 011 -- Project, location, calendar + assignment bridges
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 004_projects_assignments_orgs.sql
--- Real-repo slot: 010
+-- Real-repo slot: 011
 --
 -- Creates two genuinely missing canonical tables
 -- (rex.project_locations, rex.project_calendars) and the bridge views
@@ -16,7 +16,7 @@
 --
 -- Idempotent: CREATE IF NOT EXISTS / CREATE OR REPLACE VIEW.
 -- Depends on: rex2_canonical_ddl (projects, companies, project_members,
---   connector_mappings), 008 (rex.roles for the user role view).
+--   connector_mappings), 009 (rex.roles for the user role view).
 -- ============================================================
 
 

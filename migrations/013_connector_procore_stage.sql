@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 012 -- connector_procore schema + starter staging tables
+-- Migration 013 -- connector_procore schema + starter staging tables
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 006_connector_procore_stage.sql
--- Real-repo slot: 012 (charter 006 + 6)
+-- Real-repo slot: 013 (charter 006 + 7)
 --
 -- Creates the connector_procore schema and the minimum staging tables
 -- the Procore adapter needs to land raw API data before it is normalized
@@ -29,7 +29,7 @@
 -- The adapter layer deduplicates by (account_id, source_id) on upsert.
 --
 -- Idempotent: CREATE SCHEMA / TABLE IF NOT EXISTS.
--- Depends on: 011 (rex.connector_accounts).
+-- Depends on: 012 (rex.connector_accounts).
 -- ============================================================
 
 CREATE SCHEMA IF NOT EXISTS connector_procore;

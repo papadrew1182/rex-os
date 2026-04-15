@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 011 -- Connector registry
+-- Migration 012 -- Connector registry
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 005_connector_registry.sql
--- Real-repo slot: 011
+-- Real-repo slot: 012
 --
 -- Data-driven connector registry + per-environment account tracking.
 -- Two tables:

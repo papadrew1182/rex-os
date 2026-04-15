@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 021 -- Canonical read-model views (rex.v_*)
+-- Migration 022 -- Canonical read-model views (rex.v_*)
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 024_control_plane_views.sql (read-view part)
--- Real-repo slot: 021
+-- Real-repo slot: 022
 --
 -- Creates the seven canonical read models that the assistant, dashboards,
 -- automations, and writeback surfaces consume. No downstream surface

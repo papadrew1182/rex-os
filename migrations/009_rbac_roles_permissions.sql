@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 008 — RBAC: roles, permissions, role_permissions, role_aliases
+-- Migration 009 — RBAC: roles, permissions, role_permissions, role_aliases
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 002_rbac_roles_permissions.sql
--- Real-repo slot: 008 (charter 002 + 6)
+-- Real-repo slot: 009 (charter 002 + 7)
 --
 -- Creates the data-driven RBAC core. See baseline-reconciliation.md §3
 -- for why the existing rex.role_templates is kept in place as a UI
@@ -15,7 +15,7 @@
 -- legacy alias mapping. Every downstream permission check must resolve
 -- through this chain:
 --
---   user_accounts -> user_roles (mig 009) -> role_permissions -> permissions
+--   user_accounts -> user_roles (mig 010) -> role_permissions -> permissions
 --
 -- Idempotent: all CREATEs use IF NOT EXISTS.
 -- Depends on: 001_create_schema.sql (rex schema + set_updated_at trigger).

@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 020 -- Seed canonical roles, permissions, aliases, grants
+-- Migration 021 -- Seed canonical roles, permissions, aliases, grants
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 023 (Session 2 owns role + alias parts only).
--- Real-repo slot: 020
+-- Real-repo slot: 021
 --
 -- Seeds the canonical six-role model + starter permissions + grant
 -- matrix + legacy alias map. VP_PM resolves to PM per
@@ -16,8 +16,8 @@
 -- seeds default rex.user_preferences rows.
 --
 -- Idempotent: every INSERT uses ON CONFLICT DO NOTHING.
--- Depends on: 008 (roles/perms/role_perms/aliases),
---             009 (user_roles, user_preferences),
+-- Depends on: 009 (roles/perms/role_perms/aliases),
+--             010 (user_roles, user_preferences),
 --             rex2_foundation_bootstrap.sql (user_accounts seed rows).
 -- ============================================================
 
