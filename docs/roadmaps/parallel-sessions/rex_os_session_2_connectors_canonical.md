@@ -38,7 +38,6 @@ This lane maps to the master roadmap primarily across:
 - `backend/db.py`
 - `backend/main.py`
 - an empty `backend/routers/`
-- an empty `backend/models/`
 - a placeholder React frontend
 - one migration: `001_create_schema.sql`
 

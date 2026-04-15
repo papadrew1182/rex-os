@@ -24,7 +24,7 @@ All three session packets (`rex_os_session_1_ai_spine.md`,
 open with the same paragraph:
 
 > `rex-os` is currently a very small shell repo with `backend/db.py`,
-> `backend/main.py`, empty `backend/routers/`, empty `backend/models/`,
+> `backend/main.py`, empty `backend/routers/`,
 > placeholder React frontend, and one migration: `001_create_schema.sql`.
 
 **This description is from an earlier planning snapshot and does not
