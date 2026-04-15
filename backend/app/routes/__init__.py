@@ -61,6 +61,11 @@ from app.routes.insurance_certificates import router as insurance_certificates_r
 from app.routes.admin_jobs import router as admin_jobs_router
 from app.routes.notifications import router as notifications_router
 from app.routes.om_manuals import router as om_manuals_router
+# Session 2 (feat/canonical-connectors) lane — identity + connector
+# control-plane endpoints consumed by Session 1 assistant + Session 3
+# sidebar shell.
+from app.routes.identity import router as s2_identity_router
+from app.routes.connectors import router as s2_connectors_router
 
 all_routers = [
     # Ops
@@ -102,4 +107,7 @@ all_routers = [
     # Jobs & Notifications
     admin_jobs_router,
     notifications_router,
+    # Session 2 lane identity + connector control plane
+    s2_identity_router,
+    s2_connectors_router,
 ]
