@@ -61,6 +61,7 @@ from app.routes.insurance_certificates import router as insurance_certificates_r
 from app.routes.admin_jobs import router as admin_jobs_router
 from app.routes.notifications import router as notifications_router
 from app.routes.om_manuals import router as om_manuals_router
+
 # ── Session 1 (feat/ai-spine): AI spine router ──────────────────────────────
 # Lives at backend/routers/assistant.py so the AI spine contract is owned
 # separately from the existing app/routes/ domain routers. Imported here so

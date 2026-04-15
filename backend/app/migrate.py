@@ -45,12 +45,16 @@ MIGRATION_ORDER: list[str] = [
     # Phase 38-39: schedule depth fields, project geo, company extras,
     # observation root cause, closeout spec linkage, om_manuals table
     "005_phase38_phase39_p2_batch.sql",
-    # ── Session 1 (feat/ai-spine) lane: slots 006, 007, 008 ─────────────
+    # Session 1 AI spine (feat/ai-spine):
     # 006 = rex.chat_conversations, rex.chat_messages, rex.ai_prompt_registry
-    # 007 = rex.ai_action_catalog table
-    # 008 = full quick-actions catalog seed (rendered from
+    #       (seeded: assistant.system.base prompt v1)
+    # 007 = rex.ai_action_catalog table (CHECK constraints on risk_tier /
+    #       readiness_state, gin indexes on legacy_aliases / required_connectors /
+    #       role_visibility, no rows yet)
+    # 008 = full 77-slug / 80-alias seed rendered from
     #       backend/data/quick_actions_catalog.py via
-    #       scripts/_build_catalog_migration.py; idempotent upsert)
+    #       scripts/_build_catalog_migration.py; upserted idempotently via
+    #       jsonb_to_recordset + ON CONFLICT DO UPDATE
     "006_ai_chat_and_prompts.sql",
     "007_ai_action_catalog.sql",
     "008_ai_action_catalog_seed.sql",
