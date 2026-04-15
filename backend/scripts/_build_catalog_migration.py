@@ -119,24 +119,40 @@ ON CONFLICT (slug) DO UPDATE SET
 """
 
 
-def main() -> int:
-    validate_catalog()  # blow up if the source has drifted
+MIGRATION_RELATIVE_PATH: str = "migrations/008_ai_action_catalog_seed.sql"
+
+
+def render_migration_sql() -> str:
+    """Return the exact SQL migration content for the current Python source.
+
+    Pure function — does not write to disk. Used by both ``main()``
+    (below) and ``tests/test_catalog_migration_drift.py`` to prove the
+    committed migration is a byte-for-byte image of the Python catalog.
+    """
+    validate_catalog()  # blow up if the source itself has drifted
     blob = json.dumps(QUICK_ACTIONS_CATALOG, indent=2)
-    content = (
+    return (
         HEADER.format(slug_count=CANONICAL_SLUG_COUNT, alias_count=LEGACY_ALIAS_COUNT)
         + blob
         + FOOTER
     )
 
-    target = os.path.abspath(
+
+def migration_path() -> str:
+    """Absolute path to the committed migration file."""
+    return os.path.abspath(
         os.path.join(
             os.path.dirname(__file__),
             "..",
             "..",
-            "migrations",
-            "008_ai_action_catalog_seed.sql",
+            MIGRATION_RELATIVE_PATH,
         )
     )
+
+
+def main() -> int:
+    content = render_migration_sql()
+    target = migration_path()
     with open(target, "w", encoding="utf-8", newline="\n") as f:
         f.write(content)
     print(f"wrote {target} ({len(content)} chars)")

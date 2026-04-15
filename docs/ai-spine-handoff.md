@@ -21,6 +21,26 @@ charter see `docs/roadmaps/parallel-sessions/rex_os_session_1_ai_spine.md`.
 - `migrations/007_ai_action_catalog.sql`
 - `migrations/008_ai_action_catalog_seed.sql`
 
+## Drift-proofing and merge-safety guardrails
+
+Three test files exist specifically to keep Session 1 merge-ready.
+None of them require a live DB.
+
+| Test file | What it protects |
+|---|---|
+| `tests/test_catalog_migration_drift.py` | Regenerates `008_ai_action_catalog_seed.sql` in memory from `backend/data/quick_actions_catalog.py` and fails if the checked-in SQL differs by a single byte. Failure message points at the regenerate command. |
+| `tests/test_assistant_route_registration.py` | Imports `main.app` and asserts every frozen `/api/assistant/*` endpoint is physically mounted on the live FastAPI app. Scans `services/ai/chat_service.py` source for every SSE event type in the frozen vocabulary. Catches the exact regression where the wiring in `app/routes/__init__.py` got reverted and requests fell through to the SPA fallback. |
+| `tests/test_assistant_fresh_env_smoke.py` | End-to-end check of Session 1-owned surfaces using `FakeDispatcher`: catalog endpoint returns all 77 slugs, all 80 legacy aliases carry to the wire, required dedupes survive the round-trip, chat endpoint streams the full SSE vocabulary. |
+
+To run all guardrails together:
+
+```sh
+cd backend
+py -3 -m pytest tests/test_catalog_migration_drift.py \
+                tests/test_assistant_route_registration.py \
+                tests/test_assistant_fresh_env_smoke.py -q
+```
+
 ## Frozen HTTP contracts
 
 | Method | Path | Notes |
@@ -77,11 +97,16 @@ cd backend
 py -3 scripts/_build_catalog_migration.py
 ```
 
-Then run the catalog tests:
+Then run the catalog + drift tests:
 
 ```sh
-py -3 -m pytest tests/test_quick_actions_catalog.py -q
+py -3 -m pytest tests/test_quick_actions_catalog.py \
+                tests/test_catalog_migration_drift.py -q
 ```
+
+The drift test will fail loudly if you edit the Python catalog without
+regenerating the SQL (or vice versa). Commit both files in the same
+change so CI can never observe them out of sync.
 
 Structural invariants enforced by the test suite:
 
@@ -170,16 +195,53 @@ Until Session 2 lands:
 - **The SQL guard is strict by default.** If a query fails the deny-list
   it is rejected with a structured `BlockedQueryError`. Never relax the
   guard — tighten the allowlist instead.
+- **`can_run` is readiness/enabled only.** It is explicitly NOT
+  connector-aware in Session 1. Session 2 can layer a per-tenant
+  connector-availability check on top of `can_run` without changing
+  the contract shape.
+- **Router wiring must stay in `app/routes/__init__.py`.** The AI
+  spine router is mounted by appending `assistant_router` to
+  `all_routers`. `tests/test_assistant_route_registration.py` guards
+  this wiring and will fail loudly if it is dropped.
+
+## Parallel-session repo hygiene
+
+Session 1 hit a real problem during its first and second passes: a
+parallel agent for Session 2 was running in the same physical repo,
+flipping the git HEAD between tool calls and wiping untracked Session 1
+files. If you find yourself in the same situation, the survival rules
+are:
+
+1. **Use `git worktree` for true isolation.** Create a dedicated
+   worktree for Session 1 with
+   `git worktree add ../rex-os-ai-spine feat/ai-spine`. The parallel
+   session cannot touch the worktree because its HEAD is independent.
+2. **Commit fast.** Untracked files are vulnerable to branch-switching
+   by other agents. Committed files on `feat/ai-spine` live in git
+   history and cannot be wiped without an explicit `git reset --hard`.
+3. **Use one Bash invocation for `checkout + add + commit`** so the
+   branch cannot flip between the three. Staging inside a shell across
+   separate tool calls is not atomic.
+4. **Do not broad-stage `git add migrations/`** — that sweeps up
+   other sessions' dirty tracked files. Stage by exact filename or
+   by narrow subdirectories you own.
+5. **Session 1-owned migrations are 006/007/008 under the
+   `008_ai_action_catalog_seed.sql` filename**. Session 2 also has
+   files numbered 008/009/020 but on different names. They coexist
+   alphabetically; no filename collision exists.
 
 ## Test layout
 
 ```
 backend/tests/
-  _assistant_fakes.py                  # FakeDispatcher, FakeChatRepo, etc.
-  test_assistant_sql_guard.py          # 15 deny-list / accept cases
-  test_assistant_context_builder.py    # 13 role normalization cases
-  test_quick_actions_catalog.py        # 22 catalog invariant cases
-  test_assistant_router_contract.py    # 8 contract cases (catalog + conv + SSE)
+  _assistant_fakes.py                       # FakeDispatcher, FakeChatRepo, etc.
+  test_assistant_sql_guard.py               # 15 deny-list / accept cases
+  test_assistant_context_builder.py         # 13 role normalization cases
+  test_quick_actions_catalog.py             # 22 catalog invariant cases
+  test_assistant_router_contract.py         # 8 contract cases (catalog + conv + SSE)
+  test_catalog_migration_drift.py           # 3 drift-detection cases
+  test_assistant_route_registration.py      # 7 route-registration + SSE vocabulary
+  test_assistant_fresh_env_smoke.py         # 8 end-to-end surface checks
 ```
 
 Run the AI spine suite in isolation:
@@ -189,5 +251,46 @@ cd backend
 py -3 -m pytest tests/test_assistant_sql_guard.py \
                 tests/test_assistant_context_builder.py \
                 tests/test_quick_actions_catalog.py \
-                tests/test_assistant_router_contract.py -q
+                tests/test_assistant_router_contract.py \
+                tests/test_catalog_migration_drift.py \
+                tests/test_assistant_route_registration.py \
+                tests/test_assistant_fresh_env_smoke.py -q
+```
+
+Expected: **76 tests passing** (15 + 13 + 22 + 8 + 3 + 7 + 8) with zero DB.
+
+## What remains unproven without a live Postgres
+
+The fresh-environment smoke test substitutes `FakeDispatcher` for the
+real asyncpg path. The following must still be verified against an
+actual Postgres instance before Session 1 can be called fully merge-safe:
+
+1. **Migrations 006/007/008 apply cleanly** on a fresh DB under
+   `REX_AUTO_MIGRATE=true` — the CHECK constraints on `risk_tier` and
+   `readiness_state`, the partial unique index on `ai_prompt_registry`,
+   and the `ON CONFLICT (slug) DO UPDATE` upsert in migration 008 are
+   not exercised by any unit test.
+2. **`rex.chat_conversations` / `rex.chat_messages` CRUD** through the
+   real `ChatRepository` — the router-contract tests use
+   `FakeChatRepository`, so jsonb column round-trips, trigger-based
+   `updated_at`, and the cascade from `chat_conversations -> chat_messages`
+   are not exercised.
+3. **The `rex.v_*` curated views** needed by `SqlPlanner.plan_and_run`
+   are owned by Session 2 and do not exist yet. The guard and planner
+   are ready; the data is not.
+
+To run the missing verification manually once the views land:
+
+```sh
+# 1. apply migrations
+REX_AUTO_MIGRATE=true uvicorn backend.main:app
+
+# 2. curl the catalog and count actions
+curl -s http://localhost:8000/api/assistant/catalog | jq '.actions | length'
+# -> 77
+
+# 3. curl a chat round-trip (echo provider is fine)
+curl -N -X POST http://localhost:8000/api/assistant/chat \
+    -H 'content-type: application/json' \
+    -d '{"message":"smoke","page_context":{}}'
 ```
