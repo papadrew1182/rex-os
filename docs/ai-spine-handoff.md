@@ -1,62 +1,77 @@
 # AI Spine Handoff (Session 1 → Session 2 and Session 3)
 
-**Merge this branch:** `feat/ai-spine-landing` (clean transplant onto current `main`)
-**Do not merge:** `feat/ai-spine` (carries Session 3's `ee8f7dd` frontend commit as a parent)
+**Status:** Session 1 is landed on `main` via the transplant branch
+`feat/ai-spine-landing-v2` (locally fast-forwarded; push to
+`origin/main` is a separate human action). The earlier transplant
+branch (`feat/ai-spine-landing`) and the development branch
+(`feat/ai-spine`) are preserved for history but must not be merged
+directly.
 **Scope:** backend assistant backbone only — routing, persistence, catalog, SQL guard, SSE stream.
 
 This doc is a short developer-facing cheat sheet. For the long-form
 charter see `docs/roadmaps/parallel-sessions/rex_os_session_1_ai_spine.md`.
 
-## How to land Session 1
+## How Session 1 landed
 
-**Use `feat/ai-spine-landing`.** It is a fresh integration branch
-rooted at current `origin/main` (`526fae1`) with the five Session 1
-commits cherry-picked on top. It contains **only Session 1-owned
-files** — 44 paths, all backend + docs + migrations, zero frontend.
+`feat/ai-spine-landing-v2` is the authoritative Session 1 landing
+chain. It was created fresh from local `main` (commit `1a5e72d`
+`Add rex-os roadmap and parallel session execution packets`) after
+`main` advanced one commit beyond the earlier merge base `526fae1`.
+The six Session 1 commits were cherry-picked onto it with zero
+conflicts; the resulting tree contains exactly **44 Session 1-owned
+files** vs `main` — all backend + docs + migrations, **zero
+frontend**.
 
-`feat/ai-spine` is preserved as the development branch for history
-and reference, but **must not be merged to main as-is**: it inherits
-Session 3's committed frontend work via `ee8f7dd` (28 new files plus
-edits to `frontend/src/App.jsx` and `frontend/src/rex-theme.css`), and
-merging it would drag that non-Session-1 content into main as a side
-effect.
+Local `main` was then fast-forwarded to the v2 tip. A reviewer
+inspecting main can verify Session 1 is present by running the
+required checks below.
 
-Both branches have the same Session 1 content; only the commit graph
-differs. The landing branch is the safe choice.
+### Branches that exist (all preserved)
 
-## Current commit stack (merge-ready)
+| Branch | Role | Keep around? |
+|---|---|---|
+| `main` | Session 1 is landed here (local fast-forward; push separately) | yes — authoritative |
+| `feat/ai-spine-landing-v2` | The transplant chain actually merged into `main` | yes — traces merge provenance |
+| `feat/ai-spine-landing` | Earlier transplant (rooted at old `526fae1`; superseded by v2) | yes — history only |
+| `feat/ai-spine` | Original development branch (carries inherited Session 3 `ee8f7dd` frontend commit) | yes — development history |
 
-`feat/ai-spine-landing` (this is what you merge):
+**Do not merge `feat/ai-spine` directly.** It inherits Session 3's
+committed frontend work via `ee8f7dd` (28 files plus edits to
+`frontend/src/App.jsx` and `frontend/src/rex-theme.css`) and would
+drag non-Session-1 content into `main` as a side effect. The v2
+transplant exists specifically so that never happens.
 
-```
-b37cdea  docs(ai-spine): merge audit + optional live Anthropic proof
-469d2c6  feat(ai-spine): real optional Anthropic provider behind ModelClient
-45c929e  fix(ai-spine): register 006/007/008 + add live-DB merge gate
-63f058c  test(ai-spine): add drift, route-registration, fresh-env guardrails
-6538e03  feat(ai-spine): Session 1 backbone + full catalog import
-526fae1  Add rex-os roadmap and AI planning inventories                    [origin/main, merge base]
-```
+## Session 1 commit stack as landed
 
-Five ``(ai-spine)`` commits sit directly on top of current `main`.
-No Session 3 frontend provenance, no ``ee8f7dd`` ancestor. A fast-
-forward or a clean merge produces a main tree that contains exactly
-the 44 Session 1-owned files and nothing else.
-
-`feat/ai-spine` (development branch, kept for reference):
+The six commits that landed on `main` (stacked on `1a5e72d`):
 
 ```
-45e623e  docs(ai-spine): merge audit + optional live Anthropic proof
-704e2a4  feat(ai-spine): real optional Anthropic provider behind ModelClient
-cf7f7d3  fix(ai-spine): register 006/007/008 + add live-DB merge gate
-4e29897  test(ai-spine): add drift, route-registration, fresh-env guardrails
-a552deb  feat(ai-spine): Session 1 backbone + full catalog import
-ee8f7dd  feat(sidebar-shell): persistent right-rail assistant + control plane + my day  [Session 3 frontend]
-526fae1  Add rex-os roadmap and AI planning inventories                                  [merge base with main]
+4675c76  docs(ai-spine): point reviewers at feat/ai-spine-landing    [superseded by this doc section]
+bda4d9a  docs(ai-spine): merge audit + optional live Anthropic proof
+7bffc9a  feat(ai-spine): real optional Anthropic provider behind ModelClient
+70da793  fix(ai-spine): register 006/007/008 + add live-DB merge gate
+d3f089d  test(ai-spine): add drift, route-registration, fresh-env guardrails
+3728ff6  feat(ai-spine): Session 1 backbone + full catalog import
+1a5e72d  Add rex-os roadmap and parallel session execution packets    [parent, main at landing time]
 ```
 
-The five ``(ai-spine)`` commits here are content-identical to the
-five on the landing branch; the SHAs differ only because cherry-pick
-rewrites parent pointers.
+All three Session 1 commit chains (`feat/ai-spine`,
+`feat/ai-spine-landing`, `feat/ai-spine-landing-v2`) encode the same
+44-file Session 1 content. Only the git graph differs.
+
+## History-only reference commit chains
+
+```
+feat/ai-spine (development branch):
+  45e623e <- 704e2a4 <- cf7f7d3 <- 4e29897 <- a552deb <- ee8f7dd <- 526fae1
+
+feat/ai-spine-landing (earlier v1 transplant, superseded by v2):
+  20445ce <- b37cdea <- 469d2c6 <- 45c929e <- 63f058c <- 6538e03 <- 526fae1
+```
+
+These branches are kept for git-blame archaeology and incident
+investigation. They are content-identical to the landed v2 chain
+but are **not** merge targets.
 
 ## Required checks before merging
 
