@@ -1,25 +1,62 @@
 # AI Spine Handoff (Session 1 → Session 2 and Session 3)
 
-**Branch:** `feat/ai-spine`
+**Merge this branch:** `feat/ai-spine-landing` (clean transplant onto current `main`)
+**Do not merge:** `feat/ai-spine` (carries Session 3's `ee8f7dd` frontend commit as a parent)
 **Scope:** backend assistant backbone only — routing, persistence, catalog, SQL guard, SSE stream.
 
 This doc is a short developer-facing cheat sheet. For the long-form
 charter see `docs/roadmaps/parallel-sessions/rex_os_session_1_ai_spine.md`.
 
+## How to land Session 1
+
+**Use `feat/ai-spine-landing`.** It is a fresh integration branch
+rooted at current `origin/main` (`526fae1`) with the five Session 1
+commits cherry-picked on top. It contains **only Session 1-owned
+files** — 44 paths, all backend + docs + migrations, zero frontend.
+
+`feat/ai-spine` is preserved as the development branch for history
+and reference, but **must not be merged to main as-is**: it inherits
+Session 3's committed frontend work via `ee8f7dd` (28 new files plus
+edits to `frontend/src/App.jsx` and `frontend/src/rex-theme.css`), and
+merging it would drag that non-Session-1 content into main as a side
+effect.
+
+Both branches have the same Session 1 content; only the commit graph
+differs. The landing branch is the safe choice.
+
 ## Current commit stack (merge-ready)
 
+`feat/ai-spine-landing` (this is what you merge):
+
 ```
+b37cdea  docs(ai-spine): merge audit + optional live Anthropic proof
+469d2c6  feat(ai-spine): real optional Anthropic provider behind ModelClient
+45c929e  fix(ai-spine): register 006/007/008 + add live-DB merge gate
+63f058c  test(ai-spine): add drift, route-registration, fresh-env guardrails
+6538e03  feat(ai-spine): Session 1 backbone + full catalog import
+526fae1  Add rex-os roadmap and AI planning inventories                    [origin/main, merge base]
+```
+
+Five ``(ai-spine)`` commits sit directly on top of current `main`.
+No Session 3 frontend provenance, no ``ee8f7dd`` ancestor. A fast-
+forward or a clean merge produces a main tree that contains exactly
+the 44 Session 1-owned files and nothing else.
+
+`feat/ai-spine` (development branch, kept for reference):
+
+```
+45e623e  docs(ai-spine): merge audit + optional live Anthropic proof
 704e2a4  feat(ai-spine): real optional Anthropic provider behind ModelClient
 cf7f7d3  fix(ai-spine): register 006/007/008 + add live-DB merge gate
 4e29897  test(ai-spine): add drift, route-registration, fresh-env guardrails
 a552deb  feat(ai-spine): Session 1 backbone + full catalog import
-ee8f7dd  feat(sidebar-shell): persistent right-rail assistant + control plane + my day  [Session 3, inherited parent]
+ee8f7dd  feat(sidebar-shell): persistent right-rail assistant + control plane + my day  [Session 3 frontend]
 526fae1  Add rex-os roadmap and AI planning inventories                                  [merge base with main]
 ```
 
-All four ``(ai-spine)`` commits are Session 1's. ``ee8f7dd`` is
-Session 3's committed frontend work, inherited as a parent of this
-branch — see *Merge hot spots* below for what that implies.
+The five ``(ai-spine)`` commits here are content-identical to the
+five on the landing branch; the SHAs differ only because cherry-pick
+rewrites parent pointers.
 
 ## Required checks before merging
 
