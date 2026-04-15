@@ -46,6 +46,7 @@ export default function AutomationRegistryPanel() {
               <th>Label</th>
               <th>Category</th>
               <th>Schedule</th>
+              <th>Execution</th>
               <th>Enabled</th>
               <th>Readiness</th>
               <th>Last run</th>
@@ -58,6 +59,7 @@ export default function AutomationRegistryPanel() {
                 <td style={{ fontWeight: 600 }}>{j.label}</td>
                 <td>{j.category || "—"}</td>
                 <td style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{j.schedule_cron || "—"}</td>
+                <td style={{ fontSize: 12 }}>{j.execution_type || "—"}</td>
                 <td>{j.enabled ? "yes" : "no"}</td>
                 <td>
                   <span className={READINESS_CLASS[j.readiness_state] || "rex-readiness rex-readiness--unknown"}>

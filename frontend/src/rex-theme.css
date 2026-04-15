@@ -991,6 +991,204 @@ select.rex-input { padding-right: 24px; }
 .rex-control-plane__body { margin-top: 8px; }
 .rex-control-catalog__section { margin-bottom: 24px; }
 
+/* ── Workspace mode (wider rail) ─────────────────────────────────── */
+
+.rex-assistant-rail--workspace {
+  width: 560px;
+}
+
+/* ── Streaming status indicator ──────────────────────────────────── */
+
+.rex-assistant-thread__status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  font-size: 11px;
+  color: var(--rex-text-muted);
+  font-style: italic;
+}
+.rex-assistant-thread__dot {
+  width: 6px;
+  height: 6px;
+  background: var(--rex-accent);
+  border-radius: 50%;
+  animation: rex-assistant-pulse 1.2s infinite ease-in-out;
+}
+@keyframes rex-assistant-pulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50%      { opacity: 1;   transform: scale(1.2); }
+}
+
+/* ── Thread error banner + retry ─────────────────────────────────── */
+
+.rex-assistant-thread__error {
+  background: var(--rex-red-bg);
+  border: 1px solid var(--rex-red);
+  border-left-width: 3px;
+  border-radius: 6px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.rex-assistant-thread__error-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rex-red);
+}
+.rex-assistant-thread__error-detail {
+  font-size: 11px;
+  color: var(--rex-text-muted);
+  word-wrap: break-word;
+}
+.rex-assistant-thread__retry {
+  align-self: flex-start;
+  background: var(--rex-red);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 2px;
+}
+.rex-assistant-thread__retry:hover {
+  filter: brightness(0.95);
+}
+
+/* ── Related-action suggestions (from action.suggestions SSE) ────── */
+
+.rex-assistant-thread__suggestions {
+  margin-top: 6px;
+  padding: 8px 10px;
+  border-top: 1px dashed var(--rex-border);
+}
+.rex-assistant-thread__suggestions-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--rex-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+.rex-assistant-thread__suggestions-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.rex-assistant-thread__suggestion-chip {
+  background: var(--rex-bg-stripe);
+  border: 1px dashed var(--rex-accent-border);
+  color: var(--rex-accent);
+  padding: 4px 9px;
+  border-radius: 12px;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: ui-monospace, monospace;
+}
+.rex-assistant-thread__suggestion-chip:hover {
+  background: var(--rex-accent-light);
+}
+.rex-assistant-thread__suggestion-chip:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* ── Aborted / error message bubbles ─────────────────────────────── */
+
+.rex-assistant-msg--aborted {
+  opacity: 0.65;
+  border-style: dashed;
+}
+.rex-assistant-msg--error {
+  border-color: var(--rex-red);
+  background: var(--rex-red-bg);
+}
+.rex-assistant-msg__tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 1px 5px;
+  border-radius: 3px;
+  text-transform: uppercase;
+  background: #94a3b8;
+  color: #fff;
+  letter-spacing: 0.03em;
+}
+.rex-assistant-msg__tag--error {
+  background: var(--rex-red);
+}
+
+/* ── MyDay recent conversations ──────────────────────────────────── */
+
+.rex-myday__recent-convs {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.rex-myday__recent-conv {
+  background: var(--rex-bg-card);
+  border: 1px solid var(--rex-border);
+  border-radius: 6px;
+  padding: 10px 12px;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.rex-myday__recent-conv:hover {
+  border-color: var(--rex-accent);
+  background: var(--rex-accent-lighter);
+}
+.rex-myday__recent-conv-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--rex-text-bold);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rex-myday__recent-conv-preview {
+  font-size: 11px;
+  color: var(--rex-text-muted);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.rex-myday__recent-conv-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--rex-text-faint);
+  margin-top: 2px;
+}
+
+/* ── ConnectorHealthPanel dependent-actions column ───────────────── */
+
+.rex-control-connector__deps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.rex-control-connector__dep {
+  background: var(--rex-bg-stripe);
+  border: 1px solid var(--rex-border);
+  border-radius: 3px;
+  padding: 1px 5px;
+  font-size: 10px;
+  font-family: ui-monospace, monospace;
+  color: var(--rex-accent);
+}
+
 /* ── Narrow viewports: hide right rail entirely ───────────────────── */
 
 @media (max-width: 1200px) {

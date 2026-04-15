@@ -1,7 +1,17 @@
 // ChatComposer — free-form prompt input for the assistant.
 //
 // Keyboard: Enter submits, Shift+Enter inserts a newline.
-// Disabled while streaming so users can't pile up racing requests.
+// Disabled while a send is pending (POST in flight OR stream running)
+// so users can't pile up racing requests. Uses the `pending` flag
+// from the assistant reducer which is set at SEND_PENDING and cleared
+// at SEND_SETTLED or STREAM_CLOSED.
+//
+// NOTE: This is a <div>, not a <form>. The submit button is
+// type="button" with an explicit onClick handler. Reason: the legacy
+// Playwright smoke suite uses generic `button[type="submit"]`
+// locators that assume exactly one submit button on the page (the
+// active drawer form). A second submit button from the right-rail
+// composer would trigger strict-mode violations.
 
 import { useState, useCallback } from "react";
 import { useAssistantClient } from "./useAssistantClient";
@@ -9,14 +19,16 @@ import { useAssistantClient } from "./useAssistantClient";
 export default function ChatComposer() {
   const { assistant, sendMessage } = useAssistantClient();
   const [value, setValue] = useState("");
+  const pending = assistant.ui.pending;
   const streaming = assistant.activeConversation.streaming;
+  const disabled = pending || streaming;
 
   const submit = useCallback(async () => {
     const text = value.trim();
-    if (!text) return;
+    if (!text || disabled) return;
     setValue("");
     await sendMessage(text);
-  }, [value, sendMessage]);
+  }, [value, disabled, sendMessage]);
 
   const onKeyDown = useCallback((e) => {
     if (e.key === "Enter" && !e.shiftKey) {
@@ -36,26 +48,23 @@ export default function ChatComposer() {
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={streaming ? "Assistant is responding…" : "Ask Rex… (Enter to send, Shift+Enter for newline)"}
+        placeholder={
+          streaming ? "Assistant is responding…"
+          : pending ? "Sending…"
+          : "Ask Rex… (Enter to send, Shift+Enter for newline)"
+        }
         rows={2}
-        disabled={streaming}
+        disabled={disabled}
         aria-label="Message the assistant"
       />
-      {/*
-        Intentionally type="button": using "submit" would collide with the
-        existing Playwright e2e suite's generic `button[type="submit"]`
-        selectors (which expect exactly one submit button on the page
-        at a time — the active drawer form). Keyboard submission still
-        works via the textarea's onKeyDown → submit().
-      */}
       <button
         type="button"
         className="rex-assistant-composer__submit"
-        disabled={streaming || !value.trim()}
+        disabled={disabled || !value.trim()}
         onClick={submit}
         aria-label="Send message"
       >
-        {streaming ? "…" : "Send"}
+        {streaming ? "…" : pending ? "…" : "Send"}
       </button>
     </div>
   );

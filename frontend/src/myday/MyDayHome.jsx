@@ -10,6 +10,7 @@
 // That work slots in here without restructuring the route.
 
 import { useMemo } from "react";
+import { Link } from "react-router-dom";
 import { useMe } from "../hooks/useMe";
 import { useCurrentContext } from "../hooks/useCurrentContext";
 import { useAssistantClient } from "../assistant/useAssistantClient";
@@ -22,10 +23,23 @@ function timeOfDayGreeting() {
   return "Good evening";
 }
 
+function formatRelative(iso) {
+  if (!iso) return "";
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMin = Math.round((now - then) / 60000);
+  if (diffMin < 1) return "just now";
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHr = Math.round(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}h ago`;
+  const diffDay = Math.round(diffHr / 24);
+  return `${diffDay}d ago`;
+}
+
 export default function MyDayHome() {
   const { me } = useMe();
   const currentContext = useCurrentContext();
-  const { assistant, launchAction, setTab, setCollapsed } = useAssistantClient();
+  const { assistant, launchAction, selectConversation, setTab, setCollapsed } = useAssistantClient();
 
   const suggestedSlugs = currentContext.assistant_defaults?.suggested_action_slugs || [];
   const catalogActions = assistant.catalog.data?.actions || [];
@@ -34,6 +48,13 @@ export default function MyDayHome() {
       .map((slug) => catalogActions.find((a) => a.slug === slug))
       .filter(Boolean);
   }, [suggestedSlugs, catalogActions]);
+
+  // Recent conversations — pulled directly from the reducer's
+  // `conversations` bucket. Capped at 4 for the home surface; full
+  // history lives in the assistant sidebar's History tab.
+  const recentConversations = useMemo(() => {
+    return (assistant.conversations.items || []).slice(0, 4);
+  }, [assistant.conversations.items]);
 
   const firstName = useMemo(() => {
     if (!me?.full_name) return "";
@@ -108,6 +129,59 @@ export default function MyDayHome() {
             ))}
           </div>
         )}
+      </section>
+
+      <section className="rex-myday__section">
+        <h2 className="rex-h3">Recent conversations</h2>
+        <p className="rex-muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          Resume where you left off. Opening one pops the assistant sidebar
+          open on the Chat tab with the full thread restored.
+        </p>
+        {recentConversations.length === 0 ? (
+          <div className="rex-empty">
+            <div className="rex-empty-icon">◎</div>
+            No past conversations yet. Launch a quick action above to start one.
+          </div>
+        ) : (
+          <ul className="rex-myday__recent-convs">
+            {recentConversations.map((conv) => (
+              <li key={conv.id}>
+                <button
+                  type="button"
+                  className="rex-myday__recent-conv"
+                  onClick={() => {
+                    setCollapsed(false);
+                    selectConversation(conv.id);
+                  }}
+                >
+                  <div className="rex-myday__recent-conv-title">{conv.title || "Untitled"}</div>
+                  {conv.last_message_preview && (
+                    <div className="rex-myday__recent-conv-preview">{conv.last_message_preview}</div>
+                  )}
+                  <div className="rex-myday__recent-conv-meta">
+                    <span>{conv.active_action_slug || "chat"}</span>
+                    <span>{formatRelative(conv.last_message_at)}</span>
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="rex-myday__section">
+        <h2 className="rex-h3">Jump to</h2>
+        <p className="rex-muted" style={{ fontSize: 13, marginBottom: 12 }}>
+          Deep links into the existing shell routes.
+        </p>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <Link to="/" className="rex-btn rex-btn-outline">Portfolio</Link>
+          <Link to="/rfis" className="rex-btn rex-btn-outline">RFIs</Link>
+          <Link to="/punch-list" className="rex-btn rex-btn-outline">Punch list</Link>
+          <Link to="/schedule" className="rex-btn rex-btn-outline">Schedule Health</Link>
+          <Link to="/checklists" className="rex-btn rex-btn-outline">Closeout checklists</Link>
+          <Link to="/control-plane" className="rex-btn rex-btn-outline">Control Plane</Link>
+        </div>
       </section>
 
       <section className="rex-myday__section">

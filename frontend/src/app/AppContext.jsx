@@ -23,8 +23,10 @@ import {
 import {
   assistantReducer,
   initialAssistantState,
+  buildInitialAssistantState,
   ASSISTANT_ACTIONS,
 } from "../assistant/useAssistantState";
+import { saveUiPrefs } from "../assistant/uiPrefs";
 
 export const AppContext = createContext({
   // identity
@@ -79,8 +81,20 @@ export function AppProvider({ children }) {
 
   useEffect(() => { refetchPermissions(); }, [refetchPermissions]);
 
-  // ── Assistant state (reducer) ─────────────────────────────────────────
-  const [assistant, assistantDispatch] = useReducer(assistantReducer, initialAssistantState);
+  // ── Assistant state (reducer + persistence) ──────────────────────────
+  // buildInitialAssistantState rehydrates UI prefs from localStorage
+  // (collapsed / activeTab / workspaceMode) so a reload restores the
+  // user's last layout. An effect below writes them back on every
+  // ui change so the persistence is eventually consistent.
+  const [assistant, assistantDispatch] = useReducer(
+    assistantReducer,
+    undefined,
+    buildInitialAssistantState,
+  );
+
+  useEffect(() => {
+    saveUiPrefs(assistant.ui);
+  }, [assistant.ui.collapsed, assistant.ui.activeTab, assistant.ui.workspaceMode]);
 
   const loadCatalog = useCallback(async () => {
     assistantDispatch({ type: ASSISTANT_ACTIONS.CATALOG_LOADING });
