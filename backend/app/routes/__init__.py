@@ -69,6 +69,11 @@ from app.routes.om_manuals import router as om_manuals_router
 # change to main.py. DO NOT REMOVE — reverting this line breaks the
 # /api/assistant/* endpoints and makes them fall through to the SPA fallback.
 from routers.assistant import router as assistant_router
+# Session 2 (feat/canonical-connectors) lane — identity + connector
+# control-plane endpoints consumed by Session 1 assistant + Session 3
+# sidebar shell.
+from app.routes.identity import router as s2_identity_router
+from app.routes.connectors import router as s2_connectors_router
 
 all_routers = [
     # Ops
@@ -113,4 +118,7 @@ all_routers = [
     # AI spine (Session 1 / feat/ai-spine) — keep last so it is the newest
     # addition in git blame and easy to find.
     assistant_router,
+    # Session 2 lane identity + connector control plane
+    s2_identity_router,
+    s2_connectors_router,
 ]

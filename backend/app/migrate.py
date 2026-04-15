@@ -58,6 +58,25 @@ MIGRATION_ORDER: list[str] = [
     "006_ai_chat_and_prompts.sql",
     "007_ai_action_catalog.sql",
     "008_ai_action_catalog_seed.sql",
+    # ── Session 2 (feat/canonical-connectors) lane: 009–022 ──────────────
+    # Bumped one slot forward from the original 008–021 plan to clear room
+    # for Session 1's 008_ai_action_catalog_seed.sql once that lane landed
+    # on main. Maps 1:1 to the charter's 002–013 + 023–024 migrations with
+    # a +7 offset. See docs/roadmaps/baseline-reconciliation.md §4.
+    "009_rbac_roles_permissions.sql",           # charter 002
+    "010_user_roles_preferences.sql",           # charter 003
+    "011_project_assignment_bridges.sql",       # charter 004
+    "012_connector_registry.sql",               # charter 005
+    "013_connector_procore_stage.sql",          # charter 006
+    "014_connector_exxir_stage.sql",            # charter 007
+    "015_sync_runs_and_source_links.sql",       # charter 008
+    "016_canonical_core_additions.sql",         # charter 009
+    "017_canonical_pm_additions.sql",           # charter 010
+    "018_canonical_financial_additions.sql",    # charter 011
+    "019_canonical_schedule_additions.sql",     # charter 012
+    "020_canonical_docs_quality_additions.sql", # charter 013
+    "021_seed_roles_and_aliases.sql",           # charter 023 (role/alias part)
+    "022_canonical_read_views.sql",             # charter 024 (read-view part)
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

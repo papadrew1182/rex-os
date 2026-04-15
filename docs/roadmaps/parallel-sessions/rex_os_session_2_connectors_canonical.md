@@ -19,6 +19,21 @@ This lane maps to the master roadmap primarily across:
 
 ## Program context you should assume
 
+> **BASELINE RECONCILIATION 2026-04-14.** The "very small shell repo"
+> description below was from an earlier planning snapshot and does not
+> match the current repo state. `rex-os` is now a production-deployed
+> codebase at `main @ 3148f0c` with 8 migrations, 65 routers, 66 rex.*
+> tables, 590 passing tests, and a live Vercel frontend serving 32 page
+> components. See `docs/roadmaps/baseline-reconciliation.md` for the
+> authoritative charter → real-state mapping. Session 2 execution
+> originally used migration slots 008–021 (not 002–013); after Session 1
+> (AI Spine) landed on `main` and consumed slot 008
+> (`008_ai_action_catalog_seed.sql`), Session 2 was bumped one slot
+> forward to 009–022. Session 2 follows the repo-native
+> `backend/app/routes/` + `backend/app/services/` path conventions.
+> The architectural intent locked below (multi-connector, canonical
+> rex, v_* read models, data-driven RBAC) remains unchanged.
+
 `rex-os` is currently a very small shell repo with:
 - `backend/db.py`
 - `backend/main.py`
