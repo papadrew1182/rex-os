@@ -62,6 +62,14 @@ from app.routes.admin_jobs import router as admin_jobs_router
 from app.routes.notifications import router as notifications_router
 from app.routes.om_manuals import router as om_manuals_router
 
+# ── Session 1 (feat/ai-spine): AI spine router ──────────────────────────────
+# Lives at backend/routers/assistant.py so the AI spine contract is owned
+# separately from the existing app/routes/ domain routers. Imported here so
+# it joins the same all_routers loader that main.py consumes without any
+# change to main.py. DO NOT REMOVE — reverting this line breaks the
+# /api/assistant/* endpoints and makes them fall through to the SPA fallback.
+from routers.assistant import router as assistant_router
+
 all_routers = [
     # Ops
     ops_router,
@@ -102,4 +110,7 @@ all_routers = [
     # Jobs & Notifications
     admin_jobs_router,
     notifications_router,
+    # AI spine (Session 1 / feat/ai-spine) — keep last so it is the newest
+    # addition in git blame and easy to find.
+    assistant_router,
 ]
