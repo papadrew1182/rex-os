@@ -11,13 +11,38 @@
 // They do NOT mutate. They do NOT normalize — normalization lives in
 // lib/api.js next to the fetch call that owns it.
 //
-// The contracts are pulled verbatim from Session 3 charter
-// §/api/me, §/api/me/permissions, §/api/context/current,
-// §/api/assistant/catalog, §/api/assistant/conversations,
-// §/api/assistant/conversations/{id}, and the POST /assistant/chat ack.
+// The contracts are pulled verbatim from the Session 3 charter:
+// docs/roadmaps/parallel-sessions/rex_os_session_3_sidebar_shell.md §/api/me,
+// §/api/me/permissions, §/api/context/current, §/api/assistant/catalog,
+// §/api/assistant/conversations, §/api/assistant/conversations/{id},
+// and the POST /assistant/chat ack + SSE event list.
 //
-// When the backend team updates a contract, the one place that needs
-// to move is this file — the wrapper in lib/api.js keeps flowing.
+// Cutover guidance:
+//   - When Sessions 1/2 ship a new field in a response shape, do NOT
+//     add it to the probe unless the frontend starts reading it. The
+//     probes are "must have to render correctly", not "full schema".
+//   - When the backend CHANGES an existing field name or type, the
+//     probe should start failing against the new shape. That failure
+//     is the signal to align — either update the probe if the new shape
+//     is the new contract truth, or tell the backend team they drifted.
+//   - When the backend adds a brand new endpoint, add a new probe here
+//     and a corresponding `liveOrMock()` wrapper in lib/api.js. Keep
+//     the source-state surface name consistent across the two files.
+//
+// Drift tolerance rules (what this file rejects vs allows):
+//   REJECTED — missing required field, wrong type, non-canonical role
+//              key, non-vocabulary readiness value, non-canonical SSE
+//              event name, wrong sender_type on a message.
+//   ALLOWED  — extra unknown fields in the response, optional fields
+//              being null or missing, probes that the caller doesn't
+//              have enough context to verify (e.g. that a project_id
+//              actually exists in the backend).
+//
+// When a probe fails, the call site in lib/api.js logs the issue list
+// with `console.warn('[integration] <surface> live response failed
+// contract probe', issues)` and records the issues on the
+// integrationSource registry so the diagnostics panel shows them to
+// operators without a reload.
 
 const CANONICAL_ROLES = new Set([
   "VP", "PM", "GENERAL_SUPER", "LEAD_SUPER", "ASSISTANT_SUPER", "ACCOUNTANT",

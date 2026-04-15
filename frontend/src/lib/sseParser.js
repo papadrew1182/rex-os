@@ -1,8 +1,8 @@
 // Pure SSE frame parser — dependency-free so it can be unit-tested
 // from Node without pulling in the rest of lib/sse.js's browser
 // imports (fetch, ReadableStream, apiUrl). lib/sse.js imports
-// parseSseFrame from here and re-exports it as __parseSseFrameForTests
-// for the legacy test path.
+// parseSseFrame from here for the live-stream path; tests import it
+// directly.
 //
 // Handles the SSE frame surface that real servers actually emit:
 //   - `event: <name>` line (defaults to "message" when missing)

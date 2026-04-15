@@ -18,6 +18,23 @@
 //   - it lives in Control Plane so demo flows don't see it
 //   - it does not depend on react state libraries — subscribes to the
 //     tiny pub/sub store and keeps a local useState for the snapshot
+//
+// Cutover flow (how operators use this panel):
+//   1. Navigate to /#/control-plane → "Integration" tab.
+//   2. Read the effective mode + per-surface table. All `mock` means
+//      no live calls were attempted. Any `unavailable` means a live
+//      call failed its contract probe — read the last-error + probe
+//      columns for the reason.
+//   3. Click "Go live" (writes localStorage["rex.assistant.use_mocks"]
+//      = "false" and reloads). Surfaces owned by shipped backends should
+//      flip to `live`; unshipped ones flip to `unavailable` cleanly.
+//   4. To roll back a browser session, click "Force mock" (writes the
+//      same key to "true" and reloads) or clear it with "Clear override".
+//   5. To roll back production, flip USE_ASSISTANT_MOCKS in lib/api.js
+//      and redeploy — that's the single-flag rollback path.
+//
+// Full cutover + rollback runbook lives in
+// docs/roadmaps/parallel-sessions/rex_os_session_3_cutover_handoff.md.
 
 import { useEffect, useState, useMemo } from "react";
 import {

@@ -19,6 +19,32 @@
 //     unavailable, so the UI degrades gracefully without crashing.
 //   - `shouldUseMocks()` reads the constant AND a localStorage override
 //     so tests can flip to live mode at runtime without editing files.
+//
+// Endpoint map (HTTP → Session 3 contract source):
+//   GET  /api/me                                  — Session 2 (§identity)
+//   GET  /api/me/permissions                      — Session 2 (§permissions)
+//   GET  /api/context/current                     — Session 2 (§context)
+//   GET  /api/assistant/catalog                   — Session 1 (§catalog)
+//   GET  /api/assistant/conversations             — Session 1 (§conversations)
+//   GET  /api/assistant/conversations/{id}        — Session 1 (§conversation detail)
+//   POST /api/assistant/chat (SSE)                — Session 1 (§chat) — see lib/sse.js
+//   GET  /api/control-plane/connectors            — Session 2 (§control plane)
+//   GET  /api/control-plane/automations           — Session 2 (§control plane)
+//   GET  /api/control-plane/queue                 — Session 2 (placeholder, contract not frozen)
+//   GET  /api/myday/home                          — Session 2 (placeholder, contract not frozen)
+//
+// NOTE on /api/auth/me: the existing backend has a legacy endpoint at
+// /api/auth/me with a materially different shape (global_role + is_admin
+// rather than canonical role_keys, flat rather than { user: ... }
+// envelope). We deliberately do NOT bridge it — fabricating canonical
+// fields from legacy values would create a frontend-only contract that
+// the real Session 2 /api/me would then have to match. The identity
+// surface stays `mock` (or `unavailable` if live-override is on) until
+// Session 2 ships /api/me at the correct path with the correct envelope.
+// See docs/roadmaps/parallel-sessions/rex_os_session_3_cutover_handoff.md §9.
+//
+// Cutover: see the handoff doc §10 (Cutover checklist).
+// Rollback: see the handoff doc §11 (Rollback checklist).
 
 import { apiUrl, getToken } from "../api";
 import { mockCatalog } from "./mockCatalog";

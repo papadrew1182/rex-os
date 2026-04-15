@@ -1,6 +1,6 @@
 // SSE stream adapter for POST /api/assistant/chat.
 //
-// Contract-frozen event vocabulary (Session 3 packet):
+// Contract-frozen event vocabulary (Session 3 packet §chat SSE):
 //   conversation.created
 //   message.started
 //   message.delta
@@ -14,8 +14,29 @@
 //     honours close() immediately, suppresses late callbacks after
 //     close (so React gets no reducer dispatches against a dead tree)
 //   - Live fetch+ReadableStream: POSTs the payload, parses SSE frames
-//     off the response body, aborts via AbortController, also
-//     suppresses late callbacks after close
+//     off the response body via the pure parseSseFrame from sseParser.js,
+//     aborts via AbortController, also suppresses late callbacks after close
+//
+// Live path cutover notes:
+//   - The buffer normalizes \r\n → \n on every chunk so real servers
+//     that emit CRLF frame boundaries (\r\n\r\n) tokenize identically
+//     to LF-only servers. The parser also strips a trailing \r per line
+//     as a safety net.
+//   - The first successfully-parsed frame marks the `chatStream`
+//     surface as `live` in integrationSource. Fetch errors mark it
+//     `unavailable`. Aborts do neither (normal close).
+//   - Unknown event names (e.g. an experimental backend emitting
+//     `tool.called`) produce a one-shot console.warn per event name
+//     via isKnownSseEvent and are still forwarded to the reducer,
+//     which default-drops them. This surfaces vocabulary drift without
+//     breaking thread render.
+//
+// Open Session 1 question: the `action.suggestions` payload shape is
+// not fully contract-frozen. The frontend accepts two shapes
+// defensively in the reducer (see safeActionSuggestions() in
+// assistant/useAssistantState.js) — { suggestions: [{slug, reason}] }
+// or a bare [slug, ...] array. When Session 1 freezes the shape,
+// update contractProbes.js to enforce it and trim the reducer fallback.
 //
 // Public API:
 //
@@ -168,10 +189,9 @@ export function openAssistantStream(payload, handlers = {}) {
   };
 }
 
-// Legacy re-export so existing callers keep working. The real parser
-// lives in `sseParser.js` so it is Node-unit-testable without the
-// browser import tree (fetch, ReadableStream, etc.).
-export { parseSseFrame as __parseSseFrameForTests } from "./sseParser";
+// The real SSE frame parser lives in `sseParser.js` (pure, no browser
+// imports) so it is Node-unit-testable without dragging fetch /
+// ReadableStream / apiUrl through the import tree.
 
 // ── Mock stream ───────────────────────────────────────────────────────────
 //
