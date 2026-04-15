@@ -5,6 +5,11 @@ import { ProjectProvider, useProject } from "./project";
 import { NotificationProvider, NotificationBell } from "./notifications";
 import ErrorBoundary from "./ErrorBoundary";
 import BuildVersionChip from "./BuildVersionChip";
+import { AppProvider } from "./app/AppContext";
+import AssistantSidebar from "./assistant/AssistantSidebar";
+import MyDayHome from "./myday/MyDayHome";
+import ControlPlaneHome from "./controlPlane/ControlPlaneHome";
+import ProjectDashboard from "./app/ProjectDashboard";
 import LoginPage from "./pages/Login";
 import Portfolio from "./pages/Portfolio";
 import Companies from "./pages/Companies";
@@ -53,6 +58,7 @@ function Shell() {
   return (
     <ProjectProvider>
       <NotificationProvider>
+      <AppProvider>
       <div className={`rex-shell${sidebarOpen ? " rex-shell--sidebar-open" : ""}`}>
         {/* Sidebar backdrop — only shown on small screens when toggled */}
         <div
@@ -65,6 +71,7 @@ function Shell() {
           <div className="rex-sidebar-brand">REX OS</div>
           <div className="rex-sidebar-group">Overview</div>
           <SidebarItem to="/">Portfolio</SidebarItem>
+          <SidebarItem to="/my-day">My Day</SidebarItem>
           <div className="rex-sidebar-group">Financials</div>
           <SidebarItem to="/budget">Budget Overview</SidebarItem>
           <SidebarItem to="/pay-apps">Pay Applications</SidebarItem>
@@ -104,6 +111,7 @@ function Shell() {
               <SidebarItem to="/companies">Companies</SidebarItem>
               <SidebarItem to="/people">People &amp; Members</SidebarItem>
               <SidebarItem to="/admin/jobs">Operations</SidebarItem>
+              <SidebarItem to="/control-plane">Control Plane</SidebarItem>
             </>
           )}
           <div className="rex-sidebar-bottom">
@@ -156,12 +164,17 @@ function Shell() {
                 <Route path="/admin/jobs" element={<AdminJobs />} />
                 <Route path="/companies" element={<Companies />} />
                 <Route path="/people" element={<People />} />
+                <Route path="/my-day" element={<MyDayHome />} />
+                <Route path="/control-plane" element={<ControlPlaneHome />} />
+                <Route path="/projects/:projectSlug" element={<ProjectDashboard />} />
                 <Route path="/login" element={<Navigate to="/" />} />
               </Routes>
             </ErrorBoundary>
           </div>
         </div>
+        <AssistantSidebar />
       </div>
+      </AppProvider>
       </NotificationProvider>
     </ProjectProvider>
   );
