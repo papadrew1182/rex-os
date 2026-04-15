@@ -24,7 +24,12 @@ from repositories.chat_repository import ChatRepository
 from schemas.assistant import AssistantChatRequest, AssistantUser
 from services.ai.context_builder import AssistantContext
 from services.ai.followups import FollowupGenerator
-from services.ai.model_client import ModelClient, ModelMessage, ModelRequest
+from services.ai.model_client import (
+    ModelClient,
+    ModelMessage,
+    ModelRequest,
+    ProviderNotConfigured,
+)
 
 log = logging.getLogger(__name__)
 
@@ -108,12 +113,17 @@ class ChatService:
             async for delta in self._model.stream_completion(model_request):
                 delta_buffer.append(delta)
                 yield sse_event({"type": "message.delta", "delta": delta})
-        except NotImplementedError as exc:
+        except ProviderNotConfigured as exc:
+            # Deterministic, actionable error surface for misconfigured
+            # providers. ``exc.code`` is one of the stable codes defined
+            # on ``ProviderNotConfigured`` (e.g. ``anthropic_sdk_missing``,
+            # ``anthropic_api_key_missing``). The chat stream terminates
+            # here without persisting an assistant message.
             yield sse_event(
                 {
                     "type": "error",
-                    "code": "model_not_configured",
-                    "message": str(exc),
+                    "code": exc.code,
+                    "message": exc.message,
                 }
             )
             return

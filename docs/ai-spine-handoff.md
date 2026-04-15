@@ -243,6 +243,7 @@ backend/tests/
   test_assistant_route_registration.py      # 7 route-registration + SSE vocabulary
   test_assistant_fresh_env_smoke.py         # 8 end-to-end surface checks
   test_assistant_live_db_smoke.py           # 15 live-DB merge gate (@pytest.mark.live_db)
+  test_assistant_anthropic_provider.py      # 15 hermetic provider tests (echo + Anthropic stub)
 ```
 
 Run the hermetic AI spine suite (no DB required):
@@ -255,10 +256,11 @@ py -3 -m pytest tests/test_assistant_sql_guard.py \
                 tests/test_assistant_router_contract.py \
                 tests/test_catalog_migration_drift.py \
                 tests/test_assistant_route_registration.py \
-                tests/test_assistant_fresh_env_smoke.py -q
+                tests/test_assistant_fresh_env_smoke.py \
+                tests/test_assistant_anthropic_provider.py -q
 ```
 
-Expected: **76 tests passing** (15 + 13 + 22 + 8 + 3 + 7 + 8) with zero DB.
+Expected: **91 tests passing** (15 + 13 + 22 + 8 + 3 + 7 + 8 + 15) with zero DB.
 
 Run the live-DB merge gate (requires reachable Postgres):
 
@@ -284,10 +286,61 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rex_os \
                     tests/test_catalog_migration_drift.py \
                     tests/test_assistant_route_registration.py \
                     tests/test_assistant_fresh_env_smoke.py \
+                    tests/test_assistant_anthropic_provider.py \
                     tests/test_assistant_live_db_smoke.py -q
 ```
 
-Expected: **91 tests passing** (76 hermetic + 15 live DB gate).
+Expected: **106 tests passing** (91 hermetic + 15 live DB gate).
+
+## Model provider (echo default, Anthropic optional)
+
+Session 1 ships two providers behind a single ``ModelClient`` protocol
+in ``backend/services/ai/model_client.py``:
+
+| Provider | Default? | Enabled by | Dependencies |
+|---|---|---|---|
+| `EchoModelClient` | **yes** | `REX_AI_PROVIDER` unset / `=echo` / unknown | none |
+| `AnthropicModelClient` | no | `REX_AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY=...` | `anthropic` SDK (in `requirements.txt`) |
+
+Env vars:
+
+```sh
+REX_AI_PROVIDER=echo                    # default, safe, no network, no key
+REX_AI_PROVIDER=anthropic               # activate real Anthropic streaming
+ANTHROPIC_API_KEY=sk-ant-...            # required when provider=anthropic
+REX_ANTHROPIC_MODEL=claude-sonnet-4-6   # optional override, defaults to claude-sonnet-4-6
+```
+
+**Failure semantics are deterministic and loud, never silent:**
+
+* `REX_AI_PROVIDER=anthropic` + SDK missing → first chat request
+  emits a frozen `error` SSE event with code
+  `anthropic_sdk_missing` and a message pointing at
+  `pip install anthropic`. The stream terminates; no assistant
+  message is persisted. Catalog and conversations endpoints keep
+  working because dispatcher construction doesn't depend on the
+  model client.
+* `REX_AI_PROVIDER=anthropic` + `ANTHROPIC_API_KEY` unset or empty →
+  first chat request emits `error` SSE with code
+  `anthropic_api_key_missing`. Same non-fatal behavior for the rest
+  of the app.
+* User message **is still persisted before** any model call, so a
+  misconfigured provider never loses the user prompt — the
+  `message.started` event fires with the real user_message_id
+  before the `error` event appears.
+
+Contract-stable: no change to HTTP shapes, the catalog, the chat
+request payload, or the frozen SSE vocabulary. The only new code is a
+provider class, a structured `ProviderNotConfigured` exception, and a
+new handler in `chat_service` that converts it into an SSE `error`
+event with a specific code.
+
+**Live Anthropic traffic was NOT tested** — this pass is hermetic. The
+streaming path is proven against a stubbed SDK client that matches the
+real `anthropic.AsyncAnthropic.messages.stream(...)` shape (async
+context manager exposing `text_stream` as an async iterator of
+strings). A live test would require an API key plus network access
+and is explicitly out of scope for Session 1.
 
 ## Live-Postgres merge gate (verified)
 
@@ -354,9 +407,12 @@ Only what sits outside Session 1's lane:
    and the planner's `plan_and_run` path is fine up to the point where
    it hits the missing view. Once Session 2 lands the views, the
    assistant will transparently start executing against them.
-2. **Real AI model responses** — the live gate uses `REX_AI_PROVIDER=echo`.
-   The Anthropic integration is stubbed (`AnthropicModelClient` raises
-   `NotImplementedError`) and lands in a follow-up packet.
+2. **Live Anthropic network traffic** — the `AnthropicModelClient`
+   streaming path is implemented and hermetically verified against a
+   stubbed SDK client, but no actual calls against `api.anthropic.com`
+   were exercised in this verification pass (no API key available in
+   this worktree). The live gate uses `REX_AI_PROVIDER=echo`. See the
+   *Model provider* section above for the full contract.
 
 ## Manual reproduction (no pytest)
 
