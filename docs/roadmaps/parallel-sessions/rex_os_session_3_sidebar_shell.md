@@ -18,6 +18,21 @@ This lane maps to the master roadmap primarily across:
 
 ## Program context you should assume
 
+> **BASELINE RECONCILIATION 2026-04-14.** The "placeholder App.jsx"
+> description below was from an earlier planning snapshot. The current
+> repo is production-deployed at `main @ 3148f0c` with 32 existing page
+> components, react-router 7, a functional (non-placeholder) App.jsx,
+> and 81 Vite build modules. There is still no assistant sidebar,
+> control plane UI, or My Day surface, so this lane's core mission is
+> unchanged. Session 3's first commit on `feat/sidebar-shell` at
+> `ee8f7dd` already added the sidebar + mocked hooks (`useMe`,
+> `usePermissions`, `useCurrentContext`) alongside the existing shell
+> without removing it. Session 2 will deliver the backing endpoints
+> (`GET /api/me`, `/api/me/permissions`, `/api/context/current`,
+> `/api/connectors`, `/api/connectors/health`) that the mocked hooks
+> are already written against. See
+> `docs/roadmaps/baseline-reconciliation.md` for the full mapping.
+
 `rex-os` currently has:
 - a placeholder `frontend/src/App.jsx`
 - a basic Vite React setup

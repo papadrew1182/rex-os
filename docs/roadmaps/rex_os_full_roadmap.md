@@ -89,32 +89,49 @@ The assistant and dashboards should read from curated `rex.v_*` views, not from 
 
 ## 5. Migration plan for rex-os
 
-The migration path should look like this:
+> **BASELINE RECONCILIATION 2026-04-14.** The charter-original migration
+> numbering below (002–024) was written against the assumption that the
+> repo was a "very small shell". The current repo already has migration
+> slots 001–005 filled with phase 1–53 work (`001_create_schema.sql`,
+> `002_field_parity_batch.sql`, `003_phase21_p1_batch.sql`,
+> `004_phase31_jobs_notifications.sql`, `005_phase38_phase39_p2_batch.sql`)
+> plus four `rex2_*` canonical files. Session 1 claimed slots 006 + 007
+> on `feat/ai-spine` for the AI spine. Session 2's revised slot plan
+> starts at 008 and maps 1:1 to the charter numbering with a +6 offset.
+> See `docs/roadmaps/baseline-reconciliation.md` §4 for the full
+> mapping and `backend/app/migrate.py::MIGRATION_ORDER` for the
+> concrete list.
+>
+> **The architectural intent of the migration plan below remains
+> locked** — only the file numbering shifts.
+
+The migration path should look like this (charter-original numbering
+shown in parentheses; real repo slot in bold):
 
 - `001_create_schema.sql` (already exists)
-- `002_rbac_roles_permissions.sql`
-- `003_users_sessions_preferences.sql`
-- `004_projects_assignments_orgs.sql`
-- `005_connector_registry.sql`
-- `006_connector_procore_stage.sql`
-- `007_connector_exxir_stage.sql`
-- `008_source_links_sync_runs.sql`
-- `009_canonical_core_entities.sql`
-- `010_canonical_project_mgmt.sql`
-- `011_canonical_financials.sql`
-- `012_canonical_schedule.sql`
-- `013_canonical_documents_quality.sql`
-- `014_ai_chat_prompt_registry.sql`
-- `015_ai_action_catalog.sql`
-- `016_writeback_queue_approvals_audit.sql`
-- `017_automation_registry_job_runs.sql`
-- `018_alerts_notifications_myday.sql`
-- `019_intelligence_layer.sql`
-- `020_rex_schedule.sql`
-- `021_budget_schedule_crosswalk.sql`
-- `022_training_and_learning.sql`
-- `023_seed_roles_actions_automations_aliases.sql`
-- `024_control_plane_views.sql`
+- **`008`** (charter 002) `008_rbac_roles_permissions.sql`
+- **`009`** (charter 003) `009_user_roles_preferences.sql`
+- **`010`** (charter 004) `010_project_assignment_bridges.sql`
+- **`011`** (charter 005) `011_connector_registry.sql`
+- **`012`** (charter 006) `012_connector_procore_stage.sql`
+- **`013`** (charter 007) `013_connector_exxir_stage.sql`
+- **`014`** (charter 008) `014_sync_runs_and_source_links.sql`
+- **`015`** (charter 009) `015_canonical_core_additions.sql`
+- **`016`** (charter 010) `016_canonical_pm_additions.sql`
+- **`017`** (charter 011) `017_canonical_financial_additions.sql`
+- **`018`** (charter 012) `018_canonical_schedule_additions.sql`
+- **`019`** (charter 013) `019_canonical_docs_quality_additions.sql`
+- (charter 014) `006_ai_chat_and_prompts.sql` ← Session 1 lane, already claimed
+- (charter 015) `007_ai_action_catalog.sql` ← Session 1 lane, already claimed
+- (charter 016) writeback/queue — future Session 1 wave
+- (charter 017) automation registry — future lane
+- (charter 018) alerts/myday — future lane
+- (charter 019) intelligence layer — future lane
+- (charter 020) rex_schedule — already covered by the existing canonical DDL
+- (charter 021) budget_schedule_crosswalk — future lane
+- (charter 022) training — future lane
+- **`020`** (charter 023) `020_seed_roles_and_aliases.sql`
+- **`021`** (charter 024) `021_canonical_read_views.sql`
 
 ## 6. Phase roadmap
 

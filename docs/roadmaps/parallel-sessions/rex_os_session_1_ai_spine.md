@@ -19,6 +19,20 @@ This lane maps to the master roadmap primarily across:
 
 ## Program context you should assume
 
+> **BASELINE RECONCILIATION 2026-04-14.** The "minimal shell" description
+> below was from an earlier planning snapshot and does not match the
+> current repo state. `rex-os` is now a production-deployed codebase at
+> `main @ 3148f0c` with 8 migrations, 65 routers, 66 rex.* tables, 590
+> passing tests, and a live Vercel frontend. There is no implemented AI
+> architecture in the repo yet, so this lane's mission is unchanged.
+> See `docs/roadmaps/baseline-reconciliation.md` for the authoritative
+> charter → real-state mapping. Session 1 has already opened migration
+> slots `006_ai_chat_and_prompts.sql` and `007_ai_action_catalog.sql`
+> on `feat/ai-spine`; Session 2 is using slots 008–021. The
+> architectural intent below (persistent sidebar, streaming chat,
+> catalog, role-constrained responses, read-only SQL guard on
+> `rex.v_*`) remains unchanged.
+
 `rex-os` is currently a minimal shell. It has:
 - a very small FastAPI backend
 - a minimal Vite/React frontend
