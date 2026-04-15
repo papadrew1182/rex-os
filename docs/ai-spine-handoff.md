@@ -6,6 +6,103 @@
 This doc is a short developer-facing cheat sheet. For the long-form
 charter see `docs/roadmaps/parallel-sessions/rex_os_session_1_ai_spine.md`.
 
+## Current commit stack (merge-ready)
+
+```
+704e2a4  feat(ai-spine): real optional Anthropic provider behind ModelClient
+cf7f7d3  fix(ai-spine): register 006/007/008 + add live-DB merge gate
+4e29897  test(ai-spine): add drift, route-registration, fresh-env guardrails
+a552deb  feat(ai-spine): Session 1 backbone + full catalog import
+ee8f7dd  feat(sidebar-shell): persistent right-rail assistant + control plane + my day  [Session 3, inherited parent]
+526fae1  Add rex-os roadmap and AI planning inventories                                  [merge base with main]
+```
+
+All four ``(ai-spine)`` commits are Session 1's. ``ee8f7dd`` is
+Session 3's committed frontend work, inherited as a parent of this
+branch — see *Merge hot spots* below for what that implies.
+
+## Required checks before merging
+
+Run these from ``backend/`` in the ai-spine worktree (or wherever the
+branch is checked out):
+
+| Check | Command | Required? |
+|---|---|---|
+| Hermetic suite (no DB, no network) | `py -3 -m pytest tests/test_assistant_sql_guard.py tests/test_assistant_context_builder.py tests/test_quick_actions_catalog.py tests/test_assistant_router_contract.py tests/test_catalog_migration_drift.py tests/test_assistant_route_registration.py tests/test_assistant_fresh_env_smoke.py tests/test_assistant_anthropic_provider.py -q` | **yes** — 91 passing |
+| Live-DB merge gate | `DATABASE_URL=postgres://... py -3 -m pytest tests/test_assistant_live_db_smoke.py -v -m live_db` | **yes** — 15 passing if Postgres is reachable |
+| Live Anthropic proof | `REX_RUN_LIVE_ANTHROPIC=1 ANTHROPIC_API_KEY=sk-ant-... py -3 -m pytest tests/test_assistant_live_anthropic_smoke.py -v -m live_anthropic` | **no** — optional, 1 billed call (max_tokens=50) |
+
+Hermetic + live-DB together is the merge gate. Live-Anthropic is
+evidence-only and explicitly not required.
+
+## Merge hot spots (from the Session 1 audit)
+
+When merging ``feat/ai-spine`` into ``main``, expect conflicts only
+on the following files. Everything else Session 1 touches is a new
+file and will land cleanly.
+
+### 1. `backend/app/migrate.py`
+
+**Highest-risk hotspot.** Session 1 appends three entries to
+``MIGRATION_ORDER`` for the AI spine migrations:
+
+```
+"006_ai_chat_and_prompts.sql",
+"007_ai_action_catalog.sql",
+"008_ai_action_catalog_seed.sql",
+```
+
+Session 2 also appends to the same list (its RBAC / user-roles /
+seed migrations use distinct filenames like
+``008_rbac_roles_permissions.sql`` / ``009_user_roles_preferences.sql``
+/ ``020_seed_roles_and_aliases.sql``). Git will flag a conflict
+because both sessions add at the same location.
+
+**Resolution:** keep both blocks of additions. Ordering does not
+matter — the filenames are all distinct, and the migration runner
+applies them in the order they appear in the list.
+
+### 2. `backend/app/routes/__init__.py`
+
+Session 1 adds one import for ``routers.assistant`` and one entry
+for ``assistant_router`` at the end of ``all_routers``. Low conflict
+risk — Session 3 is frontend-only and Session 2 does not appear to
+touch this file. If it conflicts, keep Session 1's import and list
+entry. ``tests/test_assistant_route_registration.py`` will fail
+immediately if the wiring is dropped.
+
+### 3. `backend/requirements.txt`
+
+Session 1 adds one dependency (``anthropic>=0.40.0,<1.0``) near the
+bottom. Low conflict risk.
+
+### 4. `backend/pytest.ini`
+
+Session 1 adds a ``markers`` section with two markers (``live_db``
+and ``live_anthropic``). Low conflict risk.
+
+### 5. Session 3 frontend files inherited via `ee8f7dd`
+
+``feat/ai-spine`` is stacked on top of Session 3's frontend commit
+``ee8f7dd`` (``feat(sidebar-shell): persistent right-rail assistant +
+control plane + my day``). Merging Session 1 into main will also
+bring Session 3's frontend work with it.
+
+* If Session 3 has **not yet** merged into main: Session 1 brings
+  Session 3's frontend along as a side effect. That is usually fine.
+* If Session 3 has **already** merged via a different commit SHA
+  (e.g. a squash or rebase), git will see the same content from two
+  different commit paths. Standard 3-way merge handles that, but
+  verify no duplicate files in the result.
+* If both Session 1 and a separate Session 3 merge both touch
+  ``frontend/src/App.jsx`` or ``frontend/src/rex-theme.css`` with
+  different content, expect conflicts there.
+
+If this matters at merge time, rebasing ``feat/ai-spine`` onto a
+``main`` that already contains Session 3's frontend would drop the
+``ee8f7dd`` parent cleanly. Do not do that speculatively — only if
+the side-effect merge becomes a problem in practice.
+
 ## What Session 1 owns
 
 - `backend/routers/assistant.py` — the 5 frozen HTTP endpoints
@@ -244,6 +341,7 @@ backend/tests/
   test_assistant_fresh_env_smoke.py         # 8 end-to-end surface checks
   test_assistant_live_db_smoke.py           # 15 live-DB merge gate (@pytest.mark.live_db)
   test_assistant_anthropic_provider.py      # 15 hermetic provider tests (echo + Anthropic stub)
+  test_assistant_live_anthropic_smoke.py    # 1 opt-in live Anthropic proof (@pytest.mark.live_anthropic + REX_RUN_LIVE_ANTHROPIC=1)
 ```
 
 Run the hermetic AI spine suite (no DB required):
@@ -335,12 +433,31 @@ provider class, a structured `ProviderNotConfigured` exception, and a
 new handler in `chat_service` that converts it into an SSE `error`
 event with a specific code.
 
-**Live Anthropic traffic was NOT tested** — this pass is hermetic. The
-streaming path is proven against a stubbed SDK client that matches the
-real `anthropic.AsyncAnthropic.messages.stream(...)` shape (async
-context manager exposing `text_stream` as an async iterator of
-strings). A live test would require an API key plus network access
-and is explicitly out of scope for Session 1.
+**Live Anthropic traffic has been proven once against the real API.**
+A single opt-in streaming call (`max_tokens=50`, model
+`claude-sonnet-4-6`) succeeded end-to-end against
+`api.anthropic.com/v1/messages` and yielded multiple non-empty
+deltas. The hermetic path through `test_assistant_anthropic_provider.py`
+still drives a stubbed SDK client that matches
+`anthropic.AsyncAnthropic.messages.stream(...)` shape and remains
+the routine test. The live proof lives in
+`tests/test_assistant_live_anthropic_smoke.py` as a hard opt-in test:
+
+```sh
+cd backend
+REX_RUN_LIVE_ANTHROPIC=1 \
+ANTHROPIC_API_KEY=sk-ant-... \
+    py -3 -m pytest tests/test_assistant_live_anthropic_smoke.py \
+                    -v -m live_anthropic
+```
+
+The test skips cleanly in three independent ways:
+* when `ANTHROPIC_API_KEY` is unset
+* when the `anthropic` package is not installed
+* when `REX_RUN_LIVE_ANTHROPIC` is not `1`/`true`/`yes`
+
+All three must be present for the test to run. It is not a merge
+gate and must not be treated as one.
 
 ## Live-Postgres merge gate (verified)
 
@@ -407,12 +524,12 @@ Only what sits outside Session 1's lane:
    and the planner's `plan_and_run` path is fine up to the point where
    it hits the missing view. Once Session 2 lands the views, the
    assistant will transparently start executing against them.
-2. **Live Anthropic network traffic** — the `AnthropicModelClient`
-   streaming path is implemented and hermetically verified against a
-   stubbed SDK client, but no actual calls against `api.anthropic.com`
-   were exercised in this verification pass (no API key available in
-   this worktree). The live gate uses `REX_AI_PROVIDER=echo`. See the
-   *Model provider* section above for the full contract.
+2. **Live Anthropic network traffic at scale** — one real streaming
+   call has been exercised against `api.anthropic.com/v1/messages`
+   via `tests/test_assistant_live_anthropic_smoke.py` (opt-in, not a
+   merge gate). Extended live usage, concurrency behavior, and
+   latency characteristics are not part of Session 1's scope. The
+   live DB gate continues to use `REX_AI_PROVIDER=echo`.
 
 ## Manual reproduction (no pytest)
 
