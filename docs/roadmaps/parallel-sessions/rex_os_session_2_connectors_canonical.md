@@ -25,8 +25,11 @@ This lane maps to the master roadmap primarily across:
 > codebase at `main @ 3148f0c` with 8 migrations, 65 routers, 66 rex.*
 > tables, 590 passing tests, and a live Vercel frontend serving 32 page
 > components. See `docs/roadmaps/baseline-reconciliation.md` for the
-> authoritative charter → real-state mapping. Session 2 execution uses
-> migration slots 008–021 (not 002–013) and follows the repo-native
+> authoritative charter → real-state mapping. Session 2 execution
+> originally used migration slots 008–021 (not 002–013); after Session 1
+> (AI Spine) landed on `main` and consumed slot 008
+> (`008_ai_action_catalog_seed.sql`), Session 2 was bumped one slot
+> forward to 009–022. Session 2 follows the repo-native
 > `backend/app/routes/` + `backend/app/services/` path conventions.
 > The architectural intent locked below (multi-connector, canonical
 > rex, v_* read models, data-driven RBAC) remains unchanged.
