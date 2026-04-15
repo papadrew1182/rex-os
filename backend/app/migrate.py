@@ -87,6 +87,15 @@ MIGRATION_ORDER: list[str] = [
 
 DEMO_SEED_FILE: str = "rex2_demo_seed.sql"
 
+# Supplemental demo seeds applied after ``DEMO_SEED_FILE`` under the same
+# ``REX_DEMO_SEED`` gate. Each file must be idempotent on its own because
+# supplementals are retried on every boot when the env var is set. These
+# are NEVER registered in ``MIGRATION_ORDER`` — they ship demo data only
+# and must not run on production schema-migration passes.
+SUPPLEMENTAL_DEMO_SEEDS: tuple[str, ...] = (
+    "023_bishop_modern_dashboard_seed.sql",
+)
+
 def _find_migrations_dir() -> Path:
     """Locate the migrations directory robustly across local + container layouts.
 
@@ -236,11 +245,35 @@ async def apply_demo_seed(
         async with pool.acquire() as conn:
             await conn.execute(sql)
         log.info("Demo seed applied: %s", DEMO_SEED_FILE)
-        return MigrationResult(DEMO_SEED_FILE, "ok")
+        primary = MigrationResult(DEMO_SEED_FILE, "ok")
     except Exception as exc:
         detail = str(exc).splitlines()[0]
         log.error("Demo seed FAILED: %s — %s", DEMO_SEED_FILE, detail)
         return MigrationResult(DEMO_SEED_FILE, "error", detail)
+
+    # Supplemental demo seeds (idempotent, log-only). Failures here are
+    # non-fatal: the primary seed has already landed and callers only
+    # reason about the primary result, so a supplemental hiccup must not
+    # poison the boot path. Each file is still gated by REX_DEMO_SEED
+    # because we're inside ``apply_demo_seed``.
+    for filename in SUPPLEMENTAL_DEMO_SEEDS:
+        supp_path = base / filename
+        if not supp_path.is_file():
+            log.warning("Supplemental demo seed not found: %s", supp_path)
+            continue
+        try:
+            supp_sql = supp_path.read_text(encoding="utf-8")
+            async with pool.acquire() as conn:
+                await conn.execute(supp_sql)
+            log.info("Supplemental demo seed applied: %s", filename)
+        except Exception as exc:  # noqa: BLE001
+            log.error(
+                "Supplemental demo seed FAILED: %s — %s",
+                filename,
+                str(exc).splitlines()[0],
+            )
+
+    return primary
 
 
 # ── CLI entry point ───────────────────────────────────────────────────────
