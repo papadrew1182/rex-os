@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 017 -- Canonical financial additions + bridge views
+-- Migration 018 -- Canonical financial additions + bridge views
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 011_canonical_financials.sql
--- Real-repo slot: 017
+-- Real-repo slot: 018
 --
 -- Creates rex.procurement_items (genuinely missing) plus bridge views
 -- for the charter's names that map onto existing rex tables:

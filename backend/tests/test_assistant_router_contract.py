@@ -14,8 +14,8 @@ import json
 import pytest
 
 from main import app
-from schemas.catalog import CatalogResponse
-from services.ai.catalog_import import build_catalog_response_from_source
+from app.schemas.catalog import CatalogResponse
+from app.services.ai.catalog_import import build_catalog_response_from_source
 from tests._assistant_fakes import FakeDispatcher
 
 

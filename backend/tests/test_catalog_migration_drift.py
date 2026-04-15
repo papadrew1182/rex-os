@@ -56,7 +56,7 @@ def test_migration_008_matches_python_source_of_truth():
 
     If this test fails, regenerate the migration with:
         cd backend && py -3 scripts/_build_catalog_migration.py
-    then stage ``backend/data/quick_actions_catalog.py`` and
+    then stage ``backend/app/data/quick_actions_catalog.py`` and
     ``migrations/008_ai_action_catalog_seed.sql`` in the same commit.
     """
     expected = render_migration_sql().replace("\r\n", "\n")
@@ -83,7 +83,7 @@ def test_migration_008_matches_python_source_of_truth():
     lineno, exp_line, got_line = first_diff or (0, "", "")
     msg = (
         f"{MIGRATION_RELATIVE_PATH} drifted from "
-        f"backend/data/quick_actions_catalog.py\n"
+        f"backend/app/data/quick_actions_catalog.py\n"
         f"  expected line {lineno + 1}: {exp_line!r}\n"
         f"  actual   line {lineno + 1}: {got_line!r}\n"
         f"  expected length: {len(expected)} chars, {len(expected_lines)} lines\n"

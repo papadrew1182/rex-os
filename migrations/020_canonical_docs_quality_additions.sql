@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 019 -- Canonical docs/quality/weather additions + bridge views
+-- Migration 020 -- Canonical docs/quality/weather additions + bridge views
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 013_canonical_documents_quality.sql
--- Real-repo slot: 019
+-- Real-repo slot: 020
 --
 -- Creates rex.quality_findings and rex.weather_observations (both
 -- genuinely missing from phase 1-53) plus bridge views for the

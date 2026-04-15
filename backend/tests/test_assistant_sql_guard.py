@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from services.ai.sql_guard import BlockedQueryError, DEFAULT_ALLOWED_VIEWS, SqlGuard
+from app.services.ai.sql_guard import BlockedQueryError, DEFAULT_ALLOWED_VIEWS, SqlGuard
 
 
 def _guard() -> SqlGuard:

@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from repositories.catalog_repository import CatalogRepository
-from schemas.catalog import ActionParam, CatalogAction, CatalogCategory, CatalogResponse
+from app.repositories.catalog_repository import CatalogRepository
+from app.schemas.catalog import ActionParam, CatalogAction, CatalogCategory, CatalogResponse
 
 _CATEGORY_LABELS: dict[str, str] = {
     "FINANCIALS": "Financials",

@@ -1,16 +1,11 @@
-"""Repository package for Session 2 data access helpers.
-
-Session 2 (feat/canonical-connectors) lane.
+"""Repository package for backend data access helpers.
 
 Thin DB access helpers for the identity / RBAC / connector / source_link
-domain. Consumed by the Session 2 endpoint routes and (later) by
-Session 1's assistant lane when it needs to resolve permissions outside
-a normal FastAPI request context.
-
-Named ``_s2`` module-prefix so the package can coexist with Session 1's
-existing ``backend/repositories/`` top-level package if one of them
-later moves to ``backend/app/repositories/``. (See
-``docs/roadmaps/baseline-reconciliation.md`` §11.)
+domain (originally Session 2 / feat/canonical-connectors) plus the
+assistant catalog / chat / prompt repositories (originally Session 1 /
+feat/ai-spine). Both sets now live here after the post-merge
+consolidation on ``main``; see ``docs/roadmaps/baseline-reconciliation.md``
+for the history.
 """
 
 from app.repositories.identity_repository import (

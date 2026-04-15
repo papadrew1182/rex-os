@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 018 -- Canonical schedule additions + bridge views
+-- Migration 019 -- Canonical schedule additions + bridge views
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 012_canonical_schedule.sql
--- Real-repo slot: 018
+-- Real-repo slot: 019
 --
 -- Creates rex.delay_events (genuinely missing) plus bridge views for
 -- the charter's schedule names that map onto existing rex tables:

@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 014 -- Sync runs, cursors, event log, source_links
+-- Migration 015 -- Sync runs, cursors, event log, source_links
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 008_source_links_sync_runs.sql
--- Real-repo slot: 014
+-- Real-repo slot: 015
 --
 -- Adds the control-plane objects that make connector sync observable
 -- and replayable, plus the rex.source_links contract that every
@@ -28,7 +28,7 @@
 --
 -- Idempotent: CREATE IF NOT EXISTS + CREATE OR REPLACE VIEW +
 --   ALTER TABLE ADD COLUMN IF NOT EXISTS.
--- Depends on: 011 (rex.connector_accounts), rex2_canonical_ddl
+-- Depends on: 012 (rex.connector_accounts), rex2_canonical_ddl
 --   (rex.connector_mappings), rex.projects.
 -- ============================================================
 

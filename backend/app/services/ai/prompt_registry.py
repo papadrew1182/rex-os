@@ -5,7 +5,7 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 
-from repositories.prompt_repository import PromptRepository
+from app.repositories.prompt_repository import PromptRepository
 
 
 @dataclass

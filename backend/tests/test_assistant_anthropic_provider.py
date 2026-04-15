@@ -25,14 +25,14 @@ from uuid import UUID, uuid4
 import pytest
 
 from main import app
-from schemas.assistant import AssistantChatRequest, AssistantUser, PageContext
-from schemas.catalog import CatalogResponse
-from services.ai import model_client as mc
-from services.ai.catalog_import import build_catalog_response_from_source
-from services.ai.chat_service import ChatService
-from services.ai.context_builder import ContextBuilder
-from services.ai.followups import FollowupGenerator
-from services.ai.model_client import (
+from app.schemas.assistant import AssistantChatRequest, AssistantUser, PageContext
+from app.schemas.catalog import CatalogResponse
+from app.services.ai import model_client as mc
+from app.services.ai.catalog_import import build_catalog_response_from_source
+from app.services.ai.chat_service import ChatService
+from app.services.ai.context_builder import ContextBuilder
+from app.services.ai.followups import FollowupGenerator
+from app.services.ai.model_client import (
     AnthropicModelClient,
     EchoModelClient,
     ModelMessage,

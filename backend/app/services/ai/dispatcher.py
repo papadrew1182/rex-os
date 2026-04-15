@@ -6,16 +6,16 @@ from dataclasses import dataclass
 
 import asyncpg
 
-from repositories.catalog_repository import CatalogRepository
-from repositories.chat_repository import ChatRepository
-from repositories.prompt_repository import PromptRepository
-from services.ai.catalog_service import CatalogService
-from services.ai.chat_service import ChatService
-from services.ai.context_builder import ContextBuilder
-from services.ai.followups import FollowupGenerator
-from services.ai.model_client import ModelClient, get_model_client
-from services.ai.prompt_registry import PromptRegistryService
-from services.ai.sql_planner import SqlPlanner
+from app.repositories.catalog_repository import CatalogRepository
+from app.repositories.chat_repository import ChatRepository
+from app.repositories.prompt_repository import PromptRepository
+from app.services.ai.catalog_service import CatalogService
+from app.services.ai.chat_service import ChatService
+from app.services.ai.context_builder import ContextBuilder
+from app.services.ai.followups import FollowupGenerator
+from app.services.ai.model_client import ModelClient, get_model_client
+from app.services.ai.prompt_registry import PromptRegistryService
+from app.services.ai.sql_planner import SqlPlanner
 
 
 @dataclass

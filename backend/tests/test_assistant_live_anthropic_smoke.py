@@ -42,7 +42,7 @@ import os
 
 import pytest
 
-from services.ai.model_client import (
+from app.services.ai.model_client import (
     AnthropicModelClient,
     ModelMessage,
     ModelRequest,

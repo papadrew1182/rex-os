@@ -24,16 +24,16 @@ from fastapi.responses import StreamingResponse
 import db as rex_db
 from app.dependencies import get_current_user
 from app.models.foundation import UserAccount
-from schemas.assistant import AssistantChatRequest, AssistantUser
-from schemas.catalog import CatalogResponse
-from schemas.chat import (
+from app.schemas.assistant import AssistantChatRequest, AssistantUser
+from app.schemas.catalog import CatalogResponse
+from app.schemas.chat import (
     ChatConversation,
     ChatConversationSummary,
     ChatMessage,
     ConversationDetailResponse,
     ConversationListResponse,
 )
-from services.ai.dispatcher import AssistantDispatcher
+from app.services.ai.dispatcher import AssistantDispatcher
 
 log = logging.getLogger(__name__)
 

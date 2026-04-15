@@ -42,14 +42,14 @@ import json
 
 import pytest
 
-from data.quick_actions_catalog import (
+from app.data.quick_actions_catalog import (
     CANONICAL_SLUG_COUNT,
     LEGACY_ALIAS_COUNT,
     QUICK_ACTIONS_CATALOG,
 )
 from main import app
-from schemas.catalog import CatalogResponse
-from services.ai.catalog_import import (
+from app.schemas.catalog import CatalogResponse
+from app.services.ai.catalog_import import (
     build_catalog_response_from_source,
     validate_catalog,
 )

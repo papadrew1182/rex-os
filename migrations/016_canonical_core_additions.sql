@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 015 -- Canonical core additions (reserved for future)
+-- Migration 016 -- Canonical core additions (reserved for future)
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 009_canonical_core_entities.sql
--- Real-repo slot: 015
+-- Real-repo slot: 016
 --
 -- Most canonical-core objects either already exist in rex from phase
 -- 1-53 (projects, cost_codes, companies, people, project_members) or
@@ -16,7 +16,7 @@
 -- MIGRATION_ORDER ensures re-running migrations is always idempotent.
 --
 -- Idempotent: no-op.
--- Depends on: 010.
+-- Depends on: 011.
 -- ============================================================
 
 DO $$ BEGIN NULL; END $$;

@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 009 — User roles, preferences, and user view bridge
+-- Migration 010 — User roles, preferences, and user view bridge
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 003_users_sessions_preferences.sql
--- Real-repo slot: 009 (charter 003 + 6)
+-- Real-repo slot: 010 (charter 003 + 7)
 --
 -- Bridges the existing rex.user_accounts identity into the charter's
 -- data-driven RBAC contract without renaming or reshaping user_accounts
@@ -17,7 +17,7 @@
 -- rex.sessions (auth tokens) already exists from phase 1-53; untouched.
 --
 -- Idempotent: CREATE IF NOT EXISTS + CREATE OR REPLACE VIEW.
--- Depends on: 008 (rex.roles), rex2_canonical_ddl.sql (user_accounts, people,
+-- Depends on: 009 (rex.roles), rex2_canonical_ddl.sql (user_accounts, people,
 --   project_members), rex2_foundation_bootstrap.sql (seeded users).
 -- ============================================================
 

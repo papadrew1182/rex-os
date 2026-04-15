@@ -212,7 +212,7 @@ async def test_live_required_dedupes_resolve(live_pool, alias, expected):
 
 # ── 3. Real repositories against Postgres ────────────────────────────────
 async def test_live_catalog_repository_list_and_lookup(live_pool):
-    from repositories.catalog_repository import CatalogRepository
+    from app.repositories.catalog_repository import CatalogRepository
     repo = CatalogRepository(live_pool)
 
     all_rows = await repo.list_actions()
@@ -239,7 +239,7 @@ async def test_live_catalog_repository_list_and_lookup(live_pool):
 
 
 async def test_live_prompt_repository_active_lookup(live_pool):
-    from repositories.prompt_repository import PromptRepository
+    from app.repositories.prompt_repository import PromptRepository
     repo = PromptRepository(live_pool)
     row = await repo.get_active("assistant.system.base")
     assert row is not None
@@ -249,7 +249,7 @@ async def test_live_prompt_repository_active_lookup(live_pool):
 
 
 async def test_live_chat_repository_full_round_trip(live_pool):
-    from repositories.chat_repository import ChatRepository
+    from app.repositories.chat_repository import ChatRepository
     repo = ChatRepository(live_pool)
 
     user_id = uuid.UUID("20000000-0000-4000-a000-000000000001")

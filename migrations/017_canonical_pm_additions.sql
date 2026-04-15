@@ -1,9 +1,9 @@
 -- ============================================================
--- Migration 016 -- Canonical PM additions: decisions registry
+-- Migration 017 -- Canonical PM additions: decisions registry
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 010_canonical_project_mgmt.sql
--- Real-repo slot: 016
+-- Real-repo slot: 017
 --
 -- Creates rex.meeting_decisions and rex.pending_decisions. The charter's
 -- other PM entities (rfis, submittals, tasks, meetings, meeting_action_items,
