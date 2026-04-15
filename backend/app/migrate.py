@@ -45,6 +45,28 @@ MIGRATION_ORDER: list[str] = [
     # Phase 38-39: schedule depth fields, project geo, company extras,
     # observation root cause, closeout spec linkage, om_manuals table
     "005_phase38_phase39_p2_batch.sql",
+    # ── Session 1 (feat/ai-spine) lane: slots 006, 007 reserved ──────────
+    # 006_ai_chat_and_prompts.sql and 007_ai_action_catalog.sql are owned
+    # by Session 1 and will be inserted here when feat/ai-spine merges.
+    # Session 2 does not add them.
+    # ── Session 2 (feat/canonical-connectors) lane: 008–021 ──────────────
+    # Maps 1:1 to the charter's 002–013 + 023–024 migrations with a +6
+    # offset. See docs/roadmaps/baseline-reconciliation.md §4 for the
+    # full mapping.
+    "008_rbac_roles_permissions.sql",           # charter 002
+    "009_user_roles_preferences.sql",           # charter 003
+    "010_project_assignment_bridges.sql",       # charter 004
+    "011_connector_registry.sql",               # charter 005
+    "012_connector_procore_stage.sql",          # charter 006
+    "013_connector_exxir_stage.sql",            # charter 007
+    "014_sync_runs_and_source_links.sql",       # charter 008
+    "015_canonical_core_additions.sql",         # charter 009
+    "016_canonical_pm_additions.sql",           # charter 010
+    "017_canonical_financial_additions.sql",    # charter 011
+    "018_canonical_schedule_additions.sql",     # charter 012
+    "019_canonical_docs_quality_additions.sql", # charter 013
+    "020_seed_roles_and_aliases.sql",           # charter 023 (role/alias part)
+    "021_canonical_read_views.sql",             # charter 024 (read-view part)
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

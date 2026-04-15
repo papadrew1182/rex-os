@@ -1,0 +1,25 @@
+-- ============================================================
+-- Migration 021 — Canonical read-model views (rex.v_*)
+-- ============================================================
+-- Session 2 (feat/canonical-connectors) lane.
+-- Charter-original slot: 024_control_plane_views.sql (data/read-view
+--   portion only; control-plane panels + connector-health UI belong to
+--   Session 3).
+-- Real-repo slot: 021
+-- Scope: create the seven canonical read models the assistant,
+--   dashboards, and automations will consume. No downstream surface
+--   should be forced to read connector tables directly.
+--     - rex.v_project_mgmt
+--     - rex.v_financials
+--     - rex.v_schedule
+--     - rex.v_directory
+--     - rex.v_portfolio
+--     - rex.v_risk
+--     - rex.v_myday
+-- Idempotent: every view uses CREATE OR REPLACE VIEW.
+-- Depends on: all previous migrations (joins over the canonical rex tables
+--   that existed in phase 1–53 plus the additions in 010 + 015–019).
+-- Content: stub in this commit.
+-- ============================================================
+
+DO $$ BEGIN NULL; END $$;
