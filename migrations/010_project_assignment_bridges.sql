@@ -142,21 +142,9 @@ FROM rex.companies c
 WHERE c.company_type = 'subcontractor';
 
 
--- 6. rex.v_project_sources (bridge view) -------------------------------
--- Charter name for the project-row slice of rex.connector_mappings /
--- rex.source_links. Answers "which connector account sourced this
--- project, and what is its native id there?"
-CREATE OR REPLACE VIEW rex.v_project_sources AS
-SELECT
-    sl.id                          AS source_link_id,
-    sl.connector_key               AS connector_key,
-    sl.source_id                   AS external_project_id,
-    sl.canonical_id                AS project_id,
-    sl.external_url                AS external_url,
-    sl.synced_at                   AS last_synced_at,
-    sl.metadata                    AS metadata
-FROM rex.source_links sl
-WHERE sl.canonical_table = 'projects';
+-- 6. rex.v_project_sources moved to 014 (depends on rex.source_links
+-- which is created there; leaving it here caused a forward-reference
+-- failure on fresh databases where 010 runs before 014).
 
 
 -- 7. rex.v_company_contacts (bridge view) ------------------------------

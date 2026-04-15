@@ -145,3 +145,23 @@ SELECT
     cm.synced_at                                AS synced_at,
     cm.created_at                               AS created_at
 FROM rex.connector_mappings cm;
+
+
+-- 6. rex.v_project_sources -- bridge view over source_links -----------
+-- Charter name for the project-row slice of rex.connector_mappings /
+-- rex.source_links. Answers "which connector account sourced this
+-- project, and what is its native id there?"
+-- Moved here from 010 because it depends on rex.source_links, which
+-- is created above. Keeping it in 010 caused a forward-reference
+-- failure on fresh databases.
+CREATE OR REPLACE VIEW rex.v_project_sources AS
+SELECT
+    sl.id                          AS source_link_id,
+    sl.connector_key               AS connector_key,
+    sl.source_id                   AS external_project_id,
+    sl.canonical_id                AS project_id,
+    sl.external_url                AS external_url,
+    sl.synced_at                   AS last_synced_at,
+    sl.metadata                    AS metadata
+FROM rex.source_links sl
+WHERE sl.canonical_table = 'projects';
