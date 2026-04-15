@@ -1189,6 +1189,32 @@ select.rex-input { padding-right: 24px; }
   color: var(--rex-accent);
 }
 
+/* ── Integration diagnostics panel ───────────────────────────────── */
+
+.rex-integration-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 8px;
+}
+
+.rex-integration-summary code {
+  font-size: 10px;
+  background: rgba(255, 255, 255, 0.06);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+.rex-readiness--unknown {
+  background: rgba(140, 140, 160, 0.15);
+  color: #a0a0b0;
+  border: 1px solid rgba(140, 140, 160, 0.25);
+}
+
 /* ── Narrow viewports: hide right rail entirely ───────────────────── */
 
 @media (max-width: 1200px) {

@@ -16,6 +16,7 @@ import ActionCatalogPanel from "./ActionCatalogPanel";
 import AutomationRegistryPanel from "./AutomationRegistryPanel";
 import QueueReviewPanel from "./QueueReviewPanel";
 import RoleCapabilityPanel from "./RoleCapabilityPanel";
+import IntegrationDiagnosticsPanel from "./IntegrationDiagnosticsPanel";
 
 const TABS = [
   { key: "connectors", label: "Connectors" },
@@ -23,6 +24,7 @@ const TABS = [
   { key: "automations", label: "Automations" },
   { key: "queue", label: "Queue" },
   { key: "roles", label: "Roles & capabilities" },
+  { key: "integration", label: "Integration" },
 ];
 
 export default function ControlPlaneHome() {
@@ -59,6 +61,7 @@ export default function ControlPlaneHome() {
         {activeTab === "automations" && <AutomationRegistryPanel />}
         {activeTab === "queue" && <QueueReviewPanel />}
         {activeTab === "roles" && <RoleCapabilityPanel />}
+        {activeTab === "integration" && <IntegrationDiagnosticsPanel />}
       </div>
     </div>
   );

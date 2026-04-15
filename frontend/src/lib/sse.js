@@ -27,7 +27,10 @@
 //   handle.close();   // abort — safe to call multiple times
 
 import { apiUrl, getToken } from "../api";
-import { USE_ASSISTANT_MOCKS } from "./api";
+import { shouldUseMocks } from "./api";
+import { markLive, markMock, markUnavailable, markPending } from "./integrationSource";
+import { isKnownSseEvent } from "./contractProbes";
+import { parseSseFrame } from "./sseParser";
 
 /**
  * Open an assistant chat stream.
@@ -39,10 +42,19 @@ import { USE_ASSISTANT_MOCKS } from "./api";
 export function openAssistantStream(payload, handlers = {}) {
   // Wrap the caller's handlers with a "closed" guard so that late
   // events after handle.close() never dispatch into a dead UI tree.
+  // Also route any unknown SSE event through a one-time developer
+  // warning without dropping it — the reducer switches default-skips
+  // unknown names anyway, but operators should see drift surfaced.
   let closed = false;
+  const unknownSeen = new Set();
   const guarded = {
     onEvent: (event, data) => {
       if (closed) return;
+      if (!isKnownSseEvent(event) && !unknownSeen.has(event)) {
+        unknownSeen.add(event);
+        // eslint-disable-next-line no-console
+        console.warn(`[integration] unknown SSE event '${event}' — reducer will skip`);
+      }
       try { handlers.onEvent?.(event, data); } catch { /* host errors are not stream errors */ }
     },
     onError: (err) => {
@@ -54,7 +66,8 @@ export function openAssistantStream(payload, handlers = {}) {
     },
   };
 
-  if (USE_ASSISTANT_MOCKS) {
+  if (shouldUseMocks()) {
+    markMock("chatStream");
     const handle = openMockStream(payload, guarded);
     return {
       close: () => {
@@ -67,9 +80,13 @@ export function openAssistantStream(payload, handlers = {}) {
     };
   }
 
+  markPending("chatStream");
+
   // ── Live path ───────────────────────────────────────────────────────
   const controller = new AbortController();
   const token = getToken();
+
+  let sawFirstEvent = false;
 
   fetch(apiUrl("/assistant/chat"), {
     method: "POST",
@@ -89,6 +106,16 @@ export function openAssistantStream(payload, handlers = {}) {
       const decoder = new TextDecoder();
       let buffer = "";
 
+      const dispatchFrame = (frame) => {
+        const parsed = parseSseFrame(frame);
+        if (!parsed) return;
+        if (!sawFirstEvent) {
+          sawFirstEvent = true;
+          markLive("chatStream");
+        }
+        guarded.onEvent(parsed.event, parsed.data);
+      };
+
       // eslint-disable-next-line no-constant-condition
       while (true) {
         let chunk;
@@ -105,20 +132,18 @@ export function openAssistantStream(payload, handlers = {}) {
         }
         const { value, done } = chunk;
         if (done) {
-          if (buffer.trim()) {
-            const parsed = parseSseFrame(buffer);
-            if (parsed) guarded.onEvent(parsed.event, parsed.data);
-          }
+          if (buffer.trim()) dispatchFrame(buffer);
           guarded.onClose();
           return;
         }
-        buffer += decoder.decode(value, { stream: true });
+        // Normalize CRLF → LF so real servers that emit "\r\n\r\n"
+        // frame boundaries tokenize the same as LF-only servers.
+        buffer += decoder.decode(value, { stream: true }).replace(/\r\n/g, "\n");
         let idx;
         while ((idx = buffer.indexOf("\n\n")) !== -1) {
           const frame = buffer.slice(0, idx);
           buffer = buffer.slice(idx + 2);
-          const parsed = parseSseFrame(frame);
-          if (parsed) guarded.onEvent(parsed.event, parsed.data);
+          dispatchFrame(frame);
         }
       }
     })
@@ -127,6 +152,7 @@ export function openAssistantStream(payload, handlers = {}) {
         guarded.onClose();
         return;
       }
+      markUnavailable("chatStream", { error: err });
       guarded.onError(err);
       guarded.onClose();
     });
@@ -142,36 +168,10 @@ export function openAssistantStream(payload, handlers = {}) {
   };
 }
 
-// Defensive SSE frame parser. Handles:
-//   - multi-line `data:` (joined with newlines per SSE spec)
-//   - missing `event:` (defaults to "message")
-//   - non-JSON data (passed through as string)
-//   - empty/whitespace frames (returns null)
-function parseSseFrame(frame) {
-  const trimmed = frame.trim();
-  if (!trimmed) return null;
-  let eventName = "message";
-  let dataLines = [];
-  for (const line of trimmed.split("\n")) {
-    if (line.startsWith("event:")) {
-      eventName = line.slice(6).trim();
-    } else if (line.startsWith("data:")) {
-      dataLines.push(line.slice(5).replace(/^ /, ""));
-    } else if (line.startsWith(":")) {
-      // SSE comment — ignore
-    }
-  }
-  if (dataLines.length === 0) return null;
-  const dataStr = dataLines.join("\n");
-  try {
-    return { event: eventName, data: JSON.parse(dataStr) };
-  } catch {
-    return { event: eventName, data: dataStr };
-  }
-}
-
-// Exported only for tests.
-export { parseSseFrame as __parseSseFrameForTests };
+// Legacy re-export so existing callers keep working. The real parser
+// lives in `sseParser.js` so it is Node-unit-testable without the
+// browser import tree (fetch, ReadableStream, etc.).
+export { parseSseFrame as __parseSseFrameForTests } from "./sseParser";
 
 // ── Mock stream ───────────────────────────────────────────────────────────
 //
