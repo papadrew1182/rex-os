@@ -1,7 +1,7 @@
 """Quick-action catalog import + structural validation.
 
 Bridge between the Python source of truth in
-``data.quick_actions_catalog`` and ``rex.ai_action_catalog``. Three roles:
+``app.data.quick_actions_catalog`` and ``rex.ai_action_catalog``. Three roles:
 
 1. ``validate_catalog()`` — pure structural validation (no DB access).
 2. ``upsert_catalog(pool)`` — idempotent bulk UPSERT.
@@ -21,7 +21,7 @@ from typing import Any
 
 import asyncpg
 
-from data.quick_actions_catalog import (
+from app.data.quick_actions_catalog import (
     CATEGORY_LABELS,
     QUICK_ACTIONS_CATALOG,
 )

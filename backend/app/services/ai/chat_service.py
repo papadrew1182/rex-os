@@ -20,11 +20,11 @@ import json
 import logging
 from typing import Any, AsyncIterator
 
-from repositories.chat_repository import ChatRepository
-from schemas.assistant import AssistantChatRequest, AssistantUser
-from services.ai.context_builder import AssistantContext
-from services.ai.followups import FollowupGenerator
-from services.ai.model_client import (
+from app.repositories.chat_repository import ChatRepository
+from app.schemas.assistant import AssistantChatRequest, AssistantUser
+from app.services.ai.context_builder import AssistantContext
+from app.services.ai.followups import FollowupGenerator
+from app.services.ai.model_client import (
     ModelClient,
     ModelMessage,
     ModelRequest,

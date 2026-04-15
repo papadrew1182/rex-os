@@ -17,12 +17,12 @@ import sys
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from data.quick_actions_catalog import (  # noqa: E402
+from app.data.quick_actions_catalog import (  # noqa: E402
     CANONICAL_SLUG_COUNT,
     LEGACY_ALIAS_COUNT,
     QUICK_ACTIONS_CATALOG,
 )
-from services.ai.catalog_import import validate_catalog  # noqa: E402
+from app.services.ai.catalog_import import validate_catalog  # noqa: E402
 
 
 HEADER = """-- Migration 008: AI spine — full quick-action catalog seed

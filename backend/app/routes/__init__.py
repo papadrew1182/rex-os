@@ -68,7 +68,7 @@ from app.routes.om_manuals import router as om_manuals_router
 # it joins the same all_routers loader that main.py consumes without any
 # change to main.py. DO NOT REMOVE — reverting this line breaks the
 # /api/assistant/* endpoints and makes them fall through to the SPA fallback.
-from routers.assistant import router as assistant_router
+from app.routes.assistant import router as assistant_router
 # Session 2 (feat/canonical-connectors) lane — identity + connector
 # control-plane endpoints consumed by Session 1 assistant + Session 3
 # sidebar shell.

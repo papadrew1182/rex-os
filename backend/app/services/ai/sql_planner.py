@@ -7,7 +7,7 @@ from typing import Any
 
 import asyncpg
 
-from services.ai.sql_guard import (
+from app.services.ai.sql_guard import (
     BlockedQueryError,
     DEFAULT_ALLOWED_VIEWS,
     GuardResult,

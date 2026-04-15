@@ -7,12 +7,12 @@ from datetime import datetime, timezone
 from typing import Any, AsyncIterator
 from uuid import UUID, uuid4
 
-from services.ai.catalog_service import CatalogService  # noqa: F401
-from services.ai.chat_service import ChatService
-from services.ai.context_builder import ContextBuilder
-from services.ai.followups import FollowupGenerator
-from services.ai.model_client import ModelClient, ModelRequest
-from services.ai.prompt_registry import PromptRegistryService  # noqa: F401
+from app.services.ai.catalog_service import CatalogService  # noqa: F401
+from app.services.ai.chat_service import ChatService
+from app.services.ai.context_builder import ContextBuilder
+from app.services.ai.followups import FollowupGenerator
+from app.services.ai.model_client import ModelClient, ModelRequest
+from app.services.ai.prompt_registry import PromptRegistryService  # noqa: F401
 
 
 class FakeChatRepository:

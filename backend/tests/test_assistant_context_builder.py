@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from services.ai.context_builder import (
+from app.services.ai.context_builder import (
     CANONICAL_ROLES,
     ContextBuilder,
     normalize_role,
@@ -95,7 +95,7 @@ def test_build_context_injects_role_and_project_lines_into_prompt():
         full_name=None,
         legacy_role="vp",
     )
-    from schemas.assistant import PageContext
+    from app.schemas.assistant import PageContext
 
     ctx = builder.build_context(
         user=user,

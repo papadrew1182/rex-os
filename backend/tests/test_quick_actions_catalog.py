@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import pytest
 
-from data.quick_actions_catalog import (
+from app.data.quick_actions_catalog import (
     CANONICAL_SLUG_COUNT,
     LEGACY_ALIAS_COUNT,
     QUICK_ACTIONS_CATALOG,
 )
-from services.ai.catalog_import import (
+from app.services.ai.catalog_import import (
     CANONICAL_ROLE_KEYS,
     CatalogValidationError,
     VALID_READINESS_STATES,

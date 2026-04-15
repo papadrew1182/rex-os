@@ -60,7 +60,7 @@ def test_every_expected_assistant_route_is_mounted():
         "Assistant router is not fully mounted. Missing: "
         f"{missing}. This usually means the wiring in "
         "backend/app/routes/__init__.py was reverted - re-add "
-        "`from routers.assistant import router as assistant_router` "
+        "`from app.routes.assistant import router as assistant_router` "
         "and the entry in `all_routers`."
     )
 
@@ -99,7 +99,7 @@ def test_sse_event_vocabulary_is_frozen_in_chat_service():
     """
     import os
     chat_service_path = os.path.join(
-        os.path.dirname(__file__), "..", "services", "ai", "chat_service.py"
+        os.path.dirname(__file__), "..", "app", "services", "ai", "chat_service.py"
     )
     with open(chat_service_path, "r", encoding="utf-8") as f:
         src = f.read()

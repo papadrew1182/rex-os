@@ -10,7 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from uuid import UUID
 
-from schemas.assistant import AssistantUser, PageContext
+from app.schemas.assistant import AssistantUser, PageContext
 
 CANONICAL_ROLES: tuple[str, ...] = (
     "VP",
