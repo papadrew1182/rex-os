@@ -52,9 +52,9 @@ MIGRATION_ORDER: list[str] = [
     #       readiness_state, gin indexes on legacy_aliases / required_connectors /
     #       role_visibility, no rows yet)
     # 008 = full 77-slug / 80-alias seed rendered from
-    #       backend/data/quick_actions_catalog.py via
-    #       scripts/_build_catalog_migration.py; upserted idempotently via
-    #       jsonb_to_recordset + ON CONFLICT DO UPDATE
+    #       backend/app/data/quick_actions_catalog.py via
+    #       backend/scripts/_build_catalog_migration.py; upserted
+    #       idempotently via jsonb_to_recordset + ON CONFLICT DO UPDATE
     "006_ai_chat_and_prompts.sql",
     "007_ai_action_catalog.sql",
     "008_ai_action_catalog_seed.sql",

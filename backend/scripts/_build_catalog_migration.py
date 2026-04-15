@@ -1,5 +1,5 @@
 """One-shot build helper: regenerate ``migrations/008_ai_action_catalog_seed.sql``
-from ``backend/data/quick_actions_catalog.py``.
+from ``backend/app/data/quick_actions_catalog.py``.
 
 Run from ``backend/`` with::
 
@@ -31,7 +31,7 @@ HEADER = """-- Migration 008: AI spine — full quick-action catalog seed
 --
 -- Forward-only idempotent bootstrap of the canonical {slug_count}-slug /
 -- {alias_count}-alias quick-action catalog. The source of truth is the
--- Python list at ``backend/data/quick_actions_catalog.py``. Both files
+-- Python list at ``backend/app/data/quick_actions_catalog.py``. Both files
 -- must stay in sync. This file is REGENERATED from the Python source via
 -- ``py -3 scripts/_build_catalog_migration.py`` (run from backend/).
 -- Do not hand-edit the JSONB blob below.

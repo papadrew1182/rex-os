@@ -63,11 +63,11 @@ from app.routes.notifications import router as notifications_router
 from app.routes.om_manuals import router as om_manuals_router
 
 # ── Session 1 (feat/ai-spine): AI spine router ──────────────────────────────
-# Lives at backend/routers/assistant.py so the AI spine contract is owned
-# separately from the existing app/routes/ domain routers. Imported here so
-# it joins the same all_routers loader that main.py consumes without any
-# change to main.py. DO NOT REMOVE — reverting this line breaks the
-# /api/assistant/* endpoints and makes them fall through to the SPA fallback.
+# Lives at backend/app/routes/assistant.py (consolidated from the original
+# Session 1 home at backend/routers/assistant.py during the post-merge
+# cleanup pass; see fix/rex-prod-cleanup history). DO NOT REMOVE —
+# reverting this line breaks the /api/assistant/* endpoints and makes
+# them fall through to the SPA fallback.
 from app.routes.assistant import router as assistant_router
 # Session 2 (feat/canonical-connectors) lane — identity + connector
 # control-plane endpoints consumed by Session 1 assistant + Session 3
