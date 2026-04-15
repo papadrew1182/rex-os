@@ -242,7 +242,8 @@ SELECT
         WHERE s.project_id = p.id) AS max_schedule_variance_days,
     (SELECT COUNT(*) FROM rex.delay_events WHERE project_id = p.id AND status = 'active') AS active_delays,
     (SELECT COUNT(*) FROM rex.project_members WHERE project_id = p.id AND is_active = true) AS active_team_members
-FROM rex.projects p;
+FROM rex.projects p
+LEFT JOIN rex.v_budgets b ON b.project_id = p.id;
 
 
 -- ============================================================
