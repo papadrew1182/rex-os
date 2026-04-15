@@ -1,17 +1,22 @@
 -- ============================================================
--- Migration 015 — Canonical core additions + view bridges
+-- Migration 015 -- Canonical core additions (reserved for future)
 -- ============================================================
 -- Session 2 (feat/canonical-connectors) lane.
 -- Charter-original slot: 009_canonical_core_entities.sql
--- Real-repo slot: 015 (charter 009 + 6)
--- Scope:
---   - create rex.v_organizations, rex.v_vendors, rex.v_trade_partners
---     as companies-filtered views
---   - create rex.v_project_sources as a connector_mappings-filtered view
---   - project_locations + project_calendars creation moved to 010 so
---     this file focuses on view bridges only
--- Depends on: rex.companies, rex.connector_mappings, (10: locations).
--- Content: stub in this commit.
+-- Real-repo slot: 015
+--
+-- Most canonical-core objects either already exist in rex from phase
+-- 1-53 (projects, cost_codes, companies, people, project_members) or
+-- got their bridging views in migration 010 (organizations, vendors,
+-- trade_partners, project_sources, company_contacts).
+--
+-- This migration is intentionally a minimal no-op marker so the slot
+-- is preserved for future additive core entities that do not fit the
+-- PM / financial / schedule / docs buckets (016-019). Keeping it in
+-- MIGRATION_ORDER ensures re-running migrations is always idempotent.
+--
+-- Idempotent: no-op.
+-- Depends on: 010.
 -- ============================================================
 
 DO $$ BEGIN NULL; END $$;
