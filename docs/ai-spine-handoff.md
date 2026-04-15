@@ -242,9 +242,10 @@ backend/tests/
   test_catalog_migration_drift.py           # 3 drift-detection cases
   test_assistant_route_registration.py      # 7 route-registration + SSE vocabulary
   test_assistant_fresh_env_smoke.py         # 8 end-to-end surface checks
+  test_assistant_live_db_smoke.py           # 15 live-DB merge gate (@pytest.mark.live_db)
 ```
 
-Run the AI spine suite in isolation:
+Run the hermetic AI spine suite (no DB required):
 
 ```sh
 cd backend
@@ -259,31 +260,113 @@ py -3 -m pytest tests/test_assistant_sql_guard.py \
 
 Expected: **76 tests passing** (15 + 13 + 22 + 8 + 3 + 7 + 8) with zero DB.
 
-## What remains unproven without a live Postgres
-
-The fresh-environment smoke test substitutes `FakeDispatcher` for the
-real asyncpg path. The following must still be verified against an
-actual Postgres instance before Session 1 can be called fully merge-safe:
-
-1. **Migrations 006/007/008 apply cleanly** on a fresh DB under
-   `REX_AUTO_MIGRATE=true` — the CHECK constraints on `risk_tier` and
-   `readiness_state`, the partial unique index on `ai_prompt_registry`,
-   and the `ON CONFLICT (slug) DO UPDATE` upsert in migration 008 are
-   not exercised by any unit test.
-2. **`rex.chat_conversations` / `rex.chat_messages` CRUD** through the
-   real `ChatRepository` — the router-contract tests use
-   `FakeChatRepository`, so jsonb column round-trips, trigger-based
-   `updated_at`, and the cascade from `chat_conversations -> chat_messages`
-   are not exercised.
-3. **The `rex.v_*` curated views** needed by `SqlPlanner.plan_and_run`
-   are owned by Session 2 and do not exist yet. The guard and planner
-   are ready; the data is not.
-
-To run the missing verification manually once the views land:
+Run the live-DB merge gate (requires reachable Postgres):
 
 ```sh
-# 1. apply migrations
-REX_AUTO_MIGRATE=true uvicorn backend.main:app
+cd backend
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rex_os \
+    py -3 -m pytest tests/test_assistant_live_db_smoke.py -v -m live_db
+```
+
+Expected: **15 passing** against a real Postgres. Skipped automatically
+when `DATABASE_URL` is unset or the DB is unreachable.
+
+Run **everything together** (hermetic + live gate) when a Postgres is
+available — this is the full Session 1 merge signal:
+
+```sh
+cd backend
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rex_os \
+    py -3 -m pytest tests/test_assistant_sql_guard.py \
+                    tests/test_assistant_context_builder.py \
+                    tests/test_quick_actions_catalog.py \
+                    tests/test_assistant_router_contract.py \
+                    tests/test_catalog_migration_drift.py \
+                    tests/test_assistant_route_registration.py \
+                    tests/test_assistant_fresh_env_smoke.py \
+                    tests/test_assistant_live_db_smoke.py -q
+```
+
+Expected: **91 tests passing** (76 hermetic + 15 live DB gate).
+
+## Live-Postgres merge gate (verified)
+
+Session 1 is **merge-ready against a real Postgres**. A marker-gated
+integration test exercises every Session 1-owned surface end to end:
+
+```sh
+cd backend
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rex_os \
+    py -3 -m pytest tests/test_assistant_live_db_smoke.py -v -m live_db
+```
+
+Expected: **15 passing**. The test is skipped automatically when the
+DB is unreachable, so the default hermetic suite stays green on
+machines without Postgres.
+
+The live gate proves, against a real asyncpg-backed Postgres:
+
+1. **`app/migrate.py::MIGRATION_ORDER` registers 006/007/008** and
+   `apply_migrations()` runs them cleanly. This was an actual defect
+   found and fixed during Session 1's live verification pass — prior
+   to the fix, fresh environments running `REX_AUTO_MIGRATE=true`
+   would stop at migration 005 and never create the AI spine tables.
+2. **`rex.chat_conversations`, `rex.chat_messages`, `rex.ai_prompt_registry`,
+   `rex.ai_action_catalog` tables exist** with the expected shape,
+   including CHECK constraints on `risk_tier` and `readiness_state`
+   and the `set_updated_at` trigger.
+3. **Migration 008 seeds exactly 77 canonical slugs and 80 legacy
+   aliases**. The `jsonb_to_recordset` + `ON CONFLICT (slug) DO UPDATE`
+   path applies cleanly.
+4. **Zero `C-*` values used as primary slug** in the live catalog.
+5. **All three required dedupes resolve in SQL**:
+   `C-8`/`C-28` → `submittal_sla`, `C-15`/`C-60` → `monthly_owner_report`,
+   `C-5`/`C-29` → `rfi_aging`.
+6. **`CatalogRepository`** live: `list_actions()`, `list_actions(role_keys=...)`,
+   `get_by_slug()`, `resolve_alias()` all return the expected rows.
+7. **`PromptRepository.get_active('assistant.system.base')`** returns
+   the seeded prompt with `is_active=true` and `prompt_type='system'`.
+8. **`ChatRepository`** full round-trip: create a conversation with
+   `page_context`, append user + assistant messages with
+   `structured_payload`, touch to update `last_message_at` and title,
+   list conversations (with `last_message_preview`), get detail, archive
+   (soft delete), confirm gone from list and detail, confirm re-archive
+   returns False.
+9. **Live API contract** — all 5 endpoints over the real pool:
+   - `GET /api/assistant/catalog` → 200, 77 actions
+   - `POST /api/assistant/chat` → 200, `text/event-stream`, full
+     frozen SSE vocabulary emitted in the guaranteed order
+   - `GET /api/assistant/conversations` → 200, new conversation present
+   - `GET /api/assistant/conversations/{id}` → 200, user+assistant messages
+   - `DELETE /api/assistant/conversations/{id}` → 204
+   - Refetch after DELETE → 404, re-DELETE → 404
+10. **User message is persisted before model execution** (observed in
+    the chat_service stream — the user message id is emitted in
+    `message.started` before any `message.delta`).
+
+## What remains unproven
+
+Only what sits outside Session 1's lane:
+
+1. **Planner execution against `rex.v_*` curated views** is owned by
+   Session 2 and those views do not exist yet. This is NOT a Session 1
+   merge blocker: `SqlGuard` unit tests prove the deny-list is correct,
+   and the planner's `plan_and_run` path is fine up to the point where
+   it hits the missing view. Once Session 2 lands the views, the
+   assistant will transparently start executing against them.
+2. **Real AI model responses** — the live gate uses `REX_AI_PROVIDER=echo`.
+   The Anthropic integration is stubbed (`AnthropicModelClient` raises
+   `NotImplementedError`) and lands in a follow-up packet.
+
+## Manual reproduction (no pytest)
+
+If you want to verify the live path by hand:
+
+```sh
+# 1. apply migrations (picks up 006/007/008 automatically)
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/rex_os \
+REX_AUTO_MIGRATE=true \
+    uvicorn main:app --app-dir backend
 
 # 2. curl the catalog and count actions
 curl -s http://localhost:8000/api/assistant/catalog | jq '.actions | length'
