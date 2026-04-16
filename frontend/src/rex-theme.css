@@ -99,11 +99,34 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 .rex-topbar {
   height: 54px; background: var(--rex-bg-card); border-bottom: 1px solid var(--rex-border);
   display: flex; align-items: center; padding: 0 24px; gap: 14px;
+  /* Clip any descendant that refuses to shrink so the topbar's flex row
+     stays within the viewport. The project label and select already have
+     ellipsis + max-width rules for visible truncation; this guards against
+     any future child adding unexpected width. */
+  overflow: hidden;
+  min-width: 0;
 }
+.rex-topbar > * { min-width: 0; }
 .rex-topbar-project { font-weight: 600; color: var(--rex-text-bold); font-size: 14px; }
-.rex-topbar-right { margin-left: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; color: var(--rex-text-muted); }
+.rex-topbar-right {
+  margin-left: auto; display: flex; align-items: center; gap: 10px;
+  font-size: 13px; color: var(--rex-text-muted);
+  flex-shrink: 1; min-width: 0;
+}
+.rex-topbar-right > * { flex-shrink: 1; min-width: 0; }
 
-.rex-content { padding: 24px 28px; flex: 1; overflow-y: auto; }
+.rex-content {
+  padding: 24px 28px;
+  flex: 1;
+  overflow-y: auto;
+  /* Horizontal scroll belongs to internal components (.rex-table-scroll,
+     .rex-drawer, etc.), never to the main content column itself. Without
+     this, WebKit leaks wide child element intrinsic widths into
+     document.documentElement.scrollWidth even when visual overflow is
+     contained, causing phantom horizontal page scroll on iOS Safari. */
+  overflow-x: hidden;
+  min-width: 0;
+}
 
 /* ── Cards ── */
 .rex-card {
@@ -128,9 +151,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 /* ── Tables ── */
 .rex-table-wrap { border-radius: 8px; border: 1px solid var(--rex-border); overflow: hidden; box-shadow: var(--rex-shadow-sm); }
 /* Inner scroll wrapper — lets the card keep rounded corners while the table
-   scrolls horizontally on narrow viewports instead of breaking the layout. */
-.rex-table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+   scrolls horizontally on narrow viewports instead of breaking the layout.
+   `contain: inline-size` is the belt-and-suspenders step: without it, iOS
+   Safari / WebKit leak the table's intrinsic width into ancestor
+   `scrollWidth` calculations even though `overflow-x: auto` visually
+   contains the table. With it, the table scrolls *only* within this wrap,
+   never at the page level. */
+.rex-table-scroll {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  contain: inline-size;
+}
 .rex-table { width: 100%; border-collapse: collapse; font-size: 14px; min-width: 480px; }
+/* At phone widths, drop the 480px table min-width so columns compress in-place
+   and the data stays on-screen without horizontal scroll. Desktop + tablet
+   keep the 480px minimum for readability. */
+@media (max-width: 560px) {
+  .rex-table { min-width: 0; }
+}
 .rex-table thead th {
   background: var(--rex-accent); color: #fff; font-size: 11px; font-weight: 700;
   text-transform: uppercase; letter-spacing: 0.05em; padding: 10px 14px; text-align: left;
@@ -196,11 +234,36 @@ select.rex-input { padding-right: 24px; }
 .rex-row-label { color: var(--rex-text-muted); }
 .rex-row-value { font-weight: 600; color: var(--rex-text-bold); }
 
-/* ── Grid ── */
-.rex-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
-.rex-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
-.rex-grid-4 { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-.rex-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+/* ── Grid — mobile-first ──
+   Base rules assume phone portrait: single column for 2/3 grids, two
+   columns for 4/5 grids (stat-card dashboards feel cramped at 1-up).
+   Column counts grow with viewport via min-width breakpoints:
+     ≥560px  tablet-ish: 4/5 go to 2; 3 goes to 2
+     ≥768px  small tablet: 2 goes to 2; 3 stays 2; 5 goes to 3
+     ≥1024px tablet landscape / desktop: 3 goes to 3; 4 goes to 4; 5 goes to 5
+   `min-width: 0` on grid items prevents wide children (tables, long
+   numbers) from forcing the track past its share and overflowing the row. */
+.rex-grid-2 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.rex-grid-3 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+.rex-grid-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rex-grid-5 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.rex-grid-2 > *,
+.rex-grid-3 > *,
+.rex-grid-4 > *,
+.rex-grid-5 > * { min-width: 0; }
+
+@media (min-width: 560px) {
+  .rex-grid-3 { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 768px) {
+  .rex-grid-2 { grid-template-columns: 1fr 1fr; }
+  .rex-grid-5 { grid-template-columns: repeat(3, 1fr); }
+}
+@media (min-width: 1024px) {
+  .rex-grid-3 { grid-template-columns: repeat(3, 1fr); }
+  .rex-grid-4 { grid-template-columns: repeat(4, 1fr); }
+  .rex-grid-5 { grid-template-columns: repeat(5, 1fr); }
+}
 
 /* ── Detail Panel ── */
 .rex-detail-panel {
@@ -305,14 +368,9 @@ select.rex-input { padding-right: 24px; }
      • Content padding tightens on mobile
    ═══════════════════════════════════════════════════════════════════════ */
 
-/* Tablet and below — hide the 5-up stat grid overflow */
-@media (max-width: 1100px) {
-  .rex-grid-5 { grid-template-columns: repeat(3, 1fr); }
-  .rex-grid-4 { grid-template-columns: repeat(2, 1fr); }
-  .rex-grid-3 { grid-template-columns: repeat(2, 1fr); }
-}
-
-/* Below tablet: sidebar becomes an off-canvas overlay */
+/* Below tablet: sidebar becomes an off-canvas overlay. Grid column
+   counts are owned by the mobile-first ladder above; this block only
+   handles shell/topbar/drawer/content responsive behavior. */
 @media (max-width: 900px) {
   .rex-sidebar {
     position: fixed;
@@ -336,10 +394,6 @@ select.rex-input { padding-right: 24px; }
   .rex-topbar-project { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 40vw; }
   .rex-topbar-project-select { width: 140px; }
   .rex-content { padding: 14px 14px; }
-  .rex-grid-5 { grid-template-columns: repeat(2, 1fr); }
-  .rex-grid-4 { grid-template-columns: repeat(2, 1fr); }
-  .rex-grid-3 { grid-template-columns: 1fr; }
-  .rex-grid-2 { grid-template-columns: 1fr; }
   .rex-h1 { font-size: 22px; }
   .rex-h2 { font-size: 18px; }
   .rex-drawer { width: 100vw !important; max-width: 100vw; padding: 18px 14px; }
@@ -348,10 +402,8 @@ select.rex-input { padding-right: 24px; }
   .rex-detail-panel { padding: 14px 16px; }
 }
 
-/* Phone-sized — collapse stat grids entirely and allow wrapping */
+/* Phone-sized polish: keep typography and topbar choices tighter. */
 @media (max-width: 560px) {
-  .rex-grid-5 { grid-template-columns: 1fr 1fr; }
-  .rex-grid-4 { grid-template-columns: 1fr 1fr; }
   .rex-h1 { font-size: 20px; }
   .rex-topbar-project { max-width: 28vw; }
   .rex-topbar-project-select { width: 110px; }
