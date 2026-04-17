@@ -241,3 +241,67 @@ test.describe("Portfolio (/) — no horizontal overflow", () => {
     }
   });
 });
+
+// ── My Day (sidebar-shell page) ──────────────────────────────────────────
+
+test.describe("My Day (/my-day) — no horizontal overflow", () => {
+  test.beforeEach(async ({ page }) => {
+    await installMocks(page);
+  });
+
+  test("greeting + stat cards fit within viewport", async ({ page }) => {
+    await page.goto("/#/my-day");
+    await expect(
+      page.getByRole("heading", { name: /good (morning|afternoon|evening)/i })
+    ).toBeVisible({ timeout: 10000 });
+    await assertNoHorizontalOverflow(page);
+  });
+});
+
+// ── Tasks (table-heavy existing page) ────────────────────────────────────
+
+test.describe("Tasks (/tasks) — no horizontal overflow", () => {
+  test.beforeEach(async ({ page }) => {
+    await installMocks(page);
+    // Add task-specific mock so the page renders data.
+    await page.route("**/api/tasks*", async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "application/json",
+        body: JSON.stringify([
+          {
+            id: "t1",
+            task_number: 1,
+            title: "Review framing coordination drawings",
+            status: "open",
+            priority: "high",
+            category: "coordination",
+            assigned_to: null,
+            due_date: "2026-04-20",
+            completed_date: null,
+          },
+          {
+            id: "t2",
+            task_number: 2,
+            title: "File stormwater inspection report",
+            status: "in_progress",
+            priority: "medium",
+            category: "safety",
+            assigned_to: null,
+            due_date: "2026-04-25",
+            completed_date: null,
+          },
+        ]),
+      });
+    });
+  });
+
+  test("stat cards + table fit within viewport", async ({ page }) => {
+    await page.goto("/#/tasks");
+    await expect(
+      page.getByRole("heading", { name: /tasks/i })
+    ).toBeVisible({ timeout: 10000 });
+    await expect(page.locator(".rex-stat-card").first()).toBeVisible();
+    await assertNoHorizontalOverflow(page);
+  });
+});
