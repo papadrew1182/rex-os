@@ -22,12 +22,12 @@ export function useFormState(initial) {
   const [dirty, setDirty] = useState(false);
   const initialRef = useRef(initial || {});
 
-  // Reset internal state if a new initial object is passed (e.g. switching from create to edit)
-  useEffect(() => {
-    setValues(initial || {});
-    initialRef.current = initial || {};
-    setDirty(false);
-  }, [initial]);
+  // NOTE: there was previously a useEffect here that watched `initial` and
+  // reset values whenever the reference changed. That caused a critical bug:
+  // call sites like `useFormState({})` create a new object on every render,
+  // so the effect fired on every re-render and wiped the user's input.
+  // Every page already calls `form.setAll(...)` explicitly when opening
+  // create/edit drawers, so the effect was redundant. Removed.
 
   const setField = useCallback((name, value) => {
     setValues((v) => ({ ...v, [name]: value }));
