@@ -186,9 +186,15 @@ async def admin_sync_resource(
         )
 
     if connector_key == "procore":
-        return await procore_sync_resource(
-            db, account_id=account_id, resource_type=resource_type
-        )
+        try:
+            return await procore_sync_resource(
+                db, account_id=account_id, resource_type=resource_type
+            )
+        except NotImplementedError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"resource_type {resource_type!r} is not yet supported for connector {connector_key!r}: {e}",
+            )
 
     raise HTTPException(
         status_code=400,

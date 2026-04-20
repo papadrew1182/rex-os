@@ -94,7 +94,7 @@ async def procore_connector_account(db_session):
 
 @pytest.mark.anyio
 async def test_admin_sync_rfis_returns_counts(
-    client, procore_connector_account, monkeypatch
+    client, procore_connector_account, db_session, monkeypatch
 ):
     """Happy-path: admin POSTs → orchestrator runs → 200 with counts.
 
@@ -120,6 +120,14 @@ async def test_admin_sync_rfis_returns_counts(
         body = response.json()
         assert "rows_fetched" in body
         assert "rows_upserted" in body
+
+        # Prove the orchestrator actually ran — not just the route wiring.
+        sr = await db_session.execute(text(
+            "SELECT status FROM rex.sync_runs "
+            "WHERE connector_account_id = :a AND resource_type = 'rfis' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        assert sr.scalar_one() == "succeeded"
     finally:
         import app.services.connectors.procore.rex_app_pool as mod2
         if mod2._pool:
@@ -136,9 +144,7 @@ async def test_admin_sync_unknown_account_returns_404(client):
     response = await client.post(
         f"/api/connectors/{bogus}/sync/rfis",
     )
-    # Either 404 or 400 — the route is documented to use 404 for unknown
-    # accounts; accept 400 in case someone tightens the contract later.
-    assert response.status_code in (400, 404), response.text
+    assert response.status_code == 404
 
 
 @pytest.mark.anyio
