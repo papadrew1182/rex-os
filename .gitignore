@@ -3,6 +3,9 @@
 .env.*
 !.env.example
 
+# Git worktrees (project-local)
+.worktrees/
+
 # Python
 __pycache__/
 *.py[cod]
