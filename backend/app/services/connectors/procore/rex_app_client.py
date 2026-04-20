@@ -52,9 +52,15 @@ class RexAppDbClient:
 
         if cursor_value is not None:
             params.append(cursor_value)
-            # Cast $N through text first so asyncpg treats the parameter as
-            # text regardless of what Postgres infers from the comparison.
-            # The column type could be timestamptz, timestamp, date, etc.
+            # IMPORTANT: the ::text::timestamptz double cast is intentional.
+            # With $N::timestamptz alone, asyncpg's type inference demands a
+            # Python datetime for the parameter; pinning $N to ::text first
+            # forces asyncpg to send a string and lets Postgres do the cast.
+            # Do NOT "simplify" to a single cast without also updating every
+            # caller to pass datetime objects instead of ISO strings.
+            # Assumes cursor_col is a timestamptz-typed column -- a bigint
+            # column (e.g. procore_id) would fail the text->timestamptz cast
+            # at runtime. All Phase 4 callers use timestamp cursors.
             where_clauses.append(f"{cursor_col} > ${len(params)}::text::timestamptz")
 
         for col, op, value in filters or []:

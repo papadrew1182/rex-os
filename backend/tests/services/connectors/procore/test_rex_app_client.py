@@ -128,3 +128,17 @@ async def test_fetch_rows_rejects_bad_filter_op(pool):
             limit=10,
             filters=[("status", "OR 1=1 --", "open")],
         )
+
+
+@pytest.mark.asyncio
+async def test_fetch_rows_rejects_non_identifier_filter_col(pool):
+    client = RexAppDbClient(pool)
+    with pytest.raises(ValueError, match="identifier"):
+        await client.fetch_rows(
+            schema="procore",
+            table="rfis",
+            cursor_col="updated_at",
+            cursor_value=None,
+            limit=10,
+            filters=[("status; DROP TABLE foo;", "=", "open")],
+        )
