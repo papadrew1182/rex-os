@@ -76,7 +76,7 @@ async def finish_sync_run(
                    rows_upserted = :upserted,
                    rows_skipped  = :skipped,
                    error_excerpt = :err,
-                   summary       = COALESCE(:summary::jsonb, summary)
+                   summary       = COALESCE(CAST(:summary AS jsonb), summary)
              WHERE id = :id
             """
         ),
@@ -157,7 +157,8 @@ async def log_event(
             """
             INSERT INTO rex.connector_event_log
                 (connector_account_id, event_type, severity, message, payload)
-            VALUES (:account, :etype, :sev, :msg, COALESCE(:payload::jsonb, '{}'::jsonb))
+            VALUES (:account, :etype, :sev, :msg,
+                    COALESCE(CAST(:payload AS jsonb), '{}'::jsonb))
             """
         ),
         {
@@ -191,6 +192,10 @@ async def upsert_source_link(
     """Record or refresh the link from a connector-native row to a
     canonical rex.* row. Idempotent on (connector_key, source_table, source_id).
     """
+    # NOTE: we use ``CAST(:param AS <type>)`` rather than the
+    # ``:param::type`` shorthand because SQLAlchemy's ``text()``
+    # bind-parameter parser sees the double-colon as part of the
+    # parameter name and fails to substitute it. Same fix as staging.py.
     await db.execute(
         text(
             """
@@ -199,7 +204,7 @@ async def upsert_source_link(
                  source_table, project_id, metadata, synced_at)
             VALUES (:canonical_table, :canonical_id, :connector, :source_id,
                     :external_url, :source_table, :project_id,
-                    COALESCE(:metadata::jsonb, '{}'::jsonb), now())
+                    COALESCE(CAST(:metadata AS jsonb), '{}'::jsonb), now())
             ON CONFLICT (rex_table, connector, external_id)
             DO UPDATE SET
                 rex_id       = EXCLUDED.rex_id,

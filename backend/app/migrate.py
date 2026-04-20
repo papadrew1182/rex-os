@@ -77,6 +77,10 @@ MIGRATION_ORDER: list[str] = [
     "020_canonical_docs_quality_additions.sql", # charter 013
     "021_seed_roles_and_aliases.sql",           # charter 023 (role/alias part)
     "022_canonical_read_views.sql",             # charter 024 (read-view part)
+    # ── Phase 4 (feat/phase4-procore-rex-app) lane ───────────────────────
+    # 024 = unique (project_id, rfi_number) on rex.rfis so the Procore
+    #       orchestrator's ON CONFLICT upsert has a matching constraint.
+    "024_rex_rfis_project_rfi_number_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────
