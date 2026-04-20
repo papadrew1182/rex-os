@@ -11,7 +11,8 @@ Pipeline:
        c. mapper.map_<resource>(item, project_canonical_id)
        d. upsert into rex.<canonical_table> (keyed on natural key)
        e. upsert_source_link for each row
-  5. advance sync_cursor to max(next_cursor) across all projects
+  5. advance sync_cursor to min(next_cursor) across projects that
+     returned non-empty pages (ensures no project is starved)
   6. finish sync_run (status=succeeded or failed)
 
 Only 'rfis' is wired in this task; other resource_types raise
@@ -29,6 +30,13 @@ Design notes:
     silently skipped (the orchestrator only works on mapped projects).
     An account with zero mapped projects completes cleanly with zero
     counts — the sync_run still lands as 'succeeded'.
+
+NOTE on failure semantics: Each staging/canonical/source_link call commits
+independently, so if the pipeline raises partway through a multi-project
+run, the sync_run is marked 'failed' but any rows already written before
+the failure remain in place. Idempotent replay catches up the rest —
+checksum dedup on staging and ON CONFLICT on canonical + source_links
+ensure the re-run converges on the right state.
 """
 
 from __future__ import annotations
@@ -90,6 +98,10 @@ async def sync_resource(
     run_id = await start_sync_run(
         db, connector_account_id=account_id, resource_type=resource_type
     )
+    # Hoisted above the try block so the failure path can pass the
+    # partial counts to finish_sync_run (Fix 3).
+    total_fetched = 0
+    total_upserted = 0
     try:
         cursor = await get_cursor(
             db, connector_account_id=account_id, resource_type=resource_type
@@ -106,9 +118,10 @@ async def sync_resource(
               AND source_table = 'procore.projects'
         """))).mappings().all()
 
-        total_fetched = 0
-        total_upserted = 0
-        max_cursor: str | None = cursor
+        # next_cursor values from non-empty pages only. We advance the
+        # shared cursor to MIN(...) of these so no project is starved
+        # by a faster-updating peer (see below).
+        project_cursors: list[str] = []
 
         fetch_fn = getattr(adapter, cfg["fetch_fn_name"])
 
@@ -151,21 +164,28 @@ async def sync_resource(
                 )
                 total_upserted += 1
 
-            # Track the max cursor across every project's last page.
-            # ISO timestamps sort lexicographically for any fixed
-            # offset format, which is what build_rfi_payload emits.
-            if page.next_cursor and (
-                max_cursor is None or page.next_cursor > max_cursor
-            ):
-                max_cursor = page.next_cursor
+            # Collect this project's next_cursor for the MIN-across
+            # advancement below. ISO timestamps sort lexicographically
+            # for any fixed offset format, which is what
+            # build_rfi_payload emits.
+            if page.next_cursor:
+                project_cursors.append(page.next_cursor)
 
-        if max_cursor != cursor:
-            await set_cursor(
-                db,
-                connector_account_id=account_id,
-                resource_type=resource_type,
-                cursor_value=max_cursor,
-            )
+        # Advance cursor to the MIN across projects that returned non-empty
+        # pages. Rationale: shared cursor semantics mean any project must
+        # start from a point that no project has already advanced past.
+        # Using min() prevents projects with older updated_ats from being
+        # starved by faster peers. Over-fetching on the next run for
+        # faster projects is absorbed by staging's checksum-based dedup.
+        if project_cursors:
+            new_cursor = min(project_cursors)
+            if new_cursor != cursor:
+                await set_cursor(
+                    db,
+                    connector_account_id=account_id,
+                    resource_type=resource_type,
+                    cursor_value=new_cursor,
+                )
 
         await finish_sync_run(
             db,
@@ -182,6 +202,8 @@ async def sync_resource(
             db,
             sync_run_id=run_id,
             status="failed",
+            rows_fetched=total_fetched,
+            rows_upserted=total_upserted,
             error_excerpt=str(e),
         )
         raise

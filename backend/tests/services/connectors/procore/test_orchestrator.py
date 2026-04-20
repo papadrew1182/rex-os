@@ -320,3 +320,101 @@ async def test_sync_resource_no_project_mappings_is_zero_counts(
         if mod2._pool:
             await mod2._pool.close()
             mod2._pool = None
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_rfis_cursor_advance_uses_min_across_projects(
+    db_session, procore_connector_account, monkeypatch
+):
+    """Two procore projects with diverging updated_at: the shared cursor must
+    advance to the OLDER of their next_cursor values so the slower-updating
+    project is never starved on subsequent syncs."""
+    import os
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    monkeypatch.setenv("REX_APP_DATABASE_URL", url)
+    import app.services.connectors.procore.rex_app_pool as mod
+    mod._pool = None
+
+    # Seed two canonical projects + two source_link rows mapping to procore project ids
+    pa = await db_session.execute(text(
+        "INSERT INTO rex.projects (id, name, status, project_number) "
+        "VALUES (gen_random_uuid(), 'ProjA', 'active', 'PA') RETURNING id"
+    ))
+    pa_id = pa.scalar_one()
+    pb = await db_session.execute(text(
+        "INSERT INTO rex.projects (id, name, status, project_number) "
+        "VALUES (gen_random_uuid(), 'ProjB', 'active', 'PB') RETURNING id"
+    ))
+    pb_id = pb.scalar_one()
+    await db_session.execute(text("""
+        INSERT INTO rex.connector_mappings
+        (rex_table, rex_id, connector, external_id, source_table, synced_at)
+        VALUES ('rex.projects', :a, 'procore', '500', 'procore.projects', now()),
+               ('rex.projects', :b, 'procore', '600', 'procore.projects', now())
+    """), {"a": pa_id, "b": pb_id})
+
+    # Seed procore.rfis: project 500 updated recently, project 600 updated long ago.
+    # Include ``question`` because rex.rfis.question is NOT NULL — the mapper
+    # passes it through unmodified and a NULL would fail the canonical INSERT.
+    await db_session.execute(text("CREATE SCHEMA IF NOT EXISTS procore"))
+    await db_session.execute(text("DROP TABLE IF EXISTS procore.rfis"))
+    await db_session.execute(text("""
+        CREATE TABLE procore.rfis (
+            procore_id bigint PRIMARY KEY, project_id bigint,
+            number numeric(10,2), subject text, question text, status text,
+            updated_at timestamptz
+        )
+    """))
+    await db_session.execute(text(
+        "INSERT INTO procore.rfis (procore_id, project_id, number, subject, question, status, updated_at) VALUES "
+        "(901, 500, 1, 'fast', 'q-fast', 'open', '2026-04-01T00:00:00Z'),"
+        "(902, 600, 1, 'slow', 'q-slow', 'open', '2026-01-01T00:00:00Z')"
+    ))
+    await db_session.commit()
+
+    try:
+        result = await sync_resource(
+            db_session, account_id=procore_connector_account, resource_type="rfis"
+        )
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Cursor should be advanced to the MIN (older) of the two projects' next_cursors
+        cur = await db_session.execute(text(
+            "SELECT cursor_value FROM rex.sync_cursors "
+            "WHERE connector_account_id=:a AND resource_type='rfis'"
+        ), {"a": procore_connector_account})
+        cursor_value = cur.scalar_one()
+        assert cursor_value is not None
+        # The slow project's updated_at is 2026-01-01; the fast project's is 2026-04-01.
+        # MIN across the two = 2026-01-01.
+        assert "2026-01-01" in cursor_value
+        assert "2026-04-01" not in cursor_value
+    finally:
+        await db_session.execute(text("DROP TABLE IF EXISTS procore.rfis"))
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.rfis_raw WHERE account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings WHERE connector='procore' "
+            "AND external_id IN ('500','600','901','902')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.rfis WHERE project_id IN (:a, :b)"
+        ), {"a": pa_id, "b": pb_id})
+        await db_session.execute(text(
+            "DELETE FROM rex.projects WHERE id IN (:a, :b)"
+        ), {"a": pa_id, "b": pb_id})
+        await db_session.commit()
+        import app.services.connectors.procore.rex_app_pool as mod2
+        if mod2._pool:
+            await mod2._pool.close()
+            mod2._pool = None
