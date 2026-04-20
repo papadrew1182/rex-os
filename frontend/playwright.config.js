@@ -38,6 +38,10 @@ export default defineConfig({
         ...iPhone12,
         // devices['iPhone 12'] already ships portrait 390x844 + iOS Safari UA.
       },
+      // Only run specs designed for mobile viewports. Desktop-oriented tests
+      // (assistant sidebar rail, workspace mode, control plane panels) assert
+      // elements that are display:none at ≤1200px and will false-fail here.
+      testMatch: ['smoke.spec.js', 'mobile-overflow.spec.js'],
     },
     {
       name: 'iphone-landscape',
@@ -49,6 +53,7 @@ export default defineConfig({
         // explicit so intent is obvious when reading the config.
         viewport: { width: 844, height: 390 },
       },
+      testMatch: ['smoke.spec.js', 'mobile-overflow.spec.js'],
     },
   ],
   // Skip auto-starting the webserver — point at a running dev server or
