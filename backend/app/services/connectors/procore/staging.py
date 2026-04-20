@@ -103,6 +103,13 @@ async def upsert_raw(
 
     has_project_col = raw_table not in _NON_PROJECT_TABLES
 
+    # NOTE: connector_procore.daily_logs_raw has a top-level `log_date date`
+    # column (see migration 013) that this writer does NOT populate. That's
+    # intentional for Task 5 scope (RFIs only) but the follow-up plan that
+    # wires daily_logs must either extract log_date from the payload here
+    # (adding a third SQL branch or switching to a per-resource schema
+    # registry) or drop log_date from the staging schema entirely.
+
     # NOTE: we use ``CAST(:param AS <type>)`` rather than the ``:param::type``
     # shorthand because SQLAlchemy's ``text()`` bind-parameter parser sees the
     # double-colon as part of the parameter name and fails to substitute it.
@@ -150,22 +157,25 @@ async def upsert_raw(
             """
         )
 
-    upserted = 0
+    params_list: list[dict[str, Any]] = []
     for item in items:
         params = {
-            "source_id":         item["id"],
+            "source_id":         str(item["id"]),   # defensive: column is text
             "account_id":        account_id,
             "payload":           json.dumps(item, default=str),
             "source_updated_at": _coerce_timestamp(item.get("updated_at")),
             "checksum":          _checksum(item),
         }
         if has_project_col:
-            params["project_source_id"] = item.get("project_source_id")
-        await db.execute(sql, params)
-        upserted += 1
+            params["project_source_id"] = (
+                None if item.get("project_source_id") is None
+                else str(item.get("project_source_id"))
+            )
+        params_list.append(params)
 
+    await db.execute(sql, params_list)
     await db.commit()
-    return upserted
+    return len(params_list)
 
 
 __all__ = ["upsert_raw", "ALLOWED_TABLES"]
