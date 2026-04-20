@@ -13,6 +13,10 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 import db
 from app.rate_limit import limiter
 from app.routes import all_routers
+from app.services.connectors.procore.rex_app_pool import (
+    close_rex_app_pool,
+    get_rex_app_pool,
+)
 
 load_dotenv()
 
@@ -63,6 +67,17 @@ async def lifespan(app: FastAPI):
     log.info("Rex OS starting up")
     await db.get_pool()
 
+    # Second asyncpg pool for the old rex-procore "Rex App" Railway DB.
+    # Optional: env var unset disables the Procore read path without
+    # failing boot. See app/services/connectors/procore/rex_app_pool.py.
+    try:
+        await get_rex_app_pool()
+        log.info("rex_app_pool initialized")
+    except RuntimeError as exc:
+        log.warning("rex_app_pool disabled: %s", exc)
+    except Exception as exc:  # noqa: BLE001
+        log.error("rex_app_pool init failed error=%r", exc)
+
     # Auto-apply migrations on startup if REX_AUTO_MIGRATE=true.
     # Used by Railway deploys so a fresh container picks up new schema.
     if os.getenv("REX_AUTO_MIGRATE", "").lower() in ("1", "true", "yes"):
@@ -105,6 +120,10 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
     log.info("Rex OS shutting down")
+    try:
+        await close_rex_app_pool()
+    except Exception as exc:  # noqa: BLE001
+        log.error("rex_app_pool close failed error=%r", exc)
     await db.close_pool()
 
 
