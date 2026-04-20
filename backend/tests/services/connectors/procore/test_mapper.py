@@ -8,7 +8,7 @@ lines 823-846 + migration 002_field_parity_batch.sql's rfi_manager ADD):
     rfi_number      text NOT NULL
     subject         text NOT NULL
     status          text NOT NULL  -- draft|open|answered|closed|void
-    priority        text NOT NULL default 'medium'
+    priority        text NOT NULL default 'medium' (OMITTED by mapper)
     question        text NOT NULL
     answer          text
     cost_impact     text           -- yes|no|tbd
@@ -27,9 +27,11 @@ lines 823-846 + migration 002_field_parity_batch.sql's rfi_manager ADD):
     created_at      timestamptz default now() (db-managed)
     updated_at      timestamptz default now() (db-managed)
 
-The mapper also emits a convenience `source_id` key (not a rex.rfis
-column; consumed by the source_links writer) and source_names_* keys
-for deferred name->people.id resolution.
+Mapper contract:
+- Output contains ONLY canonical rex.rfis column keys.
+- `priority` is omitted so the DB default ('medium') fires.
+- `source_id` and `source_names_*` are NOT emitted -- Task 7 reads
+  those from the raw payload item directly.
 """
 
 from app.services.connectors.procore.mapper import map_rfi
@@ -61,10 +63,16 @@ def _realistic_payload() -> dict:
     }
 
 
-def test_map_rfi_maps_identity_and_project_fk():
+def test_map_rfi_maps_project_fk():
     m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
-    assert m["source_id"]  == "1234"
     assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_rfi_does_not_emit_source_id():
+    """source_id is NOT a rex.rfis column. Task 7 reads the Procore id
+    directly from the raw payload (item["id"]) for source_links."""
+    m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
 
 
 def test_map_rfi_maps_core_text_fields():
@@ -128,11 +136,14 @@ def test_map_rfi_people_fks_are_none_pending_resolution():
     assert m["created_by"]    is None
 
 
-def test_map_rfi_preserves_source_names_for_deferred_resolution():
+def test_map_rfi_does_not_emit_source_names_sidecar_keys():
+    """source_names_* sidecars are NOT rex.rfis columns. Enrichment
+    passes resolve names by re-reading the raw payload, not by
+    pulling from the mapper output."""
     m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
-    assert m["source_names_assigned_to"]   == "Jane Smith"
-    assert m["source_names_ball_in_court"] == "Architect"
-    assert m["source_names_rfi_manager"]   == "John PM"
+    assert "source_names_assigned_to"   not in m
+    assert "source_names_ball_in_court" not in m
+    assert "source_names_rfi_manager"   not in m
 
 
 def test_map_rfi_due_date_iso_timestamp_becomes_date_string():
@@ -164,7 +175,6 @@ def test_map_rfi_answered_date_none_when_not_closed():
 def test_map_rfi_computed_and_unsourced_fields_are_none():
     """These canonical columns have no payload counterpart today."""
     m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
-    assert m["priority"]     is None  # Procore RFIs don't surface priority in current payload
     assert m["cost_code_id"] is None
     assert m["days_open"]    is None
     assert m["drawing_id"]   is None
@@ -172,16 +182,30 @@ def test_map_rfi_computed_and_unsourced_fields_are_none():
     assert m["location"]     is None
 
 
+def test_map_rfi_omits_priority_so_db_default_fires():
+    """rex.rfis.priority is NOT NULL DEFAULT 'medium'. If the mapper
+    emitted `priority: None`, the INSERT would pass NULL and violate
+    the NOT NULL constraint (defaults don't fire when the column is
+    present with NULL). Omit the key entirely so the INSERT leaves
+    the column out and the DB default applies."""
+    m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
+    assert "priority" not in m
+
+
 def test_map_rfi_emits_every_targeted_canonical_column():
     """Sanity: every rex.rfis column the mapper targets appears as a
-    key in the output dict (value may be None, but the key exists)."""
+    key in the output dict (value may be None, but the key exists).
+
+    Excludes:
+    - `priority` (omitted on purpose so DB default 'medium' fires)
+    - `id`, `created_at`, `updated_at` (DB-managed)
+    """
     m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
     expected_canonical_keys = {
         "project_id",
         "rfi_number",
         "subject",
         "status",
-        "priority",
         "question",
         "answer",
         "cost_impact",
@@ -198,5 +222,8 @@ def test_map_rfi_emits_every_targeted_canonical_column():
         "location",
         "rfi_manager",
     }
-    missing = expected_canonical_keys - set(m.keys())
-    assert not missing, f"mapper missing canonical keys: {missing}"
+    assert set(m.keys()) == expected_canonical_keys, (
+        f"mapper keys differ from expected canonical set.\n"
+        f"  missing (in expected, not in m): {expected_canonical_keys - set(m.keys())}\n"
+        f"  extra   (in m, not in expected): {set(m.keys()) - expected_canonical_keys}"
+    )

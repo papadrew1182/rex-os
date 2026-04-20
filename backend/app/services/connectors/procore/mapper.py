@@ -38,10 +38,10 @@ def _coerce_rfi_number(value: Any) -> str | None:
     than writing the literal string "None"."""
     if value is None:
         return None
+    if isinstance(value, bool):  # bool is a subclass of int in Python
+        return str(value)
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
-    if isinstance(value, int):
-        return str(value)
     return str(value)
 
 
@@ -63,12 +63,12 @@ def map_rfi(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
     Canonical rex.rfis columns (from migrations/rex2_canonical_ddl.sql
     lines 823-846 + migration 002_field_parity_batch.sql):
 
-        id              uuid PK                    -- db-generated
+        id              uuid PK                    -- db-generated; NOT emitted
         project_id      uuid NOT NULL              -- <- project_canonical_id
         rfi_number      text NOT NULL              -- <- coerced from payload float
         subject         text NOT NULL
         status          text NOT NULL              -- draft|open|answered|closed|void
-        priority        text NOT NULL default 'medium' -- NOT in payload; left None
+        priority        text NOT NULL default 'medium' -- OMITTED from output on purpose
         question        text NOT NULL
         answer          text
         cost_impact     text                       -- yes|no|tbd
@@ -84,28 +84,34 @@ def map_rfi(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
         spec_section    text                       -- not in payload; None
         location        text                       -- not in payload; None
         rfi_manager     uuid (migration 002)       -- resolve name->person_id later; None
-        created_at      timestamptz default now()
-        updated_at      timestamptz default now()
+        created_at      timestamptz default now()  -- db-managed; NOT emitted
+        updated_at      timestamptz default now()  -- db-managed; NOT emitted
 
-    Fields whose canonical type is uuid but the payload carries a person's
-    name string (assignee, ball_in_court, rfi_manager) are left as None
-    here -- name->people.id resolution is Task 7's concern. The
-    original names are preserved in source_names_* keys so a later
-    enrichment pass can resolve them without re-reading staging.
+    Contract:
 
-    The "source_id" key is a convenience carryover used by the
-    source_links writer; it is NOT a rex.rfis column.
+    * Output contains ONLY canonical rex.rfis column keys -- safe to
+      splat into a generic INSERT without "column does not exist".
+    * `priority` is OMITTED on purpose. The column is NOT NULL
+      DEFAULT 'medium', but defaults don't fire when the column is
+      included in the INSERT with a NULL value. Omitting the key
+      lets the DB default apply cleanly.
+    * `source_id` is NOT emitted here -- Task 7 reads `item["id"]`
+      directly from the raw payload for the source_links writer.
+    * Name->person-UUID resolution (assignee, ball_in_court,
+      rfi_manager) is left as None here. The enrichment pass reads
+      names from the raw payload, not from this mapper's output, so
+      no source_names_* sidecar keys are emitted.
+    * `id`, `created_at`, `updated_at` are DB-managed and are not in
+      the output.
     """
     return {
         # Identity / links
-        "source_id":       str(raw.get("id", "")),
         "project_id":      project_canonical_id,
 
         # Direct canonical fields
         "rfi_number":      _coerce_rfi_number(raw.get("rfi_number")),
         "subject":         raw.get("subject"),
         "status":          raw.get("status"),
-        "priority":        raw.get("priority"),  # None until Procore surfaces it
         "question":        raw.get("question"),
         "answer":          raw.get("answer"),
         "cost_impact":     raw.get("cost_impact"),
@@ -127,14 +133,6 @@ def map_rfi(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
         "drawing_id":      None,
         "spec_section":    None,
         "location":        None,
-
-        # Preserve the raw string names so a later pass can resolve them
-        # to rex.people ids without re-reading staging. These are NOT
-        # rex.rfis columns; the sync service will strip them before the
-        # upsert and hand them to the enrichment step.
-        "source_names_assigned_to":   raw.get("assignee"),
-        "source_names_ball_in_court": raw.get("ball_in_court"),
-        "source_names_rfi_manager":   raw.get("rfi_manager"),
     }
 
 
