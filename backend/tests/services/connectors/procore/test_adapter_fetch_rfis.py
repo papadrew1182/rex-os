@@ -88,3 +88,41 @@ async def test_fetch_rfis_rejects_non_numeric_project_id(setup_rfis_fixture):
     adapter = ProcoreAdapter(account_id="00000000-0000-0000-0000-000000000001", config={})
     with pytest.raises(ValueError, match="numeric procore project id"):
         await adapter.fetch_rfis(project_external_id="not-a-number")
+
+
+@pytest.mark.asyncio
+async def test_fetch_rfis_raises_when_last_row_has_null_updated_at(monkeypatch):
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    monkeypatch.setenv("REX_APP_DATABASE_URL", url)
+    import app.services.connectors.procore.rex_app_pool as mod
+    mod._pool = None
+    pool = await get_rex_app_pool()
+
+    async with pool.acquire() as conn:
+        await conn.execute("CREATE SCHEMA IF NOT EXISTS procore")
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS procore.rfis (
+                procore_id   bigint PRIMARY KEY,
+                project_id   bigint,
+                number       numeric(10,2),
+                subject      text,
+                status       text,
+                updated_at   timestamptz
+            )
+        """)
+        await conn.execute("TRUNCATE procore.rfis")
+        await conn.execute(
+            "INSERT INTO procore.rfis (procore_id, project_id, subject, status, updated_at) "
+            "VALUES (201, 42, 'nulltest', 'open', NULL)"
+        )
+
+    try:
+        adapter = ProcoreAdapter(account_id="00000000-0000-0000-0000-000000000001", config={})
+        with pytest.raises(ValueError, match="cannot advance cursor"):
+            await adapter.fetch_rfis(project_external_id="42")
+    finally:
+        async with pool.acquire() as conn:
+            await conn.execute("DROP TABLE procore.rfis")
+        await close_rex_app_pool()

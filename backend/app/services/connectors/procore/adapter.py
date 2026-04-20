@@ -55,7 +55,10 @@ class ProcoreAdapter(ConnectorAdapter):
             return ConnectorHealth(
                 healthy=False,
                 last_error_message=str(e),
-                details={"state": "rex_app_pool_unreachable"},
+                details={
+                    "state": "rex_app_probe_failed",
+                    "error_type": type(e).__name__,
+                },
             )
 
     async def list_projects(self, cursor: str | None = None) -> ConnectorPage:
@@ -91,7 +94,13 @@ class ProcoreAdapter(ConnectorAdapter):
         items = [build_rfi_payload(r) for r in rows]
         next_cursor: str | None = None
         if items:
-            next_cursor = items[-1].get("updated_at")
+            last_updated = items[-1].get("updated_at")
+            if last_updated is None:
+                raise ValueError(
+                    "rfis row missing updated_at; cannot advance cursor. "
+                    "Source table procore.rfis is expected to have non-null updated_at."
+                )
+            next_cursor = last_updated
         return ConnectorPage(items=items, next_cursor=next_cursor)
 
     async def fetch_submittals(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
