@@ -30,6 +30,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 ALLOWED_TABLES = {
     "projects_raw",
     "users_raw",
+    "vendors_raw",
     "rfis_raw",
     "submittals_raw",
     "daily_logs_raw",
@@ -41,7 +42,7 @@ ALLOWED_TABLES = {
 }
 
 # These do NOT have a project_source_id column (company-level resources).
-_NON_PROJECT_TABLES = {"projects_raw", "users_raw"}
+_NON_PROJECT_TABLES = {"projects_raw", "users_raw", "vendors_raw"}
 
 
 def _coerce_timestamp(value: Any) -> datetime | None:

@@ -85,8 +85,13 @@ async def test_get_company(client: AsyncClient):
 
 
 async def test_create_company(client: AsyncClient):
+    # rex.companies.name is UNIQUE (migration 027), so the test must use
+    # a unique-per-run name to stay idempotent across re-runs on a shared
+    # dev DB. Suffix with a short uuid to stay deterministic within a
+    # single test run while not colliding with prior runs' residue.
+    unique_name = f"Smoke Electric Co {uuid.uuid4().hex[:8]}"
     r = await client.post("/api/companies/", json={
-        "name": "Smoke Electric Co",
+        "name": unique_name,
         "company_type": "subcontractor",
         "trade": "electrical",
     })

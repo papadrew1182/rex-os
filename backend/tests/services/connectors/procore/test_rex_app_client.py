@@ -142,3 +142,69 @@ async def test_fetch_rows_rejects_non_identifier_filter_col(pool):
             limit=10,
             filters=[("status; DROP TABLE foo;", "=", "open")],
         )
+
+
+@pytest.mark.asyncio
+async def test_fetch_rows_rejects_unknown_cursor_col_type(pool):
+    """``cursor_col_type`` is concatenated into SQL; only an allowlist
+    of known-safe types may pass through. Anything else is a hard fail."""
+    client = RexAppDbClient(pool)
+    with pytest.raises(ValueError, match="cursor_col_type"):
+        await client.fetch_rows(
+            schema="procore",
+            table="rfis",
+            cursor_col="updated_at",
+            cursor_value=None,
+            limit=10,
+            cursor_col_type="jsonb",
+        )
+
+
+@pytest.fixture
+async def fake_procore_projects(pool):
+    """Seed a minimal procore.projects table with bigint procore_id cursor."""
+    async with pool.acquire() as conn:
+        await conn.execute("CREATE SCHEMA IF NOT EXISTS procore")
+        # Don't clash with test_orchestrator.py's own DROP/CREATE of
+        # procore.projects — the tables are compatible (procore_id bigint PK)
+        # and we TRUNCATE here to keep the row set deterministic.
+        await conn.execute("""
+            CREATE TABLE IF NOT EXISTS procore.projects (
+                procore_id bigint PRIMARY KEY,
+                project_name text,
+                project_number text,
+                status text
+            )
+        """)
+        await conn.execute("TRUNCATE procore.projects")
+        await conn.executemany(
+            "INSERT INTO procore.projects (procore_id, project_name, project_number, status) "
+            "VALUES ($1, $2, $3, $4)",
+            [
+                (10, "P10", "PN-10", "Active"),
+                (20, "P20", "PN-20", "Active"),
+                (30, "P30", "PN-30", "Inactive"),
+            ],
+        )
+    yield
+    async with pool.acquire() as conn:
+        await conn.execute("DROP TABLE procore.projects")
+
+
+@pytest.mark.asyncio
+async def test_fetch_rows_supports_bigint_cursor(pool, fake_procore_projects):
+    """``procore.projects`` lacks an updated_at column, so the adapter uses
+    its bigint ``procore_id`` as the monotonic cursor. The client must
+    honor ``cursor_col_type='bigint'`` and double-cast the text param
+    into a bigint (``$N::text::bigint``) rather than the default
+    timestamptz."""
+    client = RexAppDbClient(pool)
+    rows = await client.fetch_rows(
+        schema="procore",
+        table="projects",
+        cursor_col="procore_id",
+        cursor_col_type="bigint",
+        cursor_value="15",
+        limit=10,
+    )
+    assert [r["procore_id"] for r in rows] == [20, 30]

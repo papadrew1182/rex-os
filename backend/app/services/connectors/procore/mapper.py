@@ -19,15 +19,71 @@ from typing import Any
 
 
 def map_project(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore payload (from ``payloads.build_project_payload``) ->
+    canonical ``rex.projects`` row dict.
+
+    Canonical rex.projects columns (from migrations/rex2_canonical_ddl.sql
+    line 16-33):
+        id              uuid PK (db-generated; not emitted)
+        name            text NOT NULL
+        project_number  text  (UNIQUE — see migration 025)
+        status          text NOT NULL CHECK in
+                        (active | inactive | archived |
+                         pre_construction | completed)
+        project_type    text CHECK (...)          (not in payload; omitted)
+        address_line1   text                      (omitted: payload's
+                        ``address`` field is a single freeform blob today;
+                        splitting into line1/line2 is a later concern)
+        city            text
+        state           text                      (<- payload.state_code)
+        zip             text                      (omitted for now:
+                        payload has zip_code but we're keeping the
+                        initial mapper conservative; enable in a later
+                        commit with targeted migration coverage)
+        start_date      date
+        end_date        date                      (<- payload.completion_date)
+        contract_value  numeric                   (not in Procore payload)
+        square_footage  numeric                   (not in Procore payload)
+        description     text                      (not in Procore payload)
+        created_at      timestamptz default now() (db-managed)
+        updated_at      timestamptz default now() (db-managed)
+
+    Contract:
+    * Root resource — takes ONE argument (no ``project_canonical_id``
+      because projects ARE the canonical scope).
+    * Output contains ONLY canonical rex.projects column keys so
+      orchestrator._write_projects can splat them into INSERT ... ON
+      CONFLICT directly.
+    * ``project_number`` is the natural key — upsert is keyed on it
+      (migration 025 adds the UNIQUE constraint). Required on live
+      Procore rows in practice, but the payload may carry None;
+      treat that as "row has no natural key" and let the DB fail
+      the INSERT loud rather than silently swallow.
+    * Procore statuses today are capitalized: 'Active' / 'Inactive' /
+      'Archived'. Lowercase + default missing/unknown to 'active' so
+      the CHECK constraint passes. Intentionally NOT a hard raise —
+      the live source has one-off free-text statuses we don't want
+      to block a full sync on.
+    """
+    status_raw = (raw.get("status") or "").lower()
+    canonical_status = {
+        "active":           "active",
+        "inactive":         "inactive",
+        "archived":         "archived",
+        "pre_construction": "pre_construction",
+        "completed":        "completed",
+        "":                 "active",
+    }.get(status_raw, "active")
+
     return {
-        "source_id": str(raw.get("id", "")),
-        "name": raw.get("name"),
+        "name":           raw.get("project_name") or "Untitled Project",
         "project_number": raw.get("project_number"),
-        "status": raw.get("active", True) and "active" or "inactive",
-        "city": raw.get("city"),
-        "state": raw.get("state_code"),
-        "start_date": raw.get("start_date"),
-        "end_date": raw.get("completion_date"),
+        "status":         canonical_status,
+        "city":           raw.get("city"),
+        # canonical rex.projects column is ``state`` (not ``state_code``)
+        "state":          raw.get("state_code"),
+        "start_date":     _iso_date(raw.get("start_date")),
+        "end_date":       _iso_date(raw.get("completion_date")),
     }
 
 
@@ -185,4 +241,176 @@ def map_commitment(raw: dict[str, Any], project_canonical_id: str) -> dict[str, 
     }
 
 
-__all__ = ["map_project", "map_rfi", "map_submittal", "map_commitment"]
+def map_user(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore user payload (from ``payloads.build_user_payload``) ->
+    canonical ``rex.people`` row dict.
+
+    Canonical rex.people columns we target (from
+    migrations/rex2_canonical_ddl.sql lines 57-71):
+        id              uuid PK (db-generated; not emitted)
+        company_id      uuid FK   (resolve vendor->company later; None)
+        first_name      text NOT NULL
+        last_name       text NOT NULL
+        email           text       (UPSERT natural key — migration 026
+                                    adds UNIQUE (email) to back the
+                                    orchestrator's ON CONFLICT)
+        phone           text
+        title           text       (<- payload.job_title)
+        role_type       text NOT NULL CHECK in ('internal','external')
+        is_active       boolean NOT NULL DEFAULT true  (OMITTED by mapper
+                                    so DB default fires and an admin's
+                                    manual deactivation is not overwritten
+                                    on every sync)
+        notes           text                         (not in payload)
+        created_at/updated_at — DB-managed
+
+    Role-type policy: default ``'external'``. Procore can't reliably
+    distinguish Rex employees from subs / vendors with just the is_employee
+    flag (the flag reflects the *Procore account* owner, not "Rex
+    employee"), so we stamp everyone 'external' and an admin re-classifies
+    true Rex internals in a follow-up UI pass.
+
+    NOT NULL handling:
+    * ``first_name`` / ``last_name`` — NOT NULL in the canonical table.
+      If both are missing but ``full_name`` is present, split on the
+      first space. Otherwise fall back to '(unknown)' so the INSERT
+      still succeeds; a garbage name is preferable to a crashed sync.
+    * ``email`` — NOT NULL in the task contract (UNIQUE via migration
+      026 lets us upsert on it). If a source row has NULL email, we
+      synthesize a deterministic ``procore-user-<id>@placeholder.invalid``
+      placeholder. Deterministic means the next sync targets the same
+      placeholder and the upsert converges on one row rather than
+      spawning N duplicates across re-syncs.
+    """
+    first = raw.get("first_name") or ""
+    last = raw.get("last_name") or ""
+    full = raw.get("full_name") or f"{first} {last}".strip()
+
+    # When first/last are both missing but full_name is present, try to
+    # split on the first space. Single-token names ('Madonna') get
+    # last_name='(unknown)' via the fallback below.
+    if not first and not last and full:
+        parts = full.split(" ", 1)
+        first = parts[0]
+        last = parts[1] if len(parts) > 1 else ""
+
+    if not first:
+        first = "(unknown)"
+    if not last:
+        last = "(unknown)"
+
+    email = raw.get("email")
+    if not email:
+        # Deterministic synthetic placeholder — same source id always
+        # yields the same email so the ON CONFLICT (email) upsert is
+        # idempotent across re-syncs.
+        email = f"procore-user-{raw.get('id')}@placeholder.invalid"
+
+    return {
+        "first_name": first,
+        "last_name":  last,
+        "email":      email,
+        "phone":      raw.get("phone"),
+        # rex.people.title <- payload.job_title
+        "title":      raw.get("job_title"),
+        "role_type":  "external",
+    }
+
+
+def map_vendor(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore vendor payload (from ``payloads.build_vendor_payload``) ->
+    canonical ``rex.companies`` row dict.
+
+    Canonical rex.companies columns (from
+    migrations/rex2_canonical_ddl.sql lines 36-55 + migration 005):
+        id                  uuid PK (db-generated; not emitted)
+        name                text NOT NULL (UNIQUE — migration 027)
+        trade               text
+        company_type        text NOT NULL CHECK IN (subcontractor|
+                            supplier|architect|engineer|owner|gc|
+                            consultant)
+        status              text NOT NULL DEFAULT 'active'  (OMITTED
+                            by mapper so DB default fires; don't
+                            overwrite admin deactivation on every sync)
+        phone               text
+        email               text
+        address_line1       text           (<- payload.address — the
+                            Procore freeform address goes wholesale into
+                            line1; splitting into line1/line2 is future
+                            scope)
+        city                text
+        state               text           (<- payload.state_code)
+        zip                 text           (<- payload.zip_code)
+        license_number      text
+        insurance_expiry    date           (<- GL expiry preferred,
+                            generic expiration_date as fallback — see
+                            note below)
+        insurance_carrier   text           (not in Procore payload; None)
+        bonding_capacity    numeric        (not in Procore payload)
+        notes               text           (not in Procore payload)
+        website             text           (added in migration 005)
+        mobile_phone        text           (added in migration 005; not
+                            emitted — procore row's mobile_phone is
+                            already merged into ``phone`` via the
+                            business_phone OR mobile_phone fallback in
+                            build_vendor_payload)
+        created_at/updated_at — DB-managed
+
+    Contract:
+    * Root resource — takes ONE argument (no parent scope).
+    * Output contains ONLY canonical rex.companies column keys so
+      orchestrator._write_vendors can splat them into INSERT ... ON
+      CONFLICT directly.
+    * ``name`` is the natural key — upsert keyed on it (migration 027
+      adds UNIQUE). NOT NULL on the canonical table; fall back to
+      '(unnamed vendor)' so an INSERT still succeeds on a Procore
+      row with null vendor_name AND null company_name (rare but has
+      been observed).
+    * ``company_type`` defaults to ``'subcontractor'``. Procore's
+      source doesn't expose a reliable classifier, and the dominant
+      vendor relationship in Rex's book of business is subcontractors.
+      Admin re-classifies architect / owner / GC post-sync.
+    * ``insurance_expiry`` policy: prefer ``insurance_gl_expiration_date``
+      (general liability — most frequently referenced on the Wave 1
+      ``vendor_compliance`` action), falling back to the generic
+      ``insurance_expiration_date`` when GL is null. This way a vendor
+      with only one expiration on file still lands a compliance-ready
+      date. Emits a Python ``date`` (not an ISO string) so asyncpg binds
+      it natively to the ``date`` column.
+    """
+    insurance_expiry = (
+        _iso_date(raw.get("insurance_gl_expiration_date"))
+        or _iso_date(raw.get("insurance_expiration_date"))
+    )
+    return {
+        "name":              raw.get("vendor_name") or "(unnamed vendor)",
+        "company_type":      "subcontractor",
+        "trade":             raw.get("trade_name"),
+        "phone":             raw.get("phone"),
+        "email":             raw.get("email"),
+        # canonical rex.companies column is ``address_line1`` (not
+        # ``address``); Procore's freeform address goes wholesale into
+        # line1 for now.
+        "address_line1":     raw.get("address"),
+        "city":              raw.get("city"),
+        # canonical column is ``state`` (not ``state_code``)
+        "state":             raw.get("state_code"),
+        # canonical column is ``zip`` (not ``zip_code``)
+        "zip":               raw.get("zip_code"),
+        "website":           raw.get("website"),
+        "license_number":    raw.get("license_number"),
+        "insurance_expiry":  insurance_expiry,
+        # procore.vendors doesn't carry a carrier name — admins fill
+        # this in manually post-sync.
+        "insurance_carrier": None,
+    }
+
+
+__all__ = [
+    "map_project",
+    "map_rfi",
+    "map_submittal",
+    "map_commitment",
+    "map_user",
+    "map_vendor",
+]
