@@ -149,4 +149,61 @@ def build_user_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-__all__ = ["build_rfi_payload", "build_project_payload", "build_user_payload"]
+def build_vendor_payload(row: dict[str, Any]) -> dict[str, Any]:
+    """Procore ``procore.vendors`` row -> staging payload.
+
+    Source schema (from schema_procore_all_tables.sql, 57 columns; this
+    builder carries only the subset map_vendor / orchestrator consume
+    plus insurance-expiration dates that back the Wave 1
+    ``vendor_compliance`` action).
+
+    Vendors are a root / company-level resource — ``project_source_id`` is
+    ``None``. ``staging.upsert_raw`` branches on the ``vendors_raw`` table
+    name (``_NON_PROJECT_TABLES``) so the project_source_id column is
+    not bound.
+
+    Cursor: adapter.list_vendors uses ``procore_id`` (bigint) for
+    consistency with projects/users. ``procore.vendors.updated_at`` IS
+    populated on the live source (last_upd 2026-03-13), so a timestamptz
+    cursor would work here — but keeping the cursor type uniform across
+    all three root resources simplifies the mental model and the
+    client's ``cursor_col_type`` plumbing.
+
+    ``vendor_name`` falls back to ``company_name`` because some Procore
+    rows have a null vendor_name with a populated company_name. The
+    mapper reads the already-resolved ``vendor_name`` key.
+
+    ``phone`` prefers ``business_phone`` over ``mobile_phone`` — unlike
+    users where the mobile is treated as the primary "reach a person"
+    number, vendors are companies and the business line is the right
+    front door for compliance outreach.
+    """
+    return {
+        "id":                             str(row["procore_id"]),
+        "project_source_id":              None,  # vendors are company-level
+        "vendor_name":                    row.get("vendor_name") or row.get("company_name"),
+        "trade_name":                     row.get("trade_name"),
+        "email":                          row.get("email_address"),
+        "phone":                          row.get("business_phone") or row.get("mobile_phone"),
+        "website":                        row.get("website"),
+        "address":                        row.get("address"),
+        "city":                           row.get("city"),
+        "state_code":                     row.get("state_code"),
+        "zip_code":                       row.get("zip_code"),
+        "is_active":                      row.get("is_active"),
+        "license_number":                 row.get("license_number"),
+        "insurance_expiration_date":      _iso(row.get("insurance_expiration_date")),
+        "insurance_gl_expiration_date":   _iso(row.get("insurance_gl_expiration_date")),
+        "insurance_wc_expiration_date":   _iso(row.get("insurance_wc_expiration_date")),
+        "insurance_auto_expiration_date": _iso(row.get("insurance_auto_expiration_date")),
+        "created_at":                     _iso(row.get("created_at")),
+        "updated_at":                     _iso(row.get("updated_at")),
+    }
+
+
+__all__ = [
+    "build_rfi_payload",
+    "build_project_payload",
+    "build_user_payload",
+    "build_vendor_payload",
+]

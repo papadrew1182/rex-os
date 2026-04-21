@@ -3,6 +3,7 @@ from app.services.connectors.procore.payloads import (
     build_project_payload,
     build_rfi_payload,
     build_user_payload,
+    build_vendor_payload,
 )
 
 
@@ -240,3 +241,116 @@ def test_build_user_payload_handles_null_timestamps():
     assert p["created_at"] is None
     assert p["updated_at"] is None
     assert p["last_login_at"] is None
+
+
+# ── build_vendor_payload ──────────────────────────────────────────────────
+
+
+def test_build_vendor_payload_happy_path():
+    row = {
+        "procore_id":                     6001,
+        "vendor_name":                    "Acme Subs LLC",
+        "company_name":                   "Acme Subsidiary Holdings",
+        "trade_name":                     "Electrical",
+        "email_address":                  "contact@acme.example",
+        "business_phone":                 "555-7000",
+        "mobile_phone":                   "555-7001",
+        "address":                        "500 Industrial Dr",
+        "city":                           "Dallas",
+        "state_code":                     "TX",
+        "zip_code":                       "75201",
+        "website":                        "https://acme.example",
+        "is_active":                      True,
+        "license_number":                 "TECL-12345",
+        "insurance_expiration_date":      date(2027, 1, 31),
+        "insurance_gl_expiration_date":   date(2027, 3, 15),
+        "insurance_wc_expiration_date":   date(2027, 4, 30),
+        "insurance_auto_expiration_date": date(2027, 5, 30),
+        "created_at":                     datetime(2026, 1, 1, tzinfo=timezone.utc),
+        "updated_at":                     datetime(2026, 4, 1, tzinfo=timezone.utc),
+    }
+    p = build_vendor_payload(row)
+    assert p["id"] == "6001"
+    assert p["project_source_id"] is None  # vendors are company-level
+    assert p["vendor_name"] == "Acme Subs LLC"
+    assert p["trade_name"] == "Electrical"
+    assert p["email"] == "contact@acme.example"
+    # business_phone wins over mobile_phone (company-first preference —
+    # matches how the compliance action emails the vendor's front door,
+    # not an individual's cell).
+    assert p["phone"] == "555-7000"
+    assert p["website"] == "https://acme.example"
+    assert p["address"] == "500 Industrial Dr"
+    assert p["city"] == "Dallas"
+    assert p["state_code"] == "TX"
+    assert p["zip_code"] == "75201"
+    assert p["is_active"] is True
+    assert p["license_number"] == "TECL-12345"
+    assert p["insurance_expiration_date"] == "2027-01-31"
+    assert p["insurance_gl_expiration_date"] == "2027-03-15"
+    assert p["insurance_wc_expiration_date"] == "2027-04-30"
+    assert p["insurance_auto_expiration_date"] == "2027-05-30"
+    assert p["created_at"] == "2026-01-01T00:00:00+00:00"
+    assert p["updated_at"] == "2026-04-01T00:00:00+00:00"
+
+
+def test_build_vendor_payload_vendor_name_falls_back_to_company_name():
+    """Some Procore rows have vendor_name NULL but company_name populated."""
+    row = {
+        "procore_id":   6002,
+        "vendor_name":  None,
+        "company_name": "Acme Subsidiary Holdings",
+    }
+    p = build_vendor_payload(row)
+    assert p["vendor_name"] == "Acme Subsidiary Holdings"
+
+
+def test_build_vendor_payload_phone_falls_back_to_mobile_when_business_missing():
+    row = {
+        "procore_id":     6003,
+        "business_phone": None,
+        "mobile_phone":   "555-7001",
+    }
+    p = build_vendor_payload(row)
+    assert p["phone"] == "555-7001"
+
+
+def test_build_vendor_payload_phone_none_when_both_missing():
+    row = {"procore_id": 6004, "business_phone": None, "mobile_phone": None}
+    p = build_vendor_payload(row)
+    assert p["phone"] is None
+
+
+def test_build_vendor_payload_coerces_id_to_string():
+    """procore_id is bigint; staging.source_id is text."""
+    p = build_vendor_payload({"procore_id": 42})
+    assert isinstance(p["id"], str)
+    assert p["id"] == "42"
+
+
+def test_build_vendor_payload_project_source_id_always_none():
+    """Vendors are company-level; project_source_id is None."""
+    p = build_vendor_payload({"procore_id": 6005})
+    assert p["project_source_id"] is None
+
+
+def test_build_vendor_payload_handles_null_dates():
+    """Live procore.vendors has some insurance-expiry columns null for
+    most rows (many vendors never filled them in). All four must
+    stringify to None rather than the literal 'None'."""
+    row = {
+        "procore_id":                     6006,
+        "insurance_expiration_date":      None,
+        "insurance_gl_expiration_date":   None,
+        "insurance_wc_expiration_date":   None,
+        "insurance_auto_expiration_date": None,
+        "created_at":                     None,
+        "updated_at":                     None,
+    }
+    p = build_vendor_payload(row)
+    assert p["insurance_expiration_date"] is None
+    assert p["insurance_gl_expiration_date"] is None
+    assert p["insurance_wc_expiration_date"] is None
+    assert p["insurance_auto_expiration_date"] is None
+    assert p["created_at"] is None
+    assert p["updated_at"] is None

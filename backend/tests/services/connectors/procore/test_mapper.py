@@ -34,7 +34,12 @@ Mapper contract:
   those from the raw payload item directly.
 """
 
-from app.services.connectors.procore.mapper import map_project, map_rfi, map_user
+from app.services.connectors.procore.mapper import (
+    map_project,
+    map_rfi,
+    map_user,
+    map_vendor,
+)
 
 PROJECT_CANONICAL_ID = "11111111-1111-1111-1111-111111111111"
 
@@ -547,6 +552,183 @@ def test_map_user_emits_only_canonical_columns():
         "phone",
         "title",
         "role_type",
+    }
+    assert set(m.keys()) == expected, (
+        f"mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_vendor ────────────────────────────────────────────────────────────
+
+
+def _vendor_payload() -> dict:
+    """Mirror ``payloads.build_vendor_payload`` output for a representative
+    Procore vendor row."""
+    return {
+        "id":                             "6001",
+        "project_source_id":              None,
+        "vendor_name":                    "Acme Subs LLC",
+        "trade_name":                     "Electrical",
+        "email":                          "contact@acme.example",
+        "phone":                          "555-7000",
+        "website":                        "https://acme.example",
+        "address":                        "500 Industrial Dr",
+        "city":                           "Dallas",
+        "state_code":                     "TX",
+        "zip_code":                       "75201",
+        "is_active":                      True,
+        "license_number":                 "TECL-12345",
+        "insurance_expiration_date":      "2027-01-31",
+        "insurance_gl_expiration_date":   "2027-03-15",
+        "insurance_wc_expiration_date":   "2027-04-30",
+        "insurance_auto_expiration_date": "2027-05-30",
+        "created_at":                     "2026-01-01T00:00:00+00:00",
+        "updated_at":                     "2026-04-01T00:00:00+00:00",
+    }
+
+
+def test_map_vendor_single_arg_signature():
+    """Vendors are a root resource — no parent project to inject."""
+    m = map_vendor(_vendor_payload())
+    assert isinstance(m, dict)
+
+
+def test_map_vendor_sets_name_and_company_type():
+    m = map_vendor(_vendor_payload())
+    assert m["name"] == "Acme Subs LLC"
+    # rex.companies.company_type is NOT NULL CHECK IN
+    # (subcontractor|supplier|architect|engineer|owner|gc|consultant)
+    # — Procore doesn't expose a reliable classifier, so we default to
+    # 'subcontractor' and admins re-classify.
+    assert m["company_type"] == "subcontractor"
+
+
+def test_map_vendor_name_fallback_when_missing():
+    """rex.companies.name is NOT NULL. A missing source name must fall
+    back to a safe placeholder rather than emit None and break the
+    canonical INSERT."""
+    raw = _vendor_payload()
+    raw["vendor_name"] = None
+    m = map_vendor(raw)
+    assert m["name"] == "(unnamed vendor)"
+
+
+def test_map_vendor_maps_trade_email_phone():
+    m = map_vendor(_vendor_payload())
+    assert m["trade"] == "Electrical"
+    assert m["email"] == "contact@acme.example"
+    assert m["phone"] == "555-7000"
+
+
+def test_map_vendor_maps_state_code_to_state():
+    """rex.companies column is ``state``; payload key is ``state_code``."""
+    m = map_vendor(_vendor_payload())
+    assert m["state"] == "TX"
+    assert "state_code" not in m
+
+
+def test_map_vendor_maps_address_to_address_line1():
+    """rex.companies canonical column is ``address_line1`` (not
+    ``address``). Procore payload's freeform ``address`` field goes
+    into line1 wholesale — splitting into line1/line2 is a future
+    concern."""
+    m = map_vendor(_vendor_payload())
+    assert m["address_line1"] == "500 Industrial Dr"
+    assert "address" not in m
+
+
+def test_map_vendor_maps_zip_code_to_zip():
+    """rex.companies canonical column is ``zip`` (not ``zip_code``)."""
+    m = map_vendor(_vendor_payload())
+    assert m["zip"] == "75201"
+    assert "zip_code" not in m
+
+
+def test_map_vendor_maps_city_and_website():
+    m = map_vendor(_vendor_payload())
+    assert m["city"] == "Dallas"
+    assert m["website"] == "https://acme.example"
+
+
+def test_map_vendor_maps_license_number():
+    m = map_vendor(_vendor_payload())
+    assert m["license_number"] == "TECL-12345"
+
+
+def test_map_vendor_insurance_expiry_prefers_gl_expiration():
+    """The GL (general liability) expiration is the most commonly
+    referenced carrier date on the vendor_compliance action. Prefer it
+    over the generic ``insurance_expiration_date`` when both are set,
+    and emit a Python ``date`` object so asyncpg binds it natively to
+    rex.companies.insurance_expiry."""
+    from datetime import date
+    m = map_vendor(_vendor_payload())
+    assert m["insurance_expiry"] == date(2027, 3, 15)
+    assert isinstance(m["insurance_expiry"], date)
+
+
+def test_map_vendor_insurance_expiry_falls_back_to_generic():
+    """When insurance_gl_expiration_date is NULL, fall back to the
+    generic ``insurance_expiration_date`` so vendors with only one
+    expiration on file still land a compliance-ready value."""
+    from datetime import date
+    raw = _vendor_payload()
+    raw["insurance_gl_expiration_date"] = None
+    m = map_vendor(raw)
+    assert m["insurance_expiry"] == date(2027, 1, 31)
+
+
+def test_map_vendor_insurance_expiry_none_when_both_missing():
+    raw = _vendor_payload()
+    raw["insurance_gl_expiration_date"] = None
+    raw["insurance_expiration_date"] = None
+    m = map_vendor(raw)
+    assert m["insurance_expiry"] is None
+
+
+def test_map_vendor_insurance_carrier_is_none():
+    """procore.vendors doesn't carry the carrier name; admins fill it
+    in manually post-sync."""
+    m = map_vendor(_vendor_payload())
+    assert m["insurance_carrier"] is None
+
+
+def test_map_vendor_does_not_emit_source_id():
+    """source_id is NOT a rex.companies column. Orchestrator reads the
+    procore id directly from the raw payload (item["id"]) for the
+    source_links writer."""
+    m = map_vendor(_vendor_payload())
+    assert "source_id" not in m
+
+
+def test_map_vendor_emits_only_canonical_columns():
+    """Every key the mapper emits must be a real rex.companies column
+    so the orchestrator's INSERT ... ON CONFLICT (name) splat doesn't
+    reference a nonexistent column.
+
+    Excluded from the output:
+    - id, created_at, updated_at (DB-managed)
+    - status (DB default 'active'; omitted so default fires — don't
+      overwrite an admin's manual deactivation)
+    - bonding_capacity, notes, mobile_phone (not sourced from Procore today)
+    """
+    m = map_vendor(_vendor_payload())
+    expected = {
+        "name",
+        "company_type",
+        "trade",
+        "phone",
+        "email",
+        "address_line1",
+        "city",
+        "state",
+        "zip",
+        "website",
+        "license_number",
+        "insurance_expiry",
+        "insurance_carrier",
     }
     assert set(m.keys()) == expected, (
         f"mapper keys differ from expected canonical set.\n"

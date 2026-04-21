@@ -317,4 +317,100 @@ def map_user(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-__all__ = ["map_project", "map_rfi", "map_submittal", "map_commitment", "map_user"]
+def map_vendor(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore vendor payload (from ``payloads.build_vendor_payload``) ->
+    canonical ``rex.companies`` row dict.
+
+    Canonical rex.companies columns (from
+    migrations/rex2_canonical_ddl.sql lines 36-55 + migration 005):
+        id                  uuid PK (db-generated; not emitted)
+        name                text NOT NULL (UNIQUE — migration 027)
+        trade               text
+        company_type        text NOT NULL CHECK IN (subcontractor|
+                            supplier|architect|engineer|owner|gc|
+                            consultant)
+        status              text NOT NULL DEFAULT 'active'  (OMITTED
+                            by mapper so DB default fires; don't
+                            overwrite admin deactivation on every sync)
+        phone               text
+        email               text
+        address_line1       text           (<- payload.address — the
+                            Procore freeform address goes wholesale into
+                            line1; splitting into line1/line2 is future
+                            scope)
+        city                text
+        state               text           (<- payload.state_code)
+        zip                 text           (<- payload.zip_code)
+        license_number      text
+        insurance_expiry    date           (<- GL expiry preferred,
+                            generic expiration_date as fallback — see
+                            note below)
+        insurance_carrier   text           (not in Procore payload; None)
+        bonding_capacity    numeric        (not in Procore payload)
+        notes               text           (not in Procore payload)
+        website             text           (added in migration 005)
+        mobile_phone        text           (added in migration 005; not
+                            emitted — procore row's mobile_phone is
+                            already merged into ``phone`` via the
+                            business_phone OR mobile_phone fallback in
+                            build_vendor_payload)
+        created_at/updated_at — DB-managed
+
+    Contract:
+    * Root resource — takes ONE argument (no parent scope).
+    * Output contains ONLY canonical rex.companies column keys so
+      orchestrator._write_vendors can splat them into INSERT ... ON
+      CONFLICT directly.
+    * ``name`` is the natural key — upsert keyed on it (migration 027
+      adds UNIQUE). NOT NULL on the canonical table; fall back to
+      '(unnamed vendor)' so an INSERT still succeeds on a Procore
+      row with null vendor_name AND null company_name (rare but has
+      been observed).
+    * ``company_type`` defaults to ``'subcontractor'``. Procore's
+      source doesn't expose a reliable classifier, and the dominant
+      vendor relationship in Rex's book of business is subcontractors.
+      Admin re-classifies architect / owner / GC post-sync.
+    * ``insurance_expiry`` policy: prefer ``insurance_gl_expiration_date``
+      (general liability — most frequently referenced on the Wave 1
+      ``vendor_compliance`` action), falling back to the generic
+      ``insurance_expiration_date`` when GL is null. This way a vendor
+      with only one expiration on file still lands a compliance-ready
+      date. Emits a Python ``date`` (not an ISO string) so asyncpg binds
+      it natively to the ``date`` column.
+    """
+    insurance_expiry = (
+        _iso_date(raw.get("insurance_gl_expiration_date"))
+        or _iso_date(raw.get("insurance_expiration_date"))
+    )
+    return {
+        "name":              raw.get("vendor_name") or "(unnamed vendor)",
+        "company_type":      "subcontractor",
+        "trade":             raw.get("trade_name"),
+        "phone":             raw.get("phone"),
+        "email":             raw.get("email"),
+        # canonical rex.companies column is ``address_line1`` (not
+        # ``address``); Procore's freeform address goes wholesale into
+        # line1 for now.
+        "address_line1":     raw.get("address"),
+        "city":              raw.get("city"),
+        # canonical column is ``state`` (not ``state_code``)
+        "state":             raw.get("state_code"),
+        # canonical column is ``zip`` (not ``zip_code``)
+        "zip":               raw.get("zip_code"),
+        "website":           raw.get("website"),
+        "license_number":    raw.get("license_number"),
+        "insurance_expiry":  insurance_expiry,
+        # procore.vendors doesn't carry a carrier name — admins fill
+        # this in manually post-sync.
+        "insurance_carrier": None,
+    }
+
+
+__all__ = [
+    "map_project",
+    "map_rfi",
+    "map_submittal",
+    "map_commitment",
+    "map_user",
+    "map_vendor",
+]

@@ -21,6 +21,7 @@ from app.services.connectors.procore.payloads import (
     build_project_payload,
     build_rfi_payload,
     build_user_payload,
+    build_vendor_payload,
 )
 from app.services.connectors.procore.rex_app_client import RexAppDbClient
 from app.services.connectors.procore.rex_app_pool import get_rex_app_pool
@@ -112,6 +113,41 @@ class ProcoreAdapter(ConnectorAdapter):
             limit=DEFAULT_PAGE_SIZE,
         )
         items = [build_user_payload(r) for r in rows]
+        next_cursor: str | None = None
+        if items:
+            next_cursor = items[-1]["id"]
+        return ConnectorPage(items=items, next_cursor=next_cursor)
+
+    async def list_vendors(self, cursor: str | None = None) -> ConnectorPage:
+        """Fetch one page of ``procore.vendors`` rows from the Rex App DB.
+
+        Procore-specific (not on ``ConnectorAdapter`` ABC): vendors are a
+        concept the Procore connector surfaces via its own
+        ``procore.vendors`` table. The ABC's ``list_users`` covers the
+        cross-project directory; a future multi-connector vendor API
+        would add ``list_vendors`` to the ABC (with stubs for the
+        adapters that don't implement it). The orchestrator calls this
+        through ``getattr(adapter, cfg['fetch_fn_name'])``, which is
+        duck-typed — so adding the method here without extending the
+        ABC works cleanly.
+
+        Cursor semantics: ``procore.vendors.updated_at`` IS populated on
+        the live source, but we use the bigint ``procore_id`` as the
+        monotonic cursor for consistency with projects/users (both use
+        procore_id because their updated_at is sparse). Keeping the
+        cursor type uniform across the three root resources simplifies
+        the mental model and the client's ``cursor_col_type`` plumbing.
+        """
+        client = await self._get_client()
+        rows = await client.fetch_rows(
+            schema="procore",
+            table="vendors",
+            cursor_col="procore_id",
+            cursor_col_type="bigint",
+            cursor_value=cursor,
+            limit=DEFAULT_PAGE_SIZE,
+        )
+        items = [build_vendor_payload(r) for r in rows]
         next_cursor: str | None = None
         if items:
             next_cursor = items[-1]["id"]

@@ -90,6 +90,12 @@ MIGRATION_ORDER: list[str] = [
     #       orchestrator's ON CONFLICT upsert has a matching constraint
     #       (Task 3 of Phase 4a).
     "026_rex_people_email_unique.sql",
+    # 027 = unique (name) on rex.companies + create
+    #       connector_procore.vendors_raw staging table so the vendors
+    #       resource orchestrator's ON CONFLICT (name) upsert has a
+    #       matching constraint and a place to stage raw payloads
+    #       (Task 4 of Phase 4a).
+    "027_rex_companies_name_unique_and_vendors_raw.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

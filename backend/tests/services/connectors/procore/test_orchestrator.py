@@ -260,6 +260,168 @@ async def test_sync_resource_rfis_end_to_end(
 
 
 @pytest.mark.asyncio
+async def test_sync_resource_vendors_end_to_end(
+    db_session, procore_connector_account, monkeypatch
+):
+    """Full root-resource pipeline for vendors: seed procore.vendors ->
+    sync_resource('vendors') -> rex.companies canonical rows +
+    rex.connector_mappings source_links + sync_runs / sync_cursors state.
+
+    Uses distinctive P4A-VENDOR-* vendor names so teardown is safe even
+    if a prior test run left residue. The distinctive prefix also keeps
+    the UNIQUE (name) constraint (migration 027) from colliding with
+    live rex.companies rows.
+    """
+    import os
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    monkeypatch.setenv("REX_APP_DATABASE_URL", url)
+    import app.services.connectors.procore.rex_app_pool as mod
+    mod._pool = None
+
+    # Seed procore.vendors with the minimal column set
+    # build_vendor_payload reads. DROP/CREATE instead of TRUNCATE
+    # because prior test runs may have left a table with a different
+    # column shape.
+    await db_session.execute(text("CREATE SCHEMA IF NOT EXISTS procore"))
+    await db_session.execute(text("DROP TABLE IF EXISTS procore.vendors"))
+    await db_session.execute(text("""
+        CREATE TABLE procore.vendors (
+            procore_id bigint PRIMARY KEY,
+            vendor_name text,
+            company_name text,
+            trade_name text,
+            email_address text,
+            business_phone text,
+            mobile_phone text,
+            address text,
+            city text,
+            state_code text,
+            zip_code text,
+            website text,
+            is_active boolean,
+            license_number text,
+            insurance_expiration_date date,
+            insurance_gl_expiration_date date,
+            insurance_wc_expiration_date date,
+            insurance_auto_expiration_date date,
+            created_at timestamptz,
+            updated_at timestamptz
+        )
+    """))
+    await db_session.execute(text(
+        "INSERT INTO procore.vendors "
+        "(procore_id, vendor_name, trade_name, is_active, "
+        " insurance_gl_expiration_date) "
+        "VALUES (9901, 'P4A-VENDOR-ALPHA', 'Electrical', true, "
+        "        '2027-03-15'), "
+        "       (9902, 'P4A-VENDOR-BETA',  'Plumbing',   true, NULL)"
+    ))
+    await db_session.commit()
+
+    try:
+        result = await sync_resource(
+            db_session,
+            account_id=procore_connector_account,
+            resource_type="vendors",
+        )
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Canonical rows landed in rex.companies
+        canonical = await db_session.execute(text(
+            "SELECT name, company_type, trade, insurance_expiry "
+            "FROM rex.companies "
+            "WHERE name LIKE 'P4A-VENDOR-%' "
+            "ORDER BY name"
+        ))
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        assert rows[0]["name"] == "P4A-VENDOR-ALPHA"
+        assert rows[0]["company_type"] == "subcontractor"  # default
+        assert rows[0]["trade"] == "Electrical"
+        # GL expiry preferred by the mapper
+        import datetime as _dt
+        assert rows[0]["insurance_expiry"] == _dt.date(2027, 3, 15)
+        assert rows[1]["name"] == "P4A-VENDOR-BETA"
+        assert rows[1]["trade"] == "Plumbing"
+        assert rows[1]["insurance_expiry"] is None
+
+        # source_links: one per seeded procore vendor, pointing at rex.companies
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.vendors' "
+            "  AND external_id IN ('9901','9902')"
+        ))
+        assert links.scalar_one() == 2
+
+        # Staging landed in connector_procore.vendors_raw
+        staged = await db_session.execute(text(
+            "SELECT source_id, payload->>'vendor_name' AS vn "
+            "FROM connector_procore.vendors_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('9901','9902') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [(row["source_id"], row["vn"]) for row in staged.mappings().all()]
+        assert staged_rows == [
+            ("9901", "P4A-VENDOR-ALPHA"),
+            ("9902", "P4A-VENDOR-BETA"),
+        ]
+
+        # sync_run finished in 'succeeded' state with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a AND resource_type='vendors' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+        # Cursor advanced to the last procore_id (bigint as string)
+        cur = await db_session.execute(text(
+            "SELECT cursor_value FROM rex.sync_cursors "
+            "WHERE connector_account_id=:a AND resource_type='vendors'"
+        ), {"a": procore_connector_account})
+        cursor_value = cur.scalar_one()
+        assert cursor_value == "9902"
+
+    finally:
+        await db_session.execute(text("DROP TABLE IF EXISTS procore.vendors"))
+        # Order matters: connector_mappings references rex.companies by rex_id,
+        # so delete mappings first, then the canonical rows, then staging.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.vendors' "
+            "  AND external_id IN ('9901','9902')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.companies WHERE name LIKE 'P4A-VENDOR-%'"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.vendors_raw WHERE account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()
+        import app.services.connectors.procore.rex_app_pool as mod2
+        if mod2._pool:
+            await mod2._pool.close()
+            mod2._pool = None
+
+
+@pytest.mark.asyncio
 async def test_sync_resource_unknown_resource_type_raises(
     db_session, procore_connector_account
 ):
