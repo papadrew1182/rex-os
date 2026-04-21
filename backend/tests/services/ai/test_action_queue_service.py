@@ -18,7 +18,8 @@ from app.services.ai.tools.base import (
 )
 
 
-def _spec(slug="test_tool", fires_external=False, will_approve=False):
+def _spec(slug="test_tool", fires_external=False, will_approve=False,
+          with_compensator=False):
     async def classify(args, ctx):
         return BlastRadius(
             audience='external' if will_approve else 'internal',
@@ -30,6 +31,9 @@ def _spec(slug="test_tool", fires_external=False, will_approve=False):
     async def handler(ctx):
         return ActionResult(result_payload={"ok": True, "slug": slug})
 
+    async def compensator(original_result, ctx):
+        return ActionResult(result_payload={"reversed": True})
+
     return ActionSpec(
         slug=slug,
         tool_schema={
@@ -39,6 +43,7 @@ def _spec(slug="test_tool", fires_external=False, will_approve=False):
         classify=classify,
         handler=handler,
         fires_external_effect=fires_external,
+        compensator=compensator if with_compensator else None,
     )
 
 
@@ -176,7 +181,7 @@ async def test_handler_failure_marks_failed_with_error_excerpt():
 
 @pytest.mark.asyncio
 async def test_undo_marks_undone_within_window():
-    svc, repo = _make_service(_spec(slug="undoable"))
+    svc, repo = _make_service(_spec(slug="undoable", with_compensator=True))
     user_id = uuid4()
     enq = await svc.enqueue(
         conn=_FakeConn(), user_account_id=user_id,
@@ -184,13 +189,13 @@ async def test_undo_marks_undone_within_window():
         tool_slug="undoable", tool_args={},
     )
     # It's auto_committed now — immediately undo
-    undo = await svc.undo(action_id=enq.action_id)
+    undo = await svc.undo(conn=_FakeConn(), action_id=enq.action_id)
     assert undo.status == "undone"
 
 
 @pytest.mark.asyncio
 async def test_undo_rejects_outside_window():
-    svc, repo = _make_service(_spec(slug="undoable"))
+    svc, repo = _make_service(_spec(slug="undoable", with_compensator=True))
     user_id = uuid4()
     enq = await svc.enqueue(
         conn=_FakeConn(), user_account_id=user_id,
@@ -201,6 +206,6 @@ async def test_undo_rejects_outside_window():
     repo.rows[enq.action_id]["committed_at"] = (
         datetime.now(timezone.utc) - timedelta(seconds=UNDO_WINDOW_SECONDS + 5)
     )
-    undo = await svc.undo(action_id=enq.action_id)
+    undo = await svc.undo(conn=_FakeConn(), action_id=enq.action_id)
     assert undo.status == "auto_committed"  # unchanged — outside window
     assert "undo window expired" in (undo.error_excerpt or "")

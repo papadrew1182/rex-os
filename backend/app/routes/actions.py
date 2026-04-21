@@ -126,7 +126,9 @@ async def undo(
     row = await svc._repo.get(action_id)
     if row is None:
         raise HTTPException(status_code=404, detail="action not found")
-    result = await svc.undo(action_id=action_id)
+    pool = await rex_db.get_pool()
+    async with pool.acquire() as conn:
+        result = await svc.undo(conn=conn, action_id=action_id)
     return ActionResponse(
         action_id=result.action_id,
         status=result.status,
