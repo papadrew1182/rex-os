@@ -172,3 +172,27 @@ def _by_slug(slug: str) -> dict:
         if entry["slug"] == slug:
             return entry
     raise KeyError(slug)
+
+
+WAVE1_LIVE_SLUGS = frozenset({
+    "rfi_aging",
+    "submittal_sla",
+    "budget_variance",
+    "daily_log_summary",
+    "critical_path_delays",
+    "two_week_lookahead",
+    "documentation_compliance",
+    "my_day_briefing",
+})
+
+
+def test_wave1_alpha_actions_are_now_live():
+    """Phase 5 Wave 1 alpha handlers were wired to real SQL; the catalog
+    must reflect readiness_state='live' for the 8 slugs."""
+    by_slug = {e["slug"]: e for e in QUICK_ACTIONS_CATALOG}
+    for slug in WAVE1_LIVE_SLUGS:
+        assert slug in by_slug, f"missing catalog entry for {slug!r}"
+        assert by_slug[slug]["readiness_state"] == "live", (
+            f"{slug} is still {by_slug[slug]['readiness_state']!r}, "
+            "expected 'live' after Phase 5 Wave 1 wiring"
+        )
