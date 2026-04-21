@@ -93,9 +93,66 @@ async def resolve_scope_project_ids(
     return [r["project_id"] for r in rows]
 
 
+def _render_fragment(
+    *,
+    slug: str,
+    scope_label: str,
+    summary_lines: list[str],
+    table_header: list[str],
+    rows: list[dict],
+    empty_message: str,
+) -> str:
+    """Render the standard prompt_fragment template.
+
+    Layout:
+
+        ## Quick action data: <slug>
+
+        Scope: <scope_label>
+
+        Summary:
+        - <line 1>
+        - <line 2>
+        ...
+
+        Top rows:
+        | col | col | col |
+        | --- | --- | --- |
+        | v | v | v |
+
+        Use these numbers verbatim in your response; do not recalculate them.
+
+    When rows is empty, replaces the table with ``empty_message``.
+    """
+    parts = [
+        f"## Quick action data: {slug}",
+        "",
+        f"Scope: {scope_label}",
+        "",
+        "Summary:",
+        *[f"- {line}" for line in summary_lines],
+        "",
+    ]
+    if rows:
+        header_line = "| " + " | ".join(table_header) + " |"
+        sep_line = "| " + " | ".join("---" for _ in table_header) + " |"
+        body_lines = []
+        for r in rows:
+            body_lines.append(
+                "| " + " | ".join(str(r.get(h, "")) for h in table_header) + " |"
+            )
+        parts.extend(["Top rows:", header_line, sep_line, *body_lines, ""])
+    else:
+        parts.extend([empty_message, ""])
+
+    parts.append("Use these numbers verbatim in your response; do not recalculate them.")
+    return "\n".join(parts)
+
+
 __all__ = [
     "ActionContext",
     "ActionResult",
     "QuickActionHandler",
     "resolve_scope_project_ids",
+    "_render_fragment",
 ]
