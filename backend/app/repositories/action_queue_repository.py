@@ -27,6 +27,8 @@ class ActionQueueRepository:
         requires_approval: bool,
         status: str,
         approver_role: str | None,
+        correction_of_id: UUID | None = None,
+        committed_at_now: bool = False,
     ) -> None:
         await self._db.execute(
             text(
@@ -35,7 +37,8 @@ class ActionQueueRepository:
                     id, user_account_id, requested_by_user_id,
                     conversation_id, message_id,
                     tool_slug, tool_args, blast_radius, requires_approval,
-                    status, approver_role, created_at, updated_at
+                    status, approver_role, correction_of_id,
+                    committed_at, created_at, updated_at
                 ) VALUES (
                     :id, :user_account_id,
                     :requested_by_user_id,
@@ -44,7 +47,9 @@ class ActionQueueRepository:
                     CAST(:tool_args AS jsonb),
                     CAST(:blast_radius AS jsonb),
                     :requires_approval,
-                    :status, :approver_role, now(), now()
+                    :status, :approver_role, :correction_of_id,
+                    CASE WHEN :committed_at_now THEN now() ELSE NULL END,
+                    now(), now()
                 )
                 """
             ),
@@ -60,6 +65,8 @@ class ActionQueueRepository:
                 "requires_approval": requires_approval,
                 "status": status,
                 "approver_role": approver_role,
+                "correction_of_id": correction_of_id,
+                "committed_at_now": committed_at_now,
             },
         )
         await self._db.commit()
@@ -114,6 +121,7 @@ class ActionQueueRepository:
                     "SELECT * FROM rex.action_queue "
                     "WHERE user_account_id = :uid "
                     "AND status = 'pending_approval' "
+                    r"AND tool_slug NOT LIKE '%\_\_undo' ESCAPE '\' "
                     "ORDER BY created_at DESC LIMIT :lim"
                 ),
                 {"uid": user_account_id, "lim": limit},
@@ -130,6 +138,7 @@ class ActionQueueRepository:
                     "SELECT * FROM rex.action_queue "
                     "WHERE approver_role = :role "
                     "AND status = 'pending_approval' "
+                    r"AND tool_slug NOT LIKE '%\_\_undo' ESCAPE '\' "
                     "ORDER BY created_at DESC LIMIT :lim"
                 ),
                 {"role": approver_role, "lim": limit},
