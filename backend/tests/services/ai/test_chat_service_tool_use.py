@@ -296,6 +296,11 @@ async def test_tool_use_pending_approval_emits_action_proposed_frame():
     assert ap["reasons"] == ["will notify someone outside Rex Construction"]
     assert ap["blast_radius"] == {"audience": "external", "scope_size": 1}
 
+    # Verify tool_args is present and matches the input passed to enqueue
+    assert "tool_args" in ap, f"action_proposed frame missing tool_args: {ap}"
+    assert isinstance(ap["tool_args"], dict)
+    assert ap["tool_args"] == {"rfi_id": events[0]["input"]["rfi_id"], "response": "approved as submitted"}
+
 
 @pytest.mark.asyncio
 async def test_tool_use_handler_failure_emits_action_failed_frame():
