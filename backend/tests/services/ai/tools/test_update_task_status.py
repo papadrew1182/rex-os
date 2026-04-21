@@ -106,3 +106,34 @@ async def test_handler_raises_on_unknown_task(seeded_task):
 def test_spec_metadata():
     assert SPEC.slug == "update_task_status"
     assert SPEC.fires_external_effect is False
+
+
+@pytest.mark.asyncio
+async def test_update_task_status_compensator_restores_previous_status(seeded_task):
+    conn = await connect_raw()
+    try:
+        ctx = ActionContext(
+            conn=conn, user_account_id=seeded_task["user_id"],
+            args={"task_id": str(seeded_task["task_id"]), "status": "in_progress"},
+            action_id=uuid4(),
+        )
+        result = await SPEC.handler(ctx)
+        assert result.result_payload["previous_status"] == "open"
+        row = await conn.fetchrow(
+            "SELECT status FROM rex.tasks WHERE id = $1::uuid", seeded_task["task_id"],
+        )
+        assert row["status"] == "in_progress"
+
+        assert SPEC.compensator is not None
+        await SPEC.compensator(
+            result.result_payload,
+            ActionContext(conn=conn, user_account_id=seeded_task["user_id"],
+                          args={}, action_id=uuid4(),
+                          original_result=result.result_payload),
+        )
+        row = await conn.fetchrow(
+            "SELECT status FROM rex.tasks WHERE id = $1::uuid", seeded_task["task_id"],
+        )
+        assert row["status"] == "open"
+    finally:
+        await conn.close()

@@ -9,6 +9,11 @@ from app.services.ai.tools import (
     update_task_status as _update_task_status,
     create_note as _create_note,
     answer_rfi as _answer_rfi,
+    save_meeting_packet as _save_meeting_packet,
+    save_draft as _save_draft,
+    create_alert as _create_alert,
+    delete_task as _delete_task,
+    delete_note as _delete_note,
 )
 
 _REGISTER: list[ActionSpec] = [
@@ -16,6 +21,11 @@ _REGISTER: list[ActionSpec] = [
     _update_task_status.SPEC,
     _create_note.SPEC,
     _answer_rfi.SPEC,
+    _save_meeting_packet.SPEC,
+    _save_draft.SPEC,
+    _create_alert.SPEC,
+    _delete_task.SPEC,
+    _delete_note.SPEC,
 ]
 
 _BY_SLUG: dict[str, ActionSpec] = {s.slug: s for s in _REGISTER}

@@ -190,7 +190,7 @@ class ActionQueueService:
             blast_radius=row.get("blast_radius", {}) if row else {},
         )
 
-    async def undo(self, *, action_id: UUID) -> DispatchResult:
+    async def undo(self, *, conn, action_id: UUID) -> DispatchResult:
         row = await self._repo.get(action_id)
         if row is None:
             return DispatchResult(
@@ -215,6 +215,59 @@ class ActionQueueService:
                     blast_radius=row["blast_radius"],
                     error_excerpt=f"undo window expired ({elapsed:.0f}s elapsed)",
                 )
+
+        spec = self._get_tool(row["tool_slug"])
+        if spec is None or spec.compensator is None:
+            return DispatchResult(
+                action_id=action_id, status=row["status"],
+                requires_approval=row["requires_approval"],
+                blast_radius=row["blast_radius"],
+                error_excerpt=(
+                    f"not undoable: tool {row['tool_slug']!r} has no compensator"
+                ),
+            )
+
+        undo_id = uuid4()
+        undo_slug = f"{row['tool_slug']}__undo"
+        await self._repo.insert(
+            id=undo_id,
+            user_account_id=row["user_account_id"],
+            requested_by_user_id=row["user_account_id"],
+            conversation_id=row.get("conversation_id"),
+            message_id=row.get("message_id"),
+            tool_slug=undo_slug,
+            tool_args={},
+            blast_radius=row["blast_radius"],
+            requires_approval=False,
+            status="auto_committed",
+            approver_role=None,
+            correction_of_id=action_id,
+            committed_at_now=True,
+        )
+
+        original_result = row.get("result_payload") or {}
+        ctx = self._build_action_ctx(conn, row["user_account_id"], {}, undo_id)
+        ctx.original_result = original_result
+
+        try:
+            result: ActionResult = await spec.compensator(original_result, ctx)
+        except Exception as e:
+            log.exception("compensator %s failed", spec.slug)
+            excerpt = str(e)[:500]
+            await self._repo.update_status(
+                action_id=undo_id, status="failed", error_excerpt=excerpt,
+            )
+            return DispatchResult(
+                action_id=undo_id, status="failed",
+                requires_approval=False,
+                blast_radius=row["blast_radius"],
+                error_excerpt=excerpt,
+            )
+
+        await self._repo.update_status(
+            action_id=undo_id, status="committed",
+            committed_at=True, result_payload=result.result_payload,
+        )
         await self._repo.update_status(
             action_id=action_id, status="undone", undone_at=True,
         )
@@ -222,6 +275,7 @@ class ActionQueueService:
             action_id=action_id, status="undone",
             requires_approval=row["requires_approval"],
             blast_radius=row["blast_radius"],
+            result_payload=result.result_payload,
         )
 
     async def _run_handler(

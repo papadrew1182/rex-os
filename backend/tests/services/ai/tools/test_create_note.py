@@ -108,3 +108,39 @@ async def test_handler_accepts_no_project(seeded_user_project):
 def test_spec_metadata():
     assert SPEC.slug == "create_note"
     assert SPEC.fires_external_effect is False
+
+
+@pytest.mark.asyncio
+async def test_create_note_compensator_deletes_the_row(seeded_user_project):
+    conn = await connect_raw()
+    try:
+        ctx = ActionContext(
+            conn=conn,
+            user_account_id=seeded_user_project["user_id"],
+            args={
+                "content": "Undo this note",
+                "project_id": str(seeded_user_project["proj_id"]),
+            },
+            action_id=uuid4(),
+        )
+        result = await SPEC.handler(ctx)
+        note_id = result.result_payload["note_id"]
+        row = await conn.fetchrow(
+            "SELECT id FROM rex.notes WHERE id = $1::uuid", UUID(note_id),
+        )
+        assert row is not None
+
+        assert SPEC.compensator is not None
+        ctx2 = ActionContext(
+            conn=conn,
+            user_account_id=seeded_user_project["user_id"],
+            args={}, action_id=uuid4(),
+            original_result=result.result_payload,
+        )
+        await SPEC.compensator(result.result_payload, ctx2)
+        row = await conn.fetchrow(
+            "SELECT id FROM rex.notes WHERE id = $1::uuid", UUID(note_id),
+        )
+        assert row is None
+    finally:
+        await conn.close()

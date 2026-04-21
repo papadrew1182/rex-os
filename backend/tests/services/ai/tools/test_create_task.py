@@ -144,3 +144,38 @@ def test_spec_metadata():
     assert SPEC.fires_external_effect is False
     assert "title" in SPEC.tool_schema["input_schema"]["properties"]
     assert "title" in SPEC.tool_schema["input_schema"]["required"]
+
+
+@pytest.mark.asyncio
+async def test_create_task_compensator_deletes_the_row(seeded_people):
+    conn = await connect_raw()
+    try:
+        ctx = ActionContext(
+            conn=conn, user_account_id=seeded_people["requester_user_id"],
+            args={
+                "title": "Undo me",
+                "assignee_person_id": str(seeded_people["internal_person_id"]),
+                "project_id": str(seeded_people["project_id"]),
+            },
+            action_id=uuid4(),
+        )
+        result = await SPEC.handler(ctx)
+        task_id = result.result_payload["task_id"]
+        row = await conn.fetchrow(
+            "SELECT id FROM rex.tasks WHERE id = $1::uuid", UUID(task_id),
+        )
+        assert row is not None
+
+        assert SPEC.compensator is not None
+        ctx2 = ActionContext(
+            conn=conn, user_account_id=seeded_people["requester_user_id"],
+            args={}, action_id=uuid4(),
+            original_result=result.result_payload,
+        )
+        await SPEC.compensator(result.result_payload, ctx2)
+        row = await conn.fetchrow(
+            "SELECT id FROM rex.tasks WHERE id = $1::uuid", UUID(task_id),
+        )
+        assert row is None
+    finally:
+        await conn.close()
