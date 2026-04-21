@@ -42,7 +42,7 @@ ensure the re-run converges on the right state.
 from __future__ import annotations
 
 import logging
-from typing import Any
+from typing import Any, Awaitable, Callable
 from uuid import UUID
 
 from sqlalchemy import text
@@ -209,50 +209,66 @@ async def sync_resource(
         raise
 
 
+async def _write_rfis(db: AsyncSession, row: dict[str, Any]) -> UUID:
+    """Upsert a single RFI row into rex.rfis keyed on (project_id, rfi_number).
+
+    Returns the canonical id (freshly inserted or existing row that got
+    updated). ``row``'s keys are the mapper's canonical-column output —
+    we splat them dynamically as the INSERT column list so the mapper
+    stays the single source of truth for which columns get written.
+    """
+    cols = list(row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    # The conflict key stays pinned — we never update project_id or
+    # rfi_number as part of an ON CONFLICT re-write because those
+    # ARE the identity.
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}"
+        for c in cols
+        if c not in ("project_id", "rfi_number")
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.rfis (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (project_id, rfi_number)
+        DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, row)
+    await db.commit()
+    return res.scalar_one()
+
+
+# Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
+# for its rex.<table>. Add a new entry here when a sibling resource lands —
+# keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
+_CANONICAL_WRITERS: dict[
+    str, Callable[[AsyncSession, dict[str, Any]], Awaitable[UUID]]
+] = {
+    "rfis": _write_rfis,
+}
+
+
 async def _upsert_canonical(
     db: AsyncSession,
     canonical_table: str,
     row: dict[str, Any],
 ) -> UUID:
-    """Upsert ``row`` into rex.<canonical_table> keyed on the natural key.
+    """Dispatch ``row`` to the per-resource canonical writer.
 
-    Returns the canonical id (either the freshly inserted uuid or the
-    existing one that got updated). ``row``'s keys are the mapper's
-    canonical-column output — we splat them dynamically as the INSERT
-    column list so the mapper stays the single source of truth for
-    which columns get written.
-
-    Currently only 'rfis' is supported; the follow-up resource-rollout
-    plan extends this function (or refactors to a per-resource
-    registry) when siblings land.
+    Returns the canonical id from the underlying writer. Raises
+    NotImplementedError if no writer is registered for
+    ``canonical_table`` — siblings extend the pipeline by registering
+    a new entry in ``_CANONICAL_WRITERS``.
     """
-    if canonical_table == "rfis":
-        cols = list(row.keys())
-        col_sql = ", ".join(cols)
-        val_sql = ", ".join(f":{c}" for c in cols)
-        # The conflict key stays pinned — we never update project_id or
-        # rfi_number as part of an ON CONFLICT re-write because those
-        # ARE the identity.
-        update_sql = ", ".join(
-            f"{c} = EXCLUDED.{c}"
-            for c in cols
-            if c not in ("project_id", "rfi_number")
+    writer = _CANONICAL_WRITERS.get(canonical_table)
+    if writer is None:
+        raise NotImplementedError(
+            f"no canonical writer registered for rex.{canonical_table}"
         )
-
-        sql = text(f"""
-            INSERT INTO rex.rfis (id, {col_sql})
-            VALUES (gen_random_uuid(), {val_sql})
-            ON CONFLICT (project_id, rfi_number)
-            DO UPDATE SET {update_sql}
-            RETURNING id
-        """)
-        res = await db.execute(sql, row)
-        await db.commit()
-        return res.scalar_one()
-
-    raise NotImplementedError(
-        f"_upsert_canonical for rex.{canonical_table} not implemented"
-    )
+    return await writer(db, row)
 
 
 __all__ = ["sync_resource"]
