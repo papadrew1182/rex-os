@@ -237,3 +237,65 @@ async def test_chat_service_does_not_append_when_no_slug():
     first_msg = captured["messages"][0]
     assert first_msg.role == "system"
     assert first_msg.content == "base system prompt"
+
+
+def _make_request_user_ctx(slug: str | None = None):
+    """Shared boilerplate for building (request, user, context) triples."""
+    user = _make_user()
+    request = AssistantChatRequest(
+        message="Show me RFI aging",
+        active_action_slug=slug,
+        params={},
+        conversation_id=None,
+        project_id=None,
+        mode="chat",
+    )
+    ctx = _make_context()
+    return request, user, ctx
+
+
+@pytest.mark.asyncio
+async def test_chat_service_degrades_gracefully_when_pool_acquire_fails():
+    """If acquire() on the pool raises, the chat should still complete
+    with the base system prompt — no user-visible failure."""
+    captured: dict = {}
+
+    def fake_stream(model_request):
+        captured["system_prompt"] = model_request.system_prompt
+
+        async def gen():
+            yield "ok"
+
+        return gen()
+
+    model_client = MagicMock()
+    model_client.model_key = "test-mock"
+    model_client.stream_completion = fake_stream
+
+    chat_repo = _make_chat_repo()
+
+    dispatcher = ActionDispatcher(handlers=[_CaptureHandler()])
+
+    class _BrokenPool:
+        def acquire(self):
+            raise RuntimeError("pool exhausted")
+
+    followup = MagicMock()
+    followup.suggest = MagicMock(return_value=[])
+
+    svc = ChatService(
+        chat_repo=chat_repo,
+        model_client=model_client,
+        followup_generator=followup,
+        pool=_BrokenPool(),
+        action_dispatcher=dispatcher,
+    )
+
+    request, user, ctx = _make_request_user_ctx(slug="rfi_aging")
+
+    async for _ in svc.stream_chat(request=request, user=user, context=ctx):
+        pass
+
+    # Base prompt preserved; no fragment appended; no exception raised.
+    assert captured["system_prompt"] == "base system prompt"
+    assert "Quick action data" not in captured["system_prompt"]

@@ -56,7 +56,9 @@ class ChatService:
         self._model = model_client
         self._followups = followup_generator
         self._pool = pool
-        self._action_dispatcher = action_dispatcher or _default_dispatcher
+        self._action_dispatcher = (
+            _default_dispatcher if action_dispatcher is None else action_dispatcher
+        )
 
     async def stream_chat(
         self,
@@ -104,24 +106,42 @@ class ChatService:
 
         history = await self._chat_repo.list_messages(conversation["id"])
 
-        # Quick-action prompt injection. If the request carries an
-        # ``active_action_slug`` matching a registered handler, run it and
-        # append its ``prompt_fragment`` to the system prompt before the
-        # model call. Missing pool or unknown slug is a no-op.
+        # Quick-action prompt injection.
+        # Defense-in-depth: even though the dispatcher catches its own
+        # handler exceptions, a bug in the dispatcher itself or a
+        # connection-pool failure shouldn't break the SSE stream.
+        # Degrade silently — the chat continues without injection.
         action_fragment = ""
         if request.active_action_slug and self._pool is not None:
-            async with self._pool.acquire() as _conn:
-                action_ctx = ActionContext(
-                    conn=_conn,
-                    user_account_id=user.id,
-                    project_id=getattr(context, "project_id", None),
-                    params=dict(request.params or {}),
+            import time as _time
+            from app.services.ai.actions.base import ActionContext
+            _t0 = _time.perf_counter()
+            try:
+                async with self._pool.acquire() as _conn:
+                    action_ctx = ActionContext(
+                        conn=_conn,
+                        user_account_id=user.id,
+                        project_id=context.project_id,
+                        params=dict(request.params or {}),
+                    )
+                    action_result = await self._action_dispatcher.maybe_execute(
+                        request.active_action_slug, action_ctx,
+                    )
+                _elapsed_ms = (_time.perf_counter() - _t0) * 1000
+                log.info(
+                    "action dispatched slug=%s matched=%s elapsed_ms=%.1f",
+                    request.active_action_slug,
+                    action_result is not None,
+                    _elapsed_ms,
                 )
-                action_result = await self._action_dispatcher.maybe_execute(
-                    request.active_action_slug, action_ctx,
+                if action_result is not None:
+                    action_fragment = "\n\n" + action_result.prompt_fragment
+            except Exception as exc:  # noqa: BLE001
+                log.exception(
+                    "action injection failed slug=%s — degrading to base prompt: %s",
+                    request.active_action_slug, exc,
                 )
-            if action_result is not None:
-                action_fragment = "\n\n" + action_result.prompt_fragment
+                action_fragment = ""
 
         effective_system_prompt = context.system_prompt + action_fragment
 
