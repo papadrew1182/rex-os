@@ -55,7 +55,7 @@ WITH seed AS (
       }
     ],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -445,7 +445,7 @@ WITH seed AS (
     "description": "Overdue RFIs across active projects with ball-in-court and cost/schedule impact",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -482,7 +482,7 @@ WITH seed AS (
       }
     ],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -560,7 +560,7 @@ WITH seed AS (
       }
     ],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -916,7 +916,7 @@ WITH seed AS (
       }
     ],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -960,7 +960,7 @@ WITH seed AS (
       }
     ],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -1755,7 +1755,7 @@ WITH seed AS (
     "description": "Process hygiene gaps and scorecard deductions",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -2095,7 +2095,7 @@ WITH seed AS (
     "description": "Personalized daily briefing: alerts, tasks, meetings, weather, top priorities",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "alpha",
+    "readiness_state": "live",
     "required_connectors": [],
     "role_visibility": [
       "VP",

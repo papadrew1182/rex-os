@@ -52,6 +52,7 @@ class AssistantDispatcher:
             chat_repo=chat_repo,
             model_client=model_client,
             followup_generator=instance.followup_generator,
+            pool=pool,
         )
         instance.sql_planner = SqlPlanner(pool)
         return instance
