@@ -196,6 +196,24 @@ export function useAssistantClient() {
                 payload: { text, opts, localId, error: data?.message || "stream error" },
               });
               break;
+            case "action_proposed":
+              ctx.assistantDispatch({
+                type: ASSISTANT_ACTIONS.ACTION_PROPOSED,
+                payload: data,
+              });
+              break;
+            case "action_auto_committed":
+              ctx.assistantDispatch({
+                type: ASSISTANT_ACTIONS.ACTION_AUTO_COMMITTED,
+                payload: data,
+              });
+              break;
+            case "action_failed":
+              ctx.assistantDispatch({
+                type: ASSISTANT_ACTIONS.ACTION_FAILED,
+                payload: data,
+              });
+              break;
             default:
               break;
           }

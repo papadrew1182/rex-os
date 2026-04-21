@@ -12,11 +12,16 @@
 // render alongside, labelled — these come from the defensive
 // STREAM_ACTION_SUGGESTIONS handler in the reducer.
 
-import { useEffect, useRef } from "react";
+import { useContext, useEffect, useRef } from "react";
 import { useAssistantClient } from "./useAssistantClient";
+import { AppContext } from "../app/AppContext";
+import ActionCard from "./ActionCard.jsx";
+import { ASSISTANT_ACTIONS } from "./useAssistantState";
+import { approveAction, discardAction, undoAction } from "../lib/actionsApi.js";
 
 export default function ChatThread() {
   const { assistant, sendMessage, retryLastFailed } = useAssistantClient();
+  const ctx = useContext(AppContext);
   const {
     loading,
     error,
@@ -31,6 +36,107 @@ export default function ChatThread() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
   }, [messages.length, streaming]);
+
+  // ── Action card handlers ─────────────────────────────────────────
+  // Wire ActionCard buttons (Approve / Discard / Undo / Retry /
+  // Dismiss) through actionsApi and dispatch reducer updates based on
+  // the HTTP response. All handlers flip `busy` true at entry and
+  // clear it at exit so the ActionCard disables buttons during the
+  // round-trip.
+
+  const markBusy = (action_id, busy) =>
+    ctx.assistantDispatch({
+      type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+      payload: { action_id, busy },
+    });
+
+  const handleApprove = async (action) => {
+    markBusy(action.action_id, true);
+    try {
+      await approveAction(action.action_id);
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: {
+          action_id: action.action_id,
+          state: "committed",
+          committed_at: new Date().toISOString(),
+          busy: false,
+        },
+      });
+    } catch (e) {
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: {
+          action_id: action.action_id,
+          state: "failed",
+          error_excerpt: (e && e.message) || String(e),
+          busy: false,
+        },
+      });
+    }
+  };
+
+  const handleDiscard = async (action) => {
+    markBusy(action.action_id, true);
+    try {
+      await discardAction(action.action_id);
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: { action_id: action.action_id, state: "undone", busy: false },
+      });
+    } catch (e) {
+      markBusy(action.action_id, false);
+      // Non-fatal — just surface via console; no UI change.
+      // eslint-disable-next-line no-console
+      console.error("discard failed", e);
+    }
+  };
+
+  const handleUndo = async (action) => {
+    markBusy(action.action_id, true);
+    const { status, body } = await undoAction(action.action_id);
+    if (status === 200) {
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: {
+          action_id: action.action_id,
+          state: "undone",
+          undone_at: new Date().toISOString(),
+          busy: false,
+        },
+      });
+    } else if (status === 400) {
+      // Window expired — drop the busy flag; ActionCard will re-render
+      // as history (no Undo button) when countdown hits 0.
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: { action_id: action.action_id, busy: false },
+      });
+    } else {
+      ctx.assistantDispatch({
+        type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+        payload: {
+          action_id: action.action_id,
+          state: "failed",
+          error_excerpt:
+            (body && (body.detail || body.error)) ||
+            `undo failed (status ${status})`,
+          busy: false,
+        },
+      });
+    }
+  };
+
+  const handleRetry = (action) => handleApprove(action);
+
+  const handleDismiss = (action) => {
+    // Local hide — backend row stays for audit. Flip to 'undone' so the
+    // ActionCard renders as strikethrough history.
+    ctx.assistantDispatch({
+      type: ASSISTANT_ACTIONS.ACTION_STATE_UPDATED,
+      payload: { action_id: action.action_id, state: "undone", busy: false },
+    });
+  };
 
   if (loading) {
     return (
@@ -54,9 +160,22 @@ export default function ChatThread() {
 
   return (
     <div className="rex-assistant-thread" role="log" aria-live="polite" aria-label="Assistant conversation">
-      {messages.map((msg) => (
-        <MessageBubble key={msg.id} message={msg} />
-      ))}
+      {messages.map((msg) => {
+        if (msg.type === "action") {
+          return (
+            <ActionCard
+              key={msg.action_id}
+              action={msg}
+              onApprove={handleApprove}
+              onDiscard={handleDiscard}
+              onUndo={handleUndo}
+              onRetry={handleRetry}
+              onDismiss={handleDismiss}
+            />
+          );
+        }
+        return <MessageBubble key={msg.id} message={msg} />;
+      })}
 
       {streaming && (
         <div className="rex-assistant-thread__status" aria-live="polite">

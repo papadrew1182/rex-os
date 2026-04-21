@@ -381,6 +381,7 @@ class ChatService:
                     "status": "pending_approval",
                     "reasons": list(result.reasons or []),
                     "blast_radius": dict(result.blast_radius or {}),
+                    "tool_args": dict(tool_args or {}),
                 }
             )
         elif result.status == "auto_committed":
