@@ -34,7 +34,7 @@ Mapper contract:
   those from the raw payload item directly.
 """
 
-from app.services.connectors.procore.mapper import map_project, map_rfi
+from app.services.connectors.procore.mapper import map_project, map_rfi, map_user
 
 PROJECT_CANONICAL_ID = "11111111-1111-1111-1111-111111111111"
 
@@ -401,6 +401,152 @@ def test_map_project_emits_only_canonical_columns():
         "state",
         "start_date",
         "end_date",
+    }
+    assert set(m.keys()) == expected, (
+        f"mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_user ──────────────────────────────────────────────────────────────
+
+
+def _user_payload() -> dict:
+    """Mirror ``payloads.build_user_payload`` output for a representative
+    Procore user row."""
+    return {
+        "id":                "5001",
+        "project_source_id": None,
+        "first_name":        "Jane",
+        "last_name":         "Smith",
+        "full_name":         "Jane Smith",
+        "email":             "jane@example.com",
+        "phone":             "555-1111",
+        "job_title":         "Project Manager",
+        "is_active":         True,
+        "is_employee":       False,
+        "city":              "Austin",
+        "state_code":        "TX",
+        "vendor_procore_id": 9001,
+        "employee_id":       "E-42",
+        "created_at":        "2026-01-01T00:00:00+00:00",
+        "updated_at":        "2026-04-01T00:00:00+00:00",
+        "last_login_at":     "2026-04-15T00:00:00+00:00",
+    }
+
+
+def test_map_user_single_arg_signature():
+    """Users are a root resource — no parent project to inject."""
+    m = map_user(_user_payload())
+    assert isinstance(m, dict)
+
+
+def test_map_user_maps_name_fields():
+    m = map_user(_user_payload())
+    assert m["first_name"] == "Jane"
+    assert m["last_name"] == "Smith"
+
+
+def test_map_user_maps_email_phone_title():
+    m = map_user(_user_payload())
+    assert m["email"] == "jane@example.com"
+    assert m["phone"] == "555-1111"
+    assert m["title"] == "Project Manager"
+
+
+def test_map_user_role_type_defaults_to_external():
+    """Procore can't reliably distinguish Rex employees from subs/vendors;
+    default to 'external' and let an admin re-classify true internals later.
+    The rex.people CHECK constraint allows only ('internal','external')."""
+    m = map_user(_user_payload())
+    assert m["role_type"] == "external"
+
+
+def test_map_user_first_name_fallback_when_missing():
+    """rex.people.first_name is NOT NULL. An empty/None source must be
+    coerced to a safe placeholder rather than fail the canonical INSERT."""
+    raw = _user_payload()
+    raw["first_name"] = None
+    raw["last_name"] = None
+    raw["full_name"] = None
+    m = map_user(raw)
+    assert m["first_name"] == "(unknown)"
+    assert m["last_name"] == "(unknown)"
+
+
+def test_map_user_splits_full_name_when_first_last_missing():
+    """Some live rows only have full_name populated. Split on first space
+    so 'Jane Q Smith' -> first='Jane', last='Q Smith'."""
+    raw = _user_payload()
+    raw["first_name"] = None
+    raw["last_name"] = None
+    raw["full_name"] = "Jane Q Smith"
+    m = map_user(raw)
+    assert m["first_name"] == "Jane"
+    assert m["last_name"] == "Q Smith"
+
+
+def test_map_user_single_word_full_name_last_falls_back():
+    """'Madonna' style single-token names: last_name falls back to
+    '(unknown)' so the NOT NULL constraint still holds."""
+    raw = _user_payload()
+    raw["first_name"] = None
+    raw["last_name"] = None
+    raw["full_name"] = "Madonna"
+    m = map_user(raw)
+    assert m["first_name"] == "Madonna"
+    assert m["last_name"] == "(unknown)"
+
+
+def test_map_user_missing_email_synthesizes_placeholder():
+    """rex.people.email is the natural key we upsert on (migration 026
+    adds UNIQUE). A missing email must synthesize a deterministic
+    placeholder including the procore id so a re-sync is idempotent."""
+    raw = _user_payload()
+    raw["email"] = None
+    m = map_user(raw)
+    assert m["email"] == "procore-user-5001@placeholder.invalid"
+
+
+def test_map_user_missing_email_is_idempotent_same_id():
+    """Re-mapping the same source row must produce the same synthetic
+    email so the ON CONFLICT upsert converges on one row rather than
+    creating N duplicates across re-syncs."""
+    raw = _user_payload()
+    raw["email"] = None
+    first = map_user(raw)
+    second = map_user(raw)
+    assert first["email"] == second["email"]
+
+
+def test_map_user_does_not_emit_source_id():
+    """source_id is NOT a rex.people column. Orchestrator reads the
+    procore id directly from the raw payload (item["id"]) for the
+    source_links writer."""
+    m = map_user(_user_payload())
+    assert "source_id" not in m
+
+
+def test_map_user_emits_only_canonical_columns():
+    """Every key the mapper emits must be a real rex.people column
+    so the orchestrator's INSERT ... ON CONFLICT splat doesn't
+    reference a nonexistent column.
+
+    Excluded from the output:
+    - id, created_at, updated_at (DB-managed)
+    - company_id, notes (not sourced from Procore today)
+    - is_active (DB default true; omitted so default fires — we don't
+      want to overwrite an admin's manual deactivation on every sync)
+    """
+    m = map_user(_user_payload())
+    expected = {
+        "first_name",
+        "last_name",
+        "email",
+        "phone",
+        "title",
+        "role_type",
     }
     assert set(m.keys()) == expected, (
         f"mapper keys differ from expected canonical set.\n"

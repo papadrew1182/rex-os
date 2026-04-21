@@ -241,4 +241,80 @@ def map_commitment(raw: dict[str, Any], project_canonical_id: str) -> dict[str, 
     }
 
 
-__all__ = ["map_project", "map_rfi", "map_submittal", "map_commitment"]
+def map_user(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore user payload (from ``payloads.build_user_payload``) ->
+    canonical ``rex.people`` row dict.
+
+    Canonical rex.people columns we target (from
+    migrations/rex2_canonical_ddl.sql lines 57-71):
+        id              uuid PK (db-generated; not emitted)
+        company_id      uuid FK   (resolve vendor->company later; None)
+        first_name      text NOT NULL
+        last_name       text NOT NULL
+        email           text       (UPSERT natural key — migration 026
+                                    adds UNIQUE (email) to back the
+                                    orchestrator's ON CONFLICT)
+        phone           text
+        title           text       (<- payload.job_title)
+        role_type       text NOT NULL CHECK in ('internal','external')
+        is_active       boolean NOT NULL DEFAULT true  (OMITTED by mapper
+                                    so DB default fires and an admin's
+                                    manual deactivation is not overwritten
+                                    on every sync)
+        notes           text                         (not in payload)
+        created_at/updated_at — DB-managed
+
+    Role-type policy: default ``'external'``. Procore can't reliably
+    distinguish Rex employees from subs / vendors with just the is_employee
+    flag (the flag reflects the *Procore account* owner, not "Rex
+    employee"), so we stamp everyone 'external' and an admin re-classifies
+    true Rex internals in a follow-up UI pass.
+
+    NOT NULL handling:
+    * ``first_name`` / ``last_name`` — NOT NULL in the canonical table.
+      If both are missing but ``full_name`` is present, split on the
+      first space. Otherwise fall back to '(unknown)' so the INSERT
+      still succeeds; a garbage name is preferable to a crashed sync.
+    * ``email`` — NOT NULL in the task contract (UNIQUE via migration
+      026 lets us upsert on it). If a source row has NULL email, we
+      synthesize a deterministic ``procore-user-<id>@placeholder.invalid``
+      placeholder. Deterministic means the next sync targets the same
+      placeholder and the upsert converges on one row rather than
+      spawning N duplicates across re-syncs.
+    """
+    first = raw.get("first_name") or ""
+    last = raw.get("last_name") or ""
+    full = raw.get("full_name") or f"{first} {last}".strip()
+
+    # When first/last are both missing but full_name is present, try to
+    # split on the first space. Single-token names ('Madonna') get
+    # last_name='(unknown)' via the fallback below.
+    if not first and not last and full:
+        parts = full.split(" ", 1)
+        first = parts[0]
+        last = parts[1] if len(parts) > 1 else ""
+
+    if not first:
+        first = "(unknown)"
+    if not last:
+        last = "(unknown)"
+
+    email = raw.get("email")
+    if not email:
+        # Deterministic synthetic placeholder — same source id always
+        # yields the same email so the ON CONFLICT (email) upsert is
+        # idempotent across re-syncs.
+        email = f"procore-user-{raw.get('id')}@placeholder.invalid"
+
+    return {
+        "first_name": first,
+        "last_name":  last,
+        "email":      email,
+        "phone":      raw.get("phone"),
+        # rex.people.title <- payload.job_title
+        "title":      raw.get("job_title"),
+        "role_type":  "external",
+    }
+
+
+__all__ = ["map_project", "map_rfi", "map_submittal", "map_commitment", "map_user"]

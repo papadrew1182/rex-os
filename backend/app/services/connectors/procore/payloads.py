@@ -22,6 +22,28 @@ def _iso(value: Any) -> str | None:
     return str(value)
 
 
+def _stringify_jsonb(value: Any) -> str | None:
+    """``procore.users.job_title`` is jsonb (multiselect). Coerce to a
+    readable comma-joined string ('Foreman, Carpenter') or None.
+
+    Handles:
+      - None                -> None
+      - empty str / empty   -> None (semantically "no title")
+      - str                 -> passthrough
+      - list                -> ", ".join(items); [] -> None
+      - anything else       -> str(value) as a last resort so we never
+                               crash the payload builder on an unexpected
+                               jsonb shape.
+    """
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, list):
+        return ", ".join(str(v) for v in value) if value else None
+    return str(value)
+
+
 def build_rfi_payload(row: dict[str, Any]) -> dict[str, Any]:
     return {
         "id":                str(row["procore_id"]),
@@ -82,4 +104,49 @@ def build_project_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-__all__ = ["build_rfi_payload", "build_project_payload"]
+def build_user_payload(row: dict[str, Any]) -> dict[str, Any]:
+    """Procore ``procore.users`` row -> staging payload.
+
+    Source schema (from schema_procore_all_tables.sql, 53 columns; this
+    builder carries only the subset map_user / orchestrator consume,
+    plus a couple of observability fields (is_employee, employee_id,
+    last_login_at) we want available for future enrichment without
+    re-running a full backfill).
+
+    Users are a root / company-level resource — ``project_source_id`` is
+    ``None``. ``staging.upsert_raw`` branches on the ``users_raw`` table
+    name (``_NON_PROJECT_TABLES``) so the project_source_id column is
+    not bound.
+
+    Cursor: adapter.list_users uses ``procore_id`` (bigint) because the
+    live source has ``updated_at`` NULL for most users — the same
+    reason projects use procore_id.
+
+    ``job_title`` is jsonb (multiselect) on the source; stringified here
+    via ``_stringify_jsonb`` so the payload stays JSON-primitive. The
+    mapper reads the already-stringified value.
+    """
+    return {
+        "id":                str(row["procore_id"]),
+        "project_source_id": None,  # users are company-level
+        "first_name":        row.get("first_name"),
+        "last_name":         row.get("last_name"),
+        "full_name":         row.get("full_name"),
+        "email":             row.get("email_address"),
+        # mobile_phone wins over business_phone when both are present —
+        # matches how the real Rex App renders the "primary" contact.
+        "phone":             row.get("mobile_phone") or row.get("business_phone"),
+        "job_title":         _stringify_jsonb(row.get("job_title")),
+        "is_active":         row.get("is_active"),
+        "is_employee":       row.get("is_employee"),
+        "city":              row.get("city"),
+        "state_code":        row.get("state_code"),
+        "vendor_procore_id": row.get("vendor_id"),
+        "employee_id":       row.get("employee_id"),
+        "created_at":        _iso(row.get("created_at")),
+        "updated_at":        _iso(row.get("updated_at")),
+        "last_login_at":     _iso(row.get("last_login_at")),
+    }
+
+
+__all__ = ["build_rfi_payload", "build_project_payload", "build_user_payload"]

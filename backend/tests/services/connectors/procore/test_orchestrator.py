@@ -558,3 +558,154 @@ async def test_sync_resource_projects_end_to_end(
         if mod2._pool:
             await mod2._pool.close()
             mod2._pool = None
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_users_end_to_end(
+    db_session, procore_connector_account, monkeypatch
+):
+    """Full root-resource pipeline for users: seed procore.users ->
+    sync_resource('users') -> rex.people canonical rows +
+    rex.connector_mappings source_links + sync_runs / sync_cursors state.
+
+    Uses distinctive P4A-USER-* email addresses so teardown is safe even
+    if a prior test run left residue.
+    """
+    import os
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    monkeypatch.setenv("REX_APP_DATABASE_URL", url)
+    import app.services.connectors.procore.rex_app_pool as mod
+    mod._pool = None
+
+    # Seed procore.users with the minimal column set build_user_payload
+    # reads. DROP/CREATE instead of TRUNCATE because prior test runs may
+    # have left a table with a different column shape.
+    await db_session.execute(text("CREATE SCHEMA IF NOT EXISTS procore"))
+    await db_session.execute(text("DROP TABLE IF EXISTS procore.users"))
+    await db_session.execute(text("""
+        CREATE TABLE procore.users (
+            procore_id bigint PRIMARY KEY,
+            first_name text,
+            last_name text,
+            full_name text,
+            email_address text,
+            mobile_phone text,
+            business_phone text,
+            job_title jsonb,
+            is_active boolean,
+            is_employee boolean,
+            city text,
+            state_code text,
+            zip_code text,
+            vendor_id bigint,
+            employee_id text,
+            created_at timestamptz,
+            updated_at timestamptz,
+            last_login_at timestamptz
+        )
+    """))
+    await db_session.execute(text(
+        "INSERT INTO procore.users "
+        "(procore_id, first_name, last_name, email_address, is_active) "
+        "VALUES (8801, 'Alpha', 'Tester', 'P4A-USER-ALPHA@test.invalid', true), "
+        "       (8802, 'Beta',  'Tester', 'P4A-USER-BETA@test.invalid',  true)"
+    ))
+    await db_session.commit()
+
+    try:
+        result = await sync_resource(
+            db_session,
+            account_id=procore_connector_account,
+            resource_type="users",
+        )
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Canonical rows landed in rex.people
+        canonical = await db_session.execute(text(
+            "SELECT first_name, last_name, email, role_type "
+            "FROM rex.people "
+            "WHERE email LIKE 'P4A-USER-%' "
+            "ORDER BY email"
+        ))
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        assert rows[0]["first_name"] == "Alpha"
+        assert rows[0]["last_name"] == "Tester"
+        assert rows[0]["email"] == "P4A-USER-ALPHA@test.invalid"
+        assert rows[0]["role_type"] == "external"
+        assert rows[1]["first_name"] == "Beta"
+
+        # source_links: one per seeded procore user, pointing at rex.people
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.users' "
+            "  AND external_id IN ('8801','8802')"
+        ))
+        assert links.scalar_one() == 2
+
+        # Staging landed in connector_procore.users_raw
+        staged = await db_session.execute(text(
+            "SELECT source_id, payload->>'first_name' AS fn "
+            "FROM connector_procore.users_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('8801','8802') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [(row["source_id"], row["fn"]) for row in staged.mappings().all()]
+        assert staged_rows == [
+            ("8801", "Alpha"),
+            ("8802", "Beta"),
+        ]
+
+        # sync_run finished in 'succeeded' state with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a AND resource_type='users' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+        # Cursor advanced to the last procore_id (bigint as string)
+        cur = await db_session.execute(text(
+            "SELECT cursor_value FROM rex.sync_cursors "
+            "WHERE connector_account_id=:a AND resource_type='users'"
+        ), {"a": procore_connector_account})
+        cursor_value = cur.scalar_one()
+        assert cursor_value == "8802"
+
+    finally:
+        await db_session.execute(text("DROP TABLE IF EXISTS procore.users"))
+        # Order matters: connector_mappings references rex.people by rex_id,
+        # so delete mappings first, then the canonical rows, then staging.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.users' "
+            "  AND external_id IN ('8801','8802')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.people WHERE email LIKE 'P4A-USER-%'"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.users_raw WHERE account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()
+        import app.services.connectors.procore.rex_app_pool as mod2
+        if mod2._pool:
+            await mod2._pool.close()
+            mod2._pool = None

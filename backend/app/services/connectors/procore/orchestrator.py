@@ -101,13 +101,20 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.projects",
         "fetch_fn_name":   "list_projects",
     },
+    "users": {
+        "raw_table":       "users_raw",
+        "map_fn":          mapper.map_user,         # single-arg mapper
+        "canonical_table": "people",                # rex.people
+        "source_table":    "procore.users",
+        "fetch_fn_name":   "list_users",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
 # (the raw payload) and the orchestrator's main per-project loop is
-# skipped for them. Today: just ``projects``; ``users`` and ``vendors``
-# join this set in follow-up Phase 4a tasks.
-_ROOT_RESOURCES: frozenset[str] = frozenset({"projects"})
+# skipped for them. Today: ``projects`` and ``users``; ``vendors``
+# joins this set in the follow-up Phase 4a task.
+_ROOT_RESOURCES: frozenset[str] = frozenset({"projects", "users"})
 
 
 async def sync_resource(
@@ -379,14 +386,58 @@ async def _write_projects(db: AsyncSession, row: dict[str, Any]) -> UUID:
     return res.scalar_one()
 
 
+async def _write_users(db: AsyncSession, row: dict[str, Any]) -> UUID:
+    """Upsert a single person row into rex.people keyed on email.
+
+    Migration 026 adds the UNIQUE (email) constraint this ON CONFLICT
+    relies on. Without it, Postgres fails at plan time with "there is
+    no unique or exclusion constraint matching the ON CONFLICT
+    specification".
+
+    ``row``'s keys are the mapper's canonical-column output —
+    splatted dynamically as the INSERT column list so mapper.map_user
+    stays the single source of truth for which columns get written.
+
+    NULL-email note: mapper.map_user synthesizes a deterministic
+    ``procore-user-<id>@placeholder.invalid`` address for source rows
+    with NULL email. Those placeholders still satisfy the UNIQUE
+    constraint and make the upsert idempotent across re-syncs.
+    """
+    cols = list(row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    # email is the identity key — never rewrite it as part of the
+    # conflict update. Everything else gets overwritten so a Procore
+    # row that moved phone/title/name converges on the new values
+    # after the next sync.
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}" for c in cols if c != "email"
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.people (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (email) DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, row)
+    await db.commit()
+    return res.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
+#
+# Dispatch key is the ``canonical_table`` from _RESOURCE_CONFIG, not the
+# resource_type — ``users`` maps to rex.people so the writer registers
+# under ``people``. See _upsert_canonical's lookup below.
 _CANONICAL_WRITERS: dict[
     str, Callable[[AsyncSession, dict[str, Any]], Awaitable[UUID]]
 ] = {
     "rfis":     _write_rfis,
     "projects": _write_projects,
+    "people":   _write_users,
 }
 
 

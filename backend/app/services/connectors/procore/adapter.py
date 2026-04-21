@@ -20,6 +20,7 @@ from app.services.connectors.base import (
 from app.services.connectors.procore.payloads import (
     build_project_payload,
     build_rfi_payload,
+    build_user_payload,
 )
 from app.services.connectors.procore.rex_app_client import RexAppDbClient
 from app.services.connectors.procore.rex_app_pool import get_rex_app_pool
@@ -91,7 +92,30 @@ class ProcoreAdapter(ConnectorAdapter):
         return ConnectorPage(items=items, next_cursor=next_cursor)
 
     async def list_users(self, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+        """Fetch one page of ``procore.users`` rows from the Rex App DB.
+
+        Cursor semantics: ``procore.users`` lacks a reliable ``updated_at``
+        (most rows are NULL on the live source — same pattern as projects),
+        so we use the bigint ``procore_id`` as the monotonic cursor. Each
+        call requests rows with ``procore_id > cursor`` in ascending order;
+        ``next_cursor`` is the last item's id or None when the page was
+        empty. The bigint cast goes through
+        ``RexAppDbClient.fetch_rows(cursor_col_type='bigint')``.
+        """
+        client = await self._get_client()
+        rows = await client.fetch_rows(
+            schema="procore",
+            table="users",
+            cursor_col="procore_id",
+            cursor_col_type="bigint",
+            cursor_value=cursor,
+            limit=DEFAULT_PAGE_SIZE,
+        )
+        items = [build_user_payload(r) for r in rows]
+        next_cursor: str | None = None
+        if items:
+            next_cursor = items[-1]["id"]
+        return ConnectorPage(items=items, next_cursor=next_cursor)
 
     async def fetch_project_directory(
         self, project_external_id: str, cursor: str | None = None

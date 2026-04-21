@@ -2,6 +2,7 @@ from datetime import date, datetime, timezone
 from app.services.connectors.procore.payloads import (
     build_project_payload,
     build_rfi_payload,
+    build_user_payload,
 )
 
 
@@ -129,3 +130,113 @@ def test_build_project_payload_project_source_id_always_none():
     None here makes the contract visible to readers of the payload."""
     p = build_project_payload({"procore_id": 1})
     assert p["project_source_id"] is None
+
+
+# ── build_user_payload ────────────────────────────────────────────────────
+
+
+def test_build_user_payload_happy_path():
+    row = {
+        "procore_id":     5001,
+        "first_name":     "Jane",
+        "last_name":      "Smith",
+        "full_name":      "Jane Smith",
+        "email_address":  "jane@example.com",
+        "mobile_phone":   "555-1111",
+        "business_phone": "555-2222",
+        "job_title":      ["Foreman", "Carpenter"],
+        "is_active":      True,
+        "is_employee":    False,
+        "city":           "Austin",
+        "state_code":     "TX",
+        "zip_code":       "78701",
+        "vendor_id":      9001,
+        "employee_id":    "E-42",
+        "created_at":     datetime(2026, 1, 1, tzinfo=timezone.utc),
+        "updated_at":     datetime(2026, 4, 1, tzinfo=timezone.utc),
+        "last_login_at":  datetime(2026, 4, 15, tzinfo=timezone.utc),
+    }
+    p = build_user_payload(row)
+    assert p["id"] == "5001"
+    assert p["project_source_id"] is None  # users are company-level
+    assert p["first_name"] == "Jane"
+    assert p["last_name"] == "Smith"
+    assert p["full_name"] == "Jane Smith"
+    assert p["email"] == "jane@example.com"
+    # mobile_phone wins over business_phone when both present
+    assert p["phone"] == "555-1111"
+    assert p["job_title"] == "Foreman, Carpenter"
+    assert p["is_active"] is True
+    assert p["is_employee"] is False
+    assert p["city"] == "Austin"
+    assert p["state_code"] == "TX"
+    assert p["vendor_procore_id"] == 9001
+    assert p["employee_id"] == "E-42"
+    assert p["created_at"] == "2026-01-01T00:00:00+00:00"
+    assert p["updated_at"] == "2026-04-01T00:00:00+00:00"
+    assert p["last_login_at"] == "2026-04-15T00:00:00+00:00"
+
+
+def test_build_user_payload_phone_falls_back_to_business_when_mobile_missing():
+    row = {
+        "procore_id":     5002,
+        "mobile_phone":   None,
+        "business_phone": "555-2222",
+    }
+    p = build_user_payload(row)
+    assert p["phone"] == "555-2222"
+
+
+def test_build_user_payload_phone_none_when_both_missing():
+    row = {"procore_id": 5003, "mobile_phone": None, "business_phone": None}
+    p = build_user_payload(row)
+    assert p["phone"] is None
+
+
+def test_build_user_payload_job_title_string_passthrough():
+    """Procore's users.job_title is jsonb — sometimes a string, sometimes
+    a list, sometimes null. A plain string should pass through unchanged."""
+    row = {"procore_id": 5004, "job_title": "Project Manager"}
+    p = build_user_payload(row)
+    assert p["job_title"] == "Project Manager"
+
+
+def test_build_user_payload_job_title_none_stays_none():
+    row = {"procore_id": 5005, "job_title": None}
+    p = build_user_payload(row)
+    assert p["job_title"] is None
+
+
+def test_build_user_payload_job_title_empty_list_becomes_none():
+    """A multiselect jsonb with zero entries is semantically 'no title'."""
+    row = {"procore_id": 5006, "job_title": []}
+    p = build_user_payload(row)
+    assert p["job_title"] is None
+
+
+def test_build_user_payload_job_title_empty_string_becomes_none():
+    row = {"procore_id": 5007, "job_title": ""}
+    p = build_user_payload(row)
+    assert p["job_title"] is None
+
+
+def test_build_user_payload_coerces_id_to_string():
+    """procore_id is bigint; staging.source_id is text."""
+    p = build_user_payload({"procore_id": 42})
+    assert isinstance(p["id"], str)
+    assert p["id"] == "42"
+
+
+def test_build_user_payload_handles_null_timestamps():
+    """Live Rex App DB has updated_at NULL for many users — exactly the
+    reason we use procore_id as the cursor, not updated_at."""
+    row = {
+        "procore_id":    5008,
+        "created_at":    None,
+        "updated_at":    None,
+        "last_login_at": None,
+    }
+    p = build_user_payload(row)
+    assert p["created_at"] is None
+    assert p["updated_at"] is None
+    assert p["last_login_at"] is None

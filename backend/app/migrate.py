@@ -86,6 +86,10 @@ MIGRATION_ORDER: list[str] = [
     #       resource orchestrator's ON CONFLICT upsert has a matching
     #       constraint (Task 2 of Phase 4a).
     "025_rex_projects_project_number_unique.sql",
+    # 026 = unique (email) on rex.people so the users resource
+    #       orchestrator's ON CONFLICT upsert has a matching constraint
+    #       (Task 3 of Phase 4a).
+    "026_rex_people_email_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────
