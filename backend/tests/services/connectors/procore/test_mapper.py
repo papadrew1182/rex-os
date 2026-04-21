@@ -34,7 +34,7 @@ Mapper contract:
   those from the raw payload item directly.
 """
 
-from app.services.connectors.procore.mapper import map_rfi
+from app.services.connectors.procore.mapper import map_project, map_rfi
 
 PROJECT_CANONICAL_ID = "11111111-1111-1111-1111-111111111111"
 
@@ -251,4 +251,159 @@ def test_map_rfi_emits_every_targeted_canonical_column():
         f"mapper keys differ from expected canonical set.\n"
         f"  missing (in expected, not in m): {expected_canonical_keys - set(m.keys())}\n"
         f"  extra   (in m, not in expected): {set(m.keys()) - expected_canonical_keys}"
+    )
+
+
+# ── map_project ───────────────────────────────────────────────────────────
+
+
+def _project_payload() -> dict:
+    """Mirror ``payloads.build_project_payload`` output for a representative
+    Procore project row."""
+    return {
+        "id":                "1001",
+        "project_source_id": None,
+        "project_name":      "Bishop Modern",
+        "project_number":    "BM-001",
+        "status":            "Active",
+        "city":              "Austin",
+        "state_code":        "TX",
+        "zip_code":          "78701",
+        "address":           "123 Main",
+        "start_date":        "2026-01-01",
+        "completion_date":   "2027-06-30",
+        "created_at":        "2026-01-01T00:00:00+00:00",
+        "updated_at":        "2026-04-01T00:00:00+00:00",
+    }
+
+
+def test_map_project_single_arg_signature():
+    """Projects are a root resource — no parent project to inject."""
+    m = map_project(_project_payload())
+    assert isinstance(m, dict)
+
+
+def test_map_project_sets_name_and_status():
+    m = map_project(_project_payload())
+    assert m["name"] == "Bishop Modern"
+    assert m["status"] == "active"
+
+
+def test_map_project_name_fallback_when_missing():
+    """rex.projects.name is NOT NULL. A missing source name must fall
+    back to a safe placeholder rather than emit None and break the
+    canonical INSERT."""
+    raw = _project_payload()
+    raw["project_name"] = None
+    m = map_project(raw)
+    assert m["name"] == "Untitled Project"
+
+
+def test_map_project_lowercases_status():
+    raw = _project_payload()
+    raw["status"] = "Inactive"
+    m = map_project(raw)
+    assert m["status"] == "inactive"
+
+
+def test_map_project_archived_status_passes_through():
+    raw = _project_payload()
+    raw["status"] = "Archived"
+    m = map_project(raw)
+    assert m["status"] == "archived"
+
+
+def test_map_project_missing_status_defaults_to_active():
+    """rex.projects.status is NOT NULL CHECK in {active|inactive|archived|
+    pre_construction|completed}. A None source status must coerce to
+    'active' rather than pass None through."""
+    raw = _project_payload()
+    raw["status"] = None
+    m = map_project(raw)
+    assert m["status"] == "active"
+
+
+def test_map_project_unknown_status_defaults_to_active():
+    """Procore has free-text one-offs in the wild; unknown values must
+    default to 'active' rather than break the CHECK constraint."""
+    raw = _project_payload()
+    raw["status"] = "WeirdCustomStatus"
+    m = map_project(raw)
+    assert m["status"] == "active"
+
+
+def test_map_project_maps_state_code_to_state():
+    """rex.projects column is ``state``; payload key is ``state_code``."""
+    m = map_project(_project_payload())
+    assert m["state"] == "TX"
+    assert "state_code" not in m
+
+
+def test_map_project_city_passthrough():
+    m = map_project(_project_payload())
+    assert m["city"] == "Austin"
+
+
+def test_map_project_dates_become_date_objects():
+    """rex.projects.start_date and end_date are typed ``date``; the
+    mapper must emit ``date`` objects (not ISO strings) so asyncpg
+    binds them natively."""
+    from datetime import date
+    m = map_project(_project_payload())
+    assert m["start_date"] == date(2026, 1, 1)
+    assert m["end_date"] == date(2027, 6, 30)
+
+
+def test_map_project_completion_date_becomes_end_date():
+    """Procore payload field is ``completion_date``; canonical column
+    is ``end_date``. Renaming happens here."""
+    raw = _project_payload()
+    raw["completion_date"] = "2030-12-31"
+    m = map_project(raw)
+    assert "completion_date" not in m
+    from datetime import date
+    assert m["end_date"] == date(2030, 12, 31)
+
+
+def test_map_project_none_dates_stay_none():
+    raw = _project_payload()
+    raw["start_date"] = None
+    raw["completion_date"] = None
+    m = map_project(raw)
+    assert m["start_date"] is None
+    assert m["end_date"] is None
+
+
+def test_map_project_project_number_passthrough():
+    m = map_project(_project_payload())
+    assert m["project_number"] == "BM-001"
+
+
+def test_map_project_project_number_none_stays_none():
+    """Required-field enforcement is the DB's job; the mapper must not
+    silently invent a natural key for rows that lack one."""
+    raw = _project_payload()
+    raw["project_number"] = None
+    m = map_project(raw)
+    assert m["project_number"] is None
+
+
+def test_map_project_emits_only_canonical_columns():
+    """Every key the mapper emits must be a real rex.projects column
+    so the orchestrator's INSERT ... ON CONFLICT splat doesn't
+    reference a nonexistent column."""
+    m = map_project(_project_payload())
+    expected = {
+        "name",
+        "project_number",
+        "status",
+        "city",
+        "state",
+        "start_date",
+        "end_date",
+    }
+    assert set(m.keys()) == expected, (
+        f"mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
     )

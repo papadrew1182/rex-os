@@ -44,4 +44,42 @@ def build_rfi_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-__all__ = ["build_rfi_payload"]
+def build_project_payload(row: dict[str, Any]) -> dict[str, Any]:
+    """Procore ``procore.projects`` row -> staging payload.
+
+    Source schema (from schema_procore_all_tables.sql, verified against
+    the live Rex App DB):
+        procore_id (bigint PK), company_id (bigint),
+        project_name, project_number, status,
+        start_date (date), completion_date (date),
+        address, city, state_code, zip_code,
+        created_at (timestamptz), updated_at (timestamptz).
+
+    Projects are a root resource — they ARE the scope other resources hang
+    off of — so ``project_source_id`` is ``None``. Staging writer branches
+    on this: ``connector_procore.projects_raw`` has no
+    ``project_source_id`` column, and ``upsert_raw`` skips the bind when
+    the raw table is in its ``_NON_PROJECT_TABLES`` set.
+
+    The mapper (``mapper.map_project``) reads ``project_name``, ``status``,
+    ``project_number``, ``city``, ``state_code``, ``start_date``,
+    ``completion_date`` off this dict — keep those keys stable.
+    """
+    return {
+        "id":                str(row["procore_id"]),
+        "project_source_id": None,  # projects ARE the scope; no parent
+        "project_name":      row.get("project_name"),
+        "project_number":    row.get("project_number"),
+        "status":            row.get("status"),
+        "city":              row.get("city"),
+        "state_code":        row.get("state_code"),
+        "zip_code":          row.get("zip_code"),
+        "start_date":        _iso(row.get("start_date")),
+        "completion_date":   _iso(row.get("completion_date")),
+        "address":           row.get("address"),
+        "created_at":        _iso(row.get("created_at")),
+        "updated_at":        _iso(row.get("updated_at")),
+    }
+
+
+__all__ = ["build_rfi_payload", "build_project_payload"]

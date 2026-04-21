@@ -81,6 +81,11 @@ MIGRATION_ORDER: list[str] = [
     # 024 = unique (project_id, rfi_number) on rex.rfis so the Procore
     #       orchestrator's ON CONFLICT upsert has a matching constraint.
     "024_rex_rfis_project_rfi_number_unique.sql",
+    # ── Phase 4a (feat/phase4a-resource-rollout) lane ────────────────────
+    # 025 = unique (project_number) on rex.projects so the projects
+    #       resource orchestrator's ON CONFLICT upsert has a matching
+    #       constraint (Task 2 of Phase 4a).
+    "025_rex_projects_project_number_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

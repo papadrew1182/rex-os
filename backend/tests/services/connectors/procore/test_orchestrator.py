@@ -263,11 +263,9 @@ async def test_sync_resource_rfis_end_to_end(
 async def test_sync_resource_unknown_resource_type_raises(
     db_session, procore_connector_account
 ):
-    """Dispatch table only has 'rfis' wired; anything else must be an
-    explicit NotImplementedError rather than a silent no-op so the
-    follow-up resource-rollout plan fails loud when someone calls
-    sync_resource(resource_type='submittals') before submittals is added.
-    """
+    """Unsupported resource types must raise NotImplementedError
+    rather than silently no-op, so adding a new resource forces a
+    code change in _RESOURCE_CONFIG (not just a DB row somewhere)."""
     with pytest.raises(NotImplementedError, match="submittals"):
         await sync_resource(
             db_session,
@@ -413,6 +411,148 @@ async def test_sync_resource_rfis_cursor_advance_uses_min_across_projects(
         await db_session.execute(text(
             "DELETE FROM rex.projects WHERE id IN (:a, :b)"
         ), {"a": pa_id, "b": pb_id})
+        await db_session.commit()
+        import app.services.connectors.procore.rex_app_pool as mod2
+        if mod2._pool:
+            await mod2._pool.close()
+            mod2._pool = None
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_projects_end_to_end(
+    db_session, procore_connector_account, monkeypatch
+):
+    """Full root-resource pipeline: seed procore.projects -> sync_resource
+    -> rex.projects canonical rows + rex.connector_mappings source_links
+    + sync_runs / sync_cursors state.
+
+    Uses distinctive P4A-SMOKE-* project_numbers so teardown is safe even
+    if a prior test run left residue.
+    """
+    import os
+    url = os.environ.get("DATABASE_URL")
+    if not url:
+        pytest.skip("DATABASE_URL not set")
+    monkeypatch.setenv("REX_APP_DATABASE_URL", url)
+    import app.services.connectors.procore.rex_app_pool as mod
+    mod._pool = None
+
+    # Seed procore.projects with the minimal column set the payload
+    # builder reads. DROP/CREATE instead of TRUNCATE because prior
+    # test runs may have left a table with a different column shape.
+    await db_session.execute(text("CREATE SCHEMA IF NOT EXISTS procore"))
+    await db_session.execute(text("DROP TABLE IF EXISTS procore.projects"))
+    await db_session.execute(text("""
+        CREATE TABLE procore.projects (
+            procore_id bigint PRIMARY KEY,
+            company_id bigint,
+            project_name text,
+            project_number text,
+            status text,
+            start_date date,
+            completion_date date,
+            address text,
+            city text,
+            state_code text,
+            zip_code text,
+            created_at timestamptz,
+            updated_at timestamptz
+        )
+    """))
+    await db_session.execute(text(
+        "INSERT INTO procore.projects "
+        "(procore_id, project_name, project_number, status) "
+        "VALUES (9991, 'P4a Test Alpha', 'P4A-SMOKE-001', 'Active'), "
+        "       (9992, 'P4a Test Beta',  'P4A-SMOKE-002', 'Active')"
+    ))
+    await db_session.commit()
+
+    try:
+        result = await sync_resource(
+            db_session,
+            account_id=procore_connector_account,
+            resource_type="projects",
+        )
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Canonical rows landed in rex.projects
+        canonical = await db_session.execute(text(
+            "SELECT name, project_number, status FROM rex.projects "
+            "WHERE project_number LIKE 'P4A-SMOKE-%' "
+            "ORDER BY project_number"
+        ))
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        assert rows[0]["name"] == "P4a Test Alpha"
+        assert rows[0]["project_number"] == "P4A-SMOKE-001"
+        assert rows[0]["status"] == "active"  # lowercased by mapper
+        assert rows[1]["name"] == "P4a Test Beta"
+
+        # source_links: one per seeded procore project, pointing at rex.projects
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.projects' "
+            "  AND external_id IN ('9991','9992')"
+        ))
+        assert links.scalar_one() == 2
+
+        # Staging landed in connector_procore.projects_raw
+        staged = await db_session.execute(text(
+            "SELECT source_id, payload->>'project_name' AS n "
+            "FROM connector_procore.projects_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('9991','9992') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [(row["source_id"], row["n"]) for row in staged.mappings().all()]
+        assert staged_rows == [
+            ("9991", "P4a Test Alpha"),
+            ("9992", "P4a Test Beta"),
+        ]
+
+        # sync_run finished in 'succeeded' state with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a AND resource_type='projects' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+        # Cursor advanced to the last procore_id (bigint as string)
+        cur = await db_session.execute(text(
+            "SELECT cursor_value FROM rex.sync_cursors "
+            "WHERE connector_account_id=:a AND resource_type='projects'"
+        ), {"a": procore_connector_account})
+        cursor_value = cur.scalar_one()
+        assert cursor_value == "9992"
+
+    finally:
+        await db_session.execute(text("DROP TABLE IF EXISTS procore.projects"))
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.projects' "
+            "  AND external_id IN ('9991','9992')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.projects WHERE project_number LIKE 'P4A-SMOKE-%'"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.projects_raw WHERE account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
         await db_session.commit()
         import app.services.connectors.procore.rex_app_pool as mod2
         if mod2._pool:

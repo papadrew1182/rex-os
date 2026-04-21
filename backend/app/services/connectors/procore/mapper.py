@@ -19,15 +19,71 @@ from typing import Any
 
 
 def map_project(raw: dict[str, Any]) -> dict[str, Any]:
+    """Procore payload (from ``payloads.build_project_payload``) ->
+    canonical ``rex.projects`` row dict.
+
+    Canonical rex.projects columns (from migrations/rex2_canonical_ddl.sql
+    line 16-33):
+        id              uuid PK (db-generated; not emitted)
+        name            text NOT NULL
+        project_number  text  (UNIQUE — see migration 025)
+        status          text NOT NULL CHECK in
+                        (active | inactive | archived |
+                         pre_construction | completed)
+        project_type    text CHECK (...)          (not in payload; omitted)
+        address_line1   text                      (omitted: payload's
+                        ``address`` field is a single freeform blob today;
+                        splitting into line1/line2 is a later concern)
+        city            text
+        state           text                      (<- payload.state_code)
+        zip             text                      (omitted for now:
+                        payload has zip_code but we're keeping the
+                        initial mapper conservative; enable in a later
+                        commit with targeted migration coverage)
+        start_date      date
+        end_date        date                      (<- payload.completion_date)
+        contract_value  numeric                   (not in Procore payload)
+        square_footage  numeric                   (not in Procore payload)
+        description     text                      (not in Procore payload)
+        created_at      timestamptz default now() (db-managed)
+        updated_at      timestamptz default now() (db-managed)
+
+    Contract:
+    * Root resource — takes ONE argument (no ``project_canonical_id``
+      because projects ARE the canonical scope).
+    * Output contains ONLY canonical rex.projects column keys so
+      orchestrator._write_projects can splat them into INSERT ... ON
+      CONFLICT directly.
+    * ``project_number`` is the natural key — upsert is keyed on it
+      (migration 025 adds the UNIQUE constraint). Required on live
+      Procore rows in practice, but the payload may carry None;
+      treat that as "row has no natural key" and let the DB fail
+      the INSERT loud rather than silently swallow.
+    * Procore statuses today are capitalized: 'Active' / 'Inactive' /
+      'Archived'. Lowercase + default missing/unknown to 'active' so
+      the CHECK constraint passes. Intentionally NOT a hard raise —
+      the live source has one-off free-text statuses we don't want
+      to block a full sync on.
+    """
+    status_raw = (raw.get("status") or "").lower()
+    canonical_status = {
+        "active":           "active",
+        "inactive":         "inactive",
+        "archived":         "archived",
+        "pre_construction": "pre_construction",
+        "completed":        "completed",
+        "":                 "active",
+    }.get(status_raw, "active")
+
     return {
-        "source_id": str(raw.get("id", "")),
-        "name": raw.get("name"),
+        "name":           raw.get("project_name") or "Untitled Project",
         "project_number": raw.get("project_number"),
-        "status": raw.get("active", True) and "active" or "inactive",
-        "city": raw.get("city"),
-        "state": raw.get("state_code"),
-        "start_date": raw.get("start_date"),
-        "end_date": raw.get("completion_date"),
+        "status":         canonical_status,
+        "city":           raw.get("city"),
+        # canonical rex.projects column is ``state`` (not ``state_code``)
+        "state":          raw.get("state_code"),
+        "start_date":     _iso_date(raw.get("start_date")),
+        "end_date":       _iso_date(raw.get("completion_date")),
     }
 
 
