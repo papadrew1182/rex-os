@@ -104,6 +104,12 @@ MIGRATION_ORDER: list[str] = [
     #       and rex.chat_messages are added in idempotent DO blocks so
     #       chat-table renames don't wedge the whole migration.
     "028_rex_action_queue.sql",
+    # 029 = rex.notes table backing the create_note quick action. A
+    #       deliberately minimal free-form notes surface (id, project_id,
+    #       user_account_id, content, created_at, updated_at). Decisions
+    #       get their own heavier schema in rex.pending_decisions — notes
+    #       stay separate for MVP clarity.
+    "029_rex_notes.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────
