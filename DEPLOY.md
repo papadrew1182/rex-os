@@ -382,6 +382,7 @@ This returns a JSON list of every migration file with its applied status.
 | `REX_LOGIN_RATE_LIMIT` | no | `10/minute` | Rate limit on `/api/auth/login` (slowapi format). |
 | `REX_SENTRY_DSN` | no | — | Enables backend Sentry when set. |
 | `REX_RELEASE` | no | commit sha | Release identifier surfaced by `/api/version`. |
+| `REX_APP_DATABASE_URL` | yes (for Procore connector) | — | Public Postgres URL of old rex-procore ("Rex App" Railway project). Leave unset to disable the Procore read path. |
 | `LOG_LEVEL` | no | `INFO` | Python logging level |
 
 ### Frontend (Vercel)

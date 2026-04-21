@@ -11,13 +11,18 @@ UI needs.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
-from app.dependencies import get_current_user
+from app.dependencies import get_current_user, require_admin_or_vp
 from app.models.foundation import UserAccount
+from app.services.connectors.procore.orchestrator import (
+    sync_resource as procore_sync_resource,
+)
 
 router = APIRouter(prefix="/api/connectors", tags=["session2-connectors"])
 
@@ -137,3 +142,61 @@ async def connector_health(
         })
 
     return {"items": items}
+
+
+# ── POST /api/connectors/{account_id}/sync/{resource_type} ──────────────
+#
+# Admin / VP-only. Dispatches to the appropriate connector orchestrator and
+# returns the orchestrator's ``{rows_fetched, rows_upserted}`` dict. The
+# scheduler will eventually call this on a cron schedule, but for now it's
+# the operator's hand-pull trigger.
+
+@router.post("/{account_id}/sync/{resource_type}")
+async def admin_sync_resource(
+    account_id: UUID,
+    resource_type: str,
+    db: AsyncSession = Depends(get_db),
+    user: UserAccount = Depends(require_admin_or_vp),
+) -> dict:
+    """Trigger a sync for one (account, resource_type) pair.
+
+    Returns whatever the underlying orchestrator returns (counts dict).
+    Raises:
+      * 404 if the connector_account doesn't exist
+      * 400 if the account's connector kind doesn't have a sync path yet
+      * 500 (FastAPI default) on orchestrator failure — the sync_run
+        record captures the failure detail for post-mortem.
+    """
+    connector_key = (await db.execute(
+        text(
+            """
+            SELECT c.connector_key
+            FROM rex.connector_accounts a
+            JOIN rex.connectors c ON c.id = a.connector_id
+            WHERE a.id = :a
+            """
+        ),
+        {"a": account_id},
+    )).scalar_one_or_none()
+
+    if connector_key is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"connector_account {account_id} not found",
+        )
+
+    if connector_key == "procore":
+        try:
+            return await procore_sync_resource(
+                db, account_id=account_id, resource_type=resource_type
+            )
+        except NotImplementedError as e:
+            raise HTTPException(
+                status_code=400,
+                detail=f"resource_type {resource_type!r} is not yet supported for connector {connector_key!r}: {e}",
+            )
+
+    raise HTTPException(
+        status_code=400,
+        detail=f"sync not implemented for connector {connector_key!r}",
+    )
