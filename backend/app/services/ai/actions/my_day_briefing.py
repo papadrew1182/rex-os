@@ -5,10 +5,12 @@ project_id (if set) narrows the digest to that project.
 """
 from __future__ import annotations
 
+import dataclasses
+
 from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -16,6 +18,20 @@ class Handler:
     slug = "my_day_briefing"
 
     async def run(self, ctx: ActionContext) -> ActionResult:
+        # If a project_id is supplied, verify the user has active access
+        # to it. Without this, v_myday would silently return 0 items for
+        # an inaccessible project and the scope_label would claim
+        # "your items (project-scoped)" — misleading. Silently downgrade
+        # to portfolio mode so the user sees their real items.
+        if ctx.project_id is not None:
+            has_access = await ctx.conn.fetchval(
+                "SELECT EXISTS(SELECT 1 FROM rex.v_user_project_assignments "
+                "WHERE user_account_id = $1::uuid AND project_id = $2::uuid "
+                "AND is_active = true)",
+                ctx.user_account_id, ctx.project_id,
+            )
+            if not has_access:
+                ctx = dataclasses.replace(ctx, project_id=None)
         row = await ctx.conn.fetchrow(
             """
             SELECT
@@ -86,7 +102,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=(
                     "your items (project-scoped)" if ctx.project_id

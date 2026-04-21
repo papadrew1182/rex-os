@@ -5,7 +5,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -79,7 +79,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
@@ -93,7 +93,7 @@ class Handler:
         return ActionResult(
             stats={"tasks_starting_next_14d": 0, "projects_with_starts": 0, "earliest_start_date": None},
             sample_rows=[],
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, n_projects),
                 summary_lines=["Tasks starting in next 14 days: 0"],

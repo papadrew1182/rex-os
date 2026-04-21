@@ -90,3 +90,39 @@ async def test_my_day_briefing(seeded_myday):
         assert len(r.sample_rows) == 3
     finally:
         await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_my_day_briefing_downgrades_to_portfolio_when_project_inaccessible(
+    seeded_myday,
+):
+    """If project_id is passed but the user is not a member, the handler
+    must silently downgrade to portfolio mode so the user still sees their
+    items (rather than 0 items under a misleading project-scoped label).
+    """
+    user_id, _project_id, _ = seeded_myday
+    inaccessible_project = uuid4()
+    conn = await connect_raw()
+    try:
+        # Seed the inaccessible project so the uuid exists in rex.projects,
+        # but DO NOT add a project_members row for our user.
+        await conn.execute(
+            "INSERT INTO rex.projects (id, name, status, project_number) "
+            "VALUES ($1::uuid, 'Not Mine', 'active', 'NOT-MINE-1')",
+            inaccessible_project,
+        )
+        try:
+            r = await Handler().run(ActionContext(
+                conn=conn, user_account_id=user_id, project_id=inaccessible_project,
+            ))
+            # Should still see all 3 of user's real items — not 0.
+            assert r.stats["total_items"] == 3
+            assert len(r.sample_rows) == 3
+            # Scope label should reflect the portfolio downgrade.
+            assert "across all your projects" in r.prompt_fragment
+        finally:
+            await conn.execute(
+                "DELETE FROM rex.projects WHERE id = $1::uuid", inaccessible_project,
+            )
+    finally:
+        await conn.close()

@@ -93,7 +93,7 @@ async def resolve_scope_project_ids(
     return [r["project_id"] for r in rows]
 
 
-def _render_fragment(
+def render_fragment(
     *,
     slug: str,
     scope_label: str,
@@ -154,5 +154,5 @@ __all__ = [
     "ActionResult",
     "QuickActionHandler",
     "resolve_scope_project_ids",
-    "_render_fragment",
+    "render_fragment",
 ]

@@ -81,6 +81,34 @@ async def test_handler_raising_returns_fallback_fragment():
 
 
 @pytest.mark.asyncio
+async def test_dispatcher_catches_asyncpg_errors_gracefully():
+    """If a handler's SQL hits a missing view, the dispatcher must return
+    a sentinel ActionResult rather than propagating the asyncpg error.
+
+    Strengthens test_handler_raising_returns_fallback_fragment with a
+    realistic exception type — simulates the view-missing end-to-end
+    failure mode a handler would hit in production.
+    """
+    import asyncpg
+
+    class _MissingViewHandler:
+        slug = "test_missing_view"
+
+        async def run(self, ctx):
+            raise asyncpg.UndefinedTableError(
+                'relation "rex.v_missing" does not exist'
+            )
+
+    d = ActionDispatcher(handlers=[_MissingViewHandler()])
+    r = await d.maybe_execute("test_missing_view", _make_ctx())
+    assert r is not None
+    assert r.stats == {}
+    assert r.sample_rows == []
+    assert "temporarily unavailable" in r.prompt_fragment.lower()
+    assert "test_missing_view" in r.prompt_fragment
+
+
+@pytest.mark.asyncio
 async def test_module_default_has_all_eight_handlers():
     """Smoke check that the module-level default registry contains
     exactly the 8 alpha Wave 1 slugs once the handlers are wired in."""

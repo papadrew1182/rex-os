@@ -11,7 +11,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -32,7 +32,7 @@ class Handler:
                     "oldest_days": None,
                 },
                 sample_rows=[],
-                prompt_fragment=_render_fragment(
+                prompt_fragment=render_fragment(
                     slug=self.slug,
                     scope_label=self._scope_label(ctx, 0),
                     summary_lines=["Total open RFIs: 0"],
@@ -69,7 +69,7 @@ class Handler:
                     "oldest_days": None,
                 },
                 sample_rows=[],
-                prompt_fragment=_render_fragment(
+                prompt_fragment=render_fragment(
                     slug=self.slug,
                     scope_label=self._scope_label(ctx, len(project_ids)),
                     summary_lines=["Total open RFIs: 0"],
@@ -121,7 +121,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
