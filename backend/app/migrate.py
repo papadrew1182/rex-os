@@ -96,6 +96,14 @@ MIGRATION_ORDER: list[str] = [
     #       matching constraint and a place to stage raw payloads
     #       (Task 4 of Phase 4a).
     "027_rex_companies_name_unique_and_vendors_raw.sql",
+    # ── Phase 6a (feat/phase6a-commands-approvals-core) lane ─────────────
+    # 028 = rex.action_queue table backing the command + approval
+    #       lifecycle. Every LLM tool_use invocation lands a row here
+    #       (auto_committed, pending_approval, committed, dismissed,
+    #       undone, failed, pending_retry). FKs to rex.chat_conversations
+    #       and rex.chat_messages are added in idempotent DO blocks so
+    #       chat-table renames don't wedge the whole migration.
+    "028_rex_action_queue.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────
