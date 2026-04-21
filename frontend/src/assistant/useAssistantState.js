@@ -15,6 +15,7 @@
 // Node + assert alone (see __tests__/useAssistantState.test.js).
 
 import { loadUiPrefs } from "./uiPrefs.js";
+import { formatActionSummary } from "./actionSummary.js";
 
 export const ASSISTANT_ACTIONS = {
   // catalog
@@ -52,6 +53,12 @@ export const ASSISTANT_ACTIONS = {
   STREAM_ERROR: "stream/error",
   STREAM_CLOSED: "stream/closed",
   STREAM_ABORT: "stream/abort",
+
+  // Phase 6 action cards
+  ACTION_PROPOSED: "action/proposed",
+  ACTION_AUTO_COMMITTED: "action/autoCommitted",
+  ACTION_FAILED: "action/failed",
+  ACTION_STATE_UPDATED: "action/stateUpdated",
 
   // UI
   UI_TOGGLE_COLLAPSED: "ui/toggleCollapsed",
@@ -388,6 +395,100 @@ export function assistantReducer(state, action) {
       return {
         ...state,
         activeConversation: { ...state.activeConversation, messages: msgs, streaming: false },
+      };
+    }
+
+    // ── Phase 6 action cards ─────────────────────────────────────────
+    case ASSISTANT_ACTIONS.ACTION_PROPOSED: {
+      const { action_id, tool_slug, tool_args, reasons, blast_radius } = action.payload || {};
+      const { primary, secondary } = formatActionSummary(tool_slug, tool_args || {}, null);
+      const entry = {
+        type: "action",
+        action_id,
+        slug: tool_slug,
+        state: "approval",
+        primary,
+        secondary,
+        effects: Array.isArray(reasons) ? reasons : [],
+        tool_args: tool_args || {},
+        blast_radius: blast_radius || {},
+        committed_at: null,
+        undone_at: null,
+        error_excerpt: null,
+        busy: false,
+      };
+      return {
+        ...state,
+        activeConversation: {
+          ...state.activeConversation,
+          messages: [...state.activeConversation.messages, entry],
+        },
+      };
+    }
+
+    case ASSISTANT_ACTIONS.ACTION_AUTO_COMMITTED: {
+      const { action_id, tool_slug, result } = action.payload || {};
+      const { primary, secondary } = formatActionSummary(tool_slug, {}, result || null);
+      const entry = {
+        type: "action",
+        action_id,
+        slug: tool_slug,
+        state: "committed",
+        primary,
+        secondary,
+        effects: [],
+        tool_args: {},
+        blast_radius: {},
+        committed_at: new Date().toISOString(),
+        undone_at: null,
+        error_excerpt: null,
+        result_payload: result || null,
+        busy: false,
+      };
+      return {
+        ...state,
+        activeConversation: {
+          ...state.activeConversation,
+          messages: [...state.activeConversation.messages, entry],
+        },
+      };
+    }
+
+    case ASSISTANT_ACTIONS.ACTION_FAILED: {
+      const { action_id, tool_slug, error } = action.payload || {};
+      const { primary, secondary } = formatActionSummary(tool_slug, {}, null);
+      const entry = {
+        type: "action",
+        action_id,
+        slug: tool_slug,
+        state: "failed",
+        primary,
+        secondary,
+        effects: [],
+        tool_args: {},
+        blast_radius: {},
+        committed_at: null,
+        undone_at: null,
+        error_excerpt: error || "unknown error",
+        busy: false,
+      };
+      return {
+        ...state,
+        activeConversation: {
+          ...state.activeConversation,
+          messages: [...state.activeConversation.messages, entry],
+        },
+      };
+    }
+
+    case ASSISTANT_ACTIONS.ACTION_STATE_UPDATED: {
+      const { action_id, ...patch } = action.payload || {};
+      const messages = state.activeConversation.messages.map((m) =>
+        m.type === "action" && m.action_id === action_id ? { ...m, ...patch } : m,
+      );
+      return {
+        ...state,
+        activeConversation: { ...state.activeConversation, messages },
       };
     }
 
