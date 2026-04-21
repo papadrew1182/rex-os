@@ -6,9 +6,13 @@ from dataclasses import dataclass
 
 import asyncpg
 
+from app.database import async_session_factory
+from app.repositories.action_queue_repository import ActionQueueRepository
 from app.repositories.catalog_repository import CatalogRepository
 from app.repositories.chat_repository import ChatRepository
 from app.repositories.prompt_repository import PromptRepository
+from app.services.ai.action_queue_service import ActionQueueService
+from app.services.ai.actions.blast_radius import ClassifyContext
 from app.services.ai.catalog_service import CatalogService
 from app.services.ai.chat_service import ChatService
 from app.services.ai.context_builder import ContextBuilder
@@ -16,6 +20,8 @@ from app.services.ai.followups import FollowupGenerator
 from app.services.ai.model_client import ModelClient, get_model_client
 from app.services.ai.prompt_registry import PromptRegistryService
 from app.services.ai.sql_planner import SqlPlanner
+from app.services.ai.tools import registry as tools_registry
+from app.services.ai.tools.base import ActionContext as ToolActionContext
 
 
 @dataclass
@@ -53,6 +59,29 @@ class AssistantDispatcher:
             model_client=model_client,
             followup_generator=instance.followup_generator,
             pool=pool,
+            action_queue_service_factory=_build_action_queue_service,
+            list_tool_schemas=tools_registry.list_schemas,
         )
         instance.sql_planner = SqlPlanner(pool)
         return instance
+
+
+def _build_action_queue_service() -> tuple[ActionQueueService, object]:
+    """Factory: one ``(ActionQueueService, AsyncSession)`` pair per chat
+    request that needs to enqueue. The caller closes the session.
+
+    Rationale: the action_queue_repository uses a SQLAlchemy AsyncSession
+    but the action handlers receive a live asyncpg connection. These are
+    two independent lifetimes; we let chat_service scope the session to
+    the tool_use interception loop and acquire the pool conn separately.
+    """
+    session = async_session_factory()
+    svc = ActionQueueService(
+        repo=ActionQueueRepository(session),
+        get_tool_by_slug=tools_registry.get,
+        build_classify_ctx=lambda uid: ClassifyContext(conn=None, user_account_id=uid),
+        build_action_ctx=lambda conn, uid, args, aid: ToolActionContext(
+            conn=conn, user_account_id=uid, args=args, action_id=aid,
+        ),
+    )
+    return svc, session

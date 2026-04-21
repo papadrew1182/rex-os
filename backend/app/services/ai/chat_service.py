@@ -1,6 +1,6 @@
 """Chat service — produces the SSE event stream for POST /api/assistant/chat.
 
-SSE event vocabulary (frozen for Session 3):
+SSE event vocabulary (frozen for Session 3, extended in Phase 6):
 
     conversation.created
     message.started
@@ -8,6 +8,9 @@ SSE event vocabulary (frozen for Session 3):
     message.completed
     followups.generated
     action.suggestions
+    action_proposed          (Phase 6 — tool_use classified as pending_approval)
+    action_auto_committed    (Phase 6 — tool_use auto-committed with handler result)
+    action_failed            (Phase 6 — tool_use handler raised)
     error
 
 Each event is a single JSON object serialized on its own ``data:`` line,
@@ -18,7 +21,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, AsyncIterator
+from typing import Any, AsyncIterator, Awaitable, Callable
 
 import asyncpg
 
@@ -51,6 +54,12 @@ class ChatService:
         followup_generator: FollowupGenerator,
         pool: asyncpg.Pool | None = None,
         action_dispatcher: ActionDispatcher | None = None,
+        # Phase 6: tool_use interception. If any of these are None the
+        # tool_use interception branch is disabled (tests, legacy paths).
+        action_queue_service_factory: Callable[[], Awaitable[tuple[Any, Any]]]
+            | Callable[[], tuple[Any, Any]]
+            | None = None,
+        list_tool_schemas: Callable[[], list[dict[str, Any]]] | None = None,
     ) -> None:
         self._chat_repo = chat_repo
         self._model = model_client
@@ -59,6 +68,11 @@ class ChatService:
         self._action_dispatcher = (
             _default_dispatcher if action_dispatcher is None else action_dispatcher
         )
+        # Phase 6: the factory returns (ActionQueueService, AsyncSession)
+        # per chat request. The session lifetime is scoped to stream_chat;
+        # we close it in ``finally``. Accepts sync or async callable.
+        self._action_queue_service_factory = action_queue_service_factory
+        self._list_tool_schemas = list_tool_schemas
 
     async def stream_chat(
         self,
@@ -145,6 +159,21 @@ class ChatService:
 
         effective_system_prompt = context.system_prompt + action_fragment
 
+        # Phase 6: wire the tool registry through to the model so the LLM
+        # can emit tool_use blocks we can intercept. Providers that don't
+        # support tools simply ignore this field.
+        tool_schemas: list[dict[str, Any]] | None = None
+        tool_use_enabled = (
+            self._list_tool_schemas is not None
+            and self._action_queue_service_factory is not None
+        )
+        if tool_use_enabled:
+            try:
+                tool_schemas = self._list_tool_schemas() or None
+            except Exception:  # noqa: BLE001
+                log.exception("list_tool_schemas failed — running without tools")
+                tool_schemas = None
+
         model_request = ModelRequest(
             model_key=getattr(self._model, "model_key", "echo"),
             system_prompt=effective_system_prompt,
@@ -156,13 +185,27 @@ class ChatService:
                     if m["sender_type"] in {"user", "assistant"}
                 ],
             ],
+            tools=tool_schemas,
         )
 
         delta_buffer: list[str] = []
+        tool_uses: list[dict[str, Any]] = []
+        use_events = hasattr(self._model, "stream_events") and tool_use_enabled
         try:
-            async for delta in self._model.stream_completion(model_request):
-                delta_buffer.append(delta)
-                yield sse_event({"type": "message.delta", "delta": delta})
+            if use_events:
+                async for event in self._model.stream_events(model_request):
+                    etype = event.get("type")
+                    if etype == "text":
+                        delta = event.get("delta") or ""
+                        if delta:
+                            delta_buffer.append(delta)
+                            yield sse_event({"type": "message.delta", "delta": delta})
+                    elif etype == "tool_use":
+                        tool_uses.append(event)
+            else:
+                async for delta in self._model.stream_completion(model_request):
+                    delta_buffer.append(delta)
+                    yield sse_event({"type": "message.delta", "delta": delta})
         except ProviderNotConfigured as exc:
             # Deterministic, actionable error surface for misconfigured
             # providers. ``exc.code`` is one of the stable codes defined
@@ -189,6 +232,15 @@ class ChatService:
             return
 
         full_reply = "".join(delta_buffer)
+
+        # Phase 6: intercept tool_use blocks from the model. Each one
+        # flows through ActionQueueService.enqueue, which classifies
+        # blast radius and either auto-commits or parks for approval.
+        for tu in tool_uses:
+            async for frame in self._dispatch_tool_use(
+                tu, user=user, conversation=conversation, user_msg=user_msg
+            ):
+                yield frame
 
         followups = self._followups.suggest(
             active_action_slug=request.active_action_slug,
@@ -219,6 +271,136 @@ class ChatService:
                 "message_id": str(assistant_msg["id"]),
             }
         )
+
+    async def _dispatch_tool_use(
+        self,
+        tool_use: dict[str, Any],
+        *,
+        user: AssistantUser,
+        conversation: dict[str, Any],
+        user_msg: dict[str, Any],
+    ) -> AsyncIterator[str]:
+        """Enqueue a single tool_use block through ActionQueueService and
+        yield the matching SSE frame (``action_proposed`` /
+        ``action_auto_committed`` / ``action_failed``).
+
+        Session and pool-connection lifetimes are scoped to this method:
+        both are closed/released before returning.
+        """
+        tool_slug = tool_use.get("name")
+        tool_args = tool_use.get("input") or {}
+        if not tool_slug:
+            # Malformed tool_use block from the model — surface as failed
+            # so the client sees something went wrong without crashing.
+            yield sse_event(
+                {
+                    "type": "action_failed",
+                    "action_id": None,
+                    "tool_slug": None,
+                    "error": "model emitted tool_use without a tool name",
+                }
+            )
+            return
+
+        factory = self._action_queue_service_factory
+        if factory is None:
+            # Defensive; this branch only runs when tool_use_enabled=True
+            # which requires a factory.
+            return
+
+        session = None
+        try:
+            built = factory()
+            # Support both sync and async factories.
+            if hasattr(built, "__await__"):
+                queue_svc, session = await built  # type: ignore[misc]
+            else:
+                queue_svc, session = built
+        except Exception as exc:  # noqa: BLE001
+            log.exception("failed to build action queue service")
+            yield sse_event(
+                {
+                    "type": "action_failed",
+                    "action_id": None,
+                    "tool_slug": tool_slug,
+                    "error": f"action queue unavailable: {exc}",
+                }
+            )
+            return
+
+        try:
+            # The handler side of ActionQueueService expects a live
+            # asyncpg connection for SQL in ctx.conn. When the pool is
+            # configured we acquire one; otherwise we pass None and let
+            # the handler fail in a captured fashion.
+            if self._pool is not None:
+                async with self._pool.acquire() as conn:
+                    result = await queue_svc.enqueue(
+                        conn=conn,
+                        user_account_id=user.id,
+                        requested_by_user_id=user.id,
+                        conversation_id=conversation["id"],
+                        message_id=user_msg["id"],
+                        tool_slug=tool_slug,
+                        tool_args=tool_args,
+                    )
+            else:
+                result = await queue_svc.enqueue(
+                    conn=None,
+                    user_account_id=user.id,
+                    requested_by_user_id=user.id,
+                    conversation_id=conversation["id"],
+                    message_id=user_msg["id"],
+                    tool_slug=tool_slug,
+                    tool_args=tool_args,
+                )
+        except Exception as exc:  # noqa: BLE001
+            log.exception("action queue enqueue failed slug=%s", tool_slug)
+            yield sse_event(
+                {
+                    "type": "action_failed",
+                    "action_id": None,
+                    "tool_slug": tool_slug,
+                    "error": str(exc),
+                }
+            )
+            return
+        finally:
+            if session is not None:
+                try:
+                    await session.close()
+                except Exception:  # noqa: BLE001
+                    log.exception("failed to close action queue session")
+
+        if result.status == "pending_approval":
+            yield sse_event(
+                {
+                    "type": "action_proposed",
+                    "action_id": str(result.action_id),
+                    "tool_slug": tool_slug,
+                    "status": "pending_approval",
+                    "reasons": list(result.reasons or []),
+                    "blast_radius": dict(result.blast_radius or {}),
+                }
+            )
+        elif result.status == "auto_committed":
+            yield sse_event(
+                {
+                    "type": "action_auto_committed",
+                    "action_id": str(result.action_id),
+                    "tool_slug": tool_slug,
+                    "result": dict(result.result_payload or {}),
+                }
+            )
+        else:  # failed / anything unexpected
+            yield sse_event(
+                {
+                    "type": "action_failed",
+                    "action_id": str(result.action_id),
+                    "tool_slug": tool_slug,
+                    "error": result.error_excerpt or "unknown error",
+                }
+            )
 
     async def _resolve_conversation(
         self, *, request: AssistantChatRequest, user: AssistantUser

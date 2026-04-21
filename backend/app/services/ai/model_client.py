@@ -47,6 +47,9 @@ class ModelRequest:
     system_prompt: str | None = None
     max_tokens: int = 1024
     metadata: dict[str, str] = field(default_factory=dict)
+    # Phase 6: Anthropic tool_use schemas (already in tool_schema wire format).
+    # Echo provider ignores this; Anthropic provider forwards it to the SDK.
+    tools: list[dict[str, Any]] | None = None
 
 
 class ModelClient(Protocol):
@@ -55,6 +58,21 @@ class ModelClient(Protocol):
     ) -> AsyncIterator[str]: ...
 
     async def complete(self, request: ModelRequest) -> str: ...
+
+    async def stream_events(
+        self, request: ModelRequest
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Yields discriminated event dicts.
+
+        Event shapes:
+          * ``{"type": "text", "delta": "..."}`` — partial text chunk.
+          * ``{"type": "tool_use", "id": "...", "name": "...", "input": {...}}``
+            — emitted after the streamed tool_use block is fully assembled.
+
+        Chat service fans these into SSE frames; tool_use events trigger
+        ActionQueueService.enqueue.
+        """
+        ...
 
 
 class ProviderNotConfigured(Exception):
@@ -101,6 +119,15 @@ class EchoModelClient:
         async for chunk in self.stream_completion(request):
             parts.append(chunk)
         return "".join(parts)
+
+    async def stream_events(
+        self, request: ModelRequest
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Echo client never emits tool_use — it only fans deltas through
+        as ``{"type": "text", ...}`` events so the chat service can share
+        one code path across providers."""
+        async for chunk in self.stream_completion(request):
+            yield {"type": "text", "delta": chunk}
 
 
 # ── anthropic provider ─────────────────────────────────────────────────────
@@ -198,12 +225,7 @@ class AnthropicModelClient:
         system = "\n\n".join(system_parts) if system_parts else None
         return system, convo
 
-    # ── protocol impl ─────────────────────────────────────────────────────
-    async def stream_completion(
-        self, request: ModelRequest
-    ) -> AsyncIterator[str]:
-        client = self._resolve_client()
-
+    def _build_stream_kwargs(self, request: ModelRequest) -> dict[str, Any]:
         # Prefer the explicit request.system_prompt if present; the
         # chat_service always sets this so Anthropic receives the
         # canonical role + project context.
@@ -217,6 +239,16 @@ class AnthropicModelClient:
         }
         if system:
             stream_kwargs["system"] = system
+        if request.tools:
+            stream_kwargs["tools"] = request.tools
+        return stream_kwargs
+
+    # ── protocol impl ─────────────────────────────────────────────────────
+    async def stream_completion(
+        self, request: ModelRequest
+    ) -> AsyncIterator[str]:
+        client = self._resolve_client()
+        stream_kwargs = self._build_stream_kwargs(request)
 
         async with client.messages.stream(**stream_kwargs) as stream:
             async for text in stream.text_stream:
@@ -228,6 +260,47 @@ class AnthropicModelClient:
         async for chunk in self.stream_completion(request):
             parts.append(chunk)
         return "".join(parts)
+
+    async def stream_events(
+        self, request: ModelRequest
+    ) -> AsyncIterator[dict[str, Any]]:
+        """Stream Anthropic text deltas, then emit any tool_use blocks.
+
+        Implementation note: we iterate ``text_stream`` for incremental
+        text rendering, then pull ``get_final_message()`` from the SDK.
+        The SDK reassembles ``input_json_delta`` chunks into a dict for
+        each ``tool_use`` content block, so we don't have to buffer
+        partial JSON ourselves.
+        """
+        client = self._resolve_client()
+        stream_kwargs = self._build_stream_kwargs(request)
+
+        async with client.messages.stream(**stream_kwargs) as stream:
+            async for text in stream.text_stream:
+                if text:
+                    yield {"type": "text", "delta": text}
+
+            # After the text stream drains, the SDK has the full message
+            # (including any tool_use blocks with their assembled input).
+            try:
+                final_message = await stream.get_final_message()
+            except Exception:  # noqa: BLE001
+                # If the SDK can't produce a final message, we've already
+                # emitted everything we could. Fall silent so text-only
+                # conversations still complete normally.
+                return
+
+            content = getattr(final_message, "content", None) or []
+            for block in content:
+                block_type = getattr(block, "type", None)
+                if block_type != "tool_use":
+                    continue
+                yield {
+                    "type": "tool_use",
+                    "id": getattr(block, "id", None),
+                    "name": getattr(block, "name", None),
+                    "input": getattr(block, "input", None) or {},
+                }
 
 
 # ── selector ───────────────────────────────────────────────────────────────
