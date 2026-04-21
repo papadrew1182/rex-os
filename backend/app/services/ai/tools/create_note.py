@@ -62,12 +62,24 @@ async def _handler(ctx: ActionContext) -> ActionResult:
     })
 
 
+async def _compensator(original_result: dict, ctx: ActionContext) -> ActionResult:
+    note_id = UUID(str(original_result["note_id"]))
+    await ctx.conn.execute(
+        "DELETE FROM rex.notes WHERE id = $1::uuid", note_id,
+    )
+    return ActionResult(result_payload={
+        "compensated": "create_note",
+        "note_id": str(note_id),
+    })
+
+
 SPEC = ActionSpec(
     slug="create_note",
     tool_schema=TOOL_SCHEMA,
     classify=_classify,
     handler=_handler,
     fires_external_effect=False,
+    compensator=_compensator,
 )
 
 __all__ = ["SPEC"]

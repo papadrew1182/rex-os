@@ -58,12 +58,28 @@ async def _handler(ctx: ActionContext) -> ActionResult:
     })
 
 
+async def _compensator(original_result: dict, ctx: ActionContext) -> ActionResult:
+    task_id = UUID(str(original_result["task_id"]))
+    prior = str(original_result["previous_status"])
+    await ctx.conn.execute(
+        "UPDATE rex.tasks SET status = $1, updated_at = now() "
+        "WHERE id = $2::uuid",
+        prior, task_id,
+    )
+    return ActionResult(result_payload={
+        "compensated": "update_task_status",
+        "task_id": str(task_id),
+        "restored_status": prior,
+    })
+
+
 SPEC = ActionSpec(
     slug="update_task_status",
     tool_schema=TOOL_SCHEMA,
     classify=_classify,
     handler=_handler,
     fires_external_effect=False,
+    compensator=_compensator,
 )
 
 __all__ = ["SPEC"]
