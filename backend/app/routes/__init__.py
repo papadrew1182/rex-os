@@ -74,6 +74,8 @@ from app.routes.assistant import router as assistant_router
 # sidebar shell.
 from app.routes.identity import router as s2_identity_router
 from app.routes.connectors import router as s2_connectors_router
+# Phase 6a action queue HTTP surface — approve / discard / undo / pending.
+from app.routes.actions import router as actions_router
 
 all_routers = [
     # Ops
@@ -121,4 +123,6 @@ all_routers = [
     # Session 2 lane identity + connector control plane
     s2_identity_router,
     s2_connectors_router,
+    # Phase 6a action queue
+    actions_router,
 ]
