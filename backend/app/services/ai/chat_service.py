@@ -20,8 +20,12 @@ import json
 import logging
 from typing import Any, AsyncIterator
 
+import asyncpg
+
 from app.repositories.chat_repository import ChatRepository
 from app.schemas.assistant import AssistantChatRequest, AssistantUser
+from app.services.ai.action_dispatcher import ActionDispatcher, _default_dispatcher
+from app.services.ai.actions.base import ActionContext
 from app.services.ai.context_builder import AssistantContext
 from app.services.ai.followups import FollowupGenerator
 from app.services.ai.model_client import (
@@ -45,10 +49,14 @@ class ChatService:
         chat_repo: ChatRepository,
         model_client: ModelClient,
         followup_generator: FollowupGenerator,
+        pool: asyncpg.Pool | None = None,
+        action_dispatcher: ActionDispatcher | None = None,
     ) -> None:
         self._chat_repo = chat_repo
         self._model = model_client
         self._followups = followup_generator
+        self._pool = pool
+        self._action_dispatcher = action_dispatcher or _default_dispatcher
 
     async def stream_chat(
         self,
@@ -95,11 +103,33 @@ class ChatService:
         )
 
         history = await self._chat_repo.list_messages(conversation["id"])
+
+        # Quick-action prompt injection. If the request carries an
+        # ``active_action_slug`` matching a registered handler, run it and
+        # append its ``prompt_fragment`` to the system prompt before the
+        # model call. Missing pool or unknown slug is a no-op.
+        action_fragment = ""
+        if request.active_action_slug and self._pool is not None:
+            async with self._pool.acquire() as _conn:
+                action_ctx = ActionContext(
+                    conn=_conn,
+                    user_account_id=user.id,
+                    project_id=getattr(context, "project_id", None),
+                    params=dict(request.params or {}),
+                )
+                action_result = await self._action_dispatcher.maybe_execute(
+                    request.active_action_slug, action_ctx,
+                )
+            if action_result is not None:
+                action_fragment = "\n\n" + action_result.prompt_fragment
+
+        effective_system_prompt = context.system_prompt + action_fragment
+
         model_request = ModelRequest(
             model_key=getattr(self._model, "model_key", "echo"),
-            system_prompt=context.system_prompt,
+            system_prompt=effective_system_prompt,
             messages=[
-                ModelMessage(role="system", content=context.system_prompt),
+                ModelMessage(role="system", content=effective_system_prompt),
                 *[
                     ModelMessage(role=_sender_to_role(m["sender_type"]), content=m["content"])
                     for m in history
