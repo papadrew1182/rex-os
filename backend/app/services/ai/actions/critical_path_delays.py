@@ -10,7 +10,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -82,7 +82,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
@@ -96,7 +96,7 @@ class Handler:
         return ActionResult(
             stats={"critical_tasks_delayed": 0, "worst_delay_days": 0, "projects_with_critical_delays": 0},
             sample_rows=[],
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, n_projects),
                 summary_lines=["Critical path tasks delayed: 0"],

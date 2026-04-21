@@ -11,7 +11,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -26,6 +26,30 @@ class Handler:
         )
         if not project_ids:
             return self._empty(ctx, 0)
+
+        # Full-portfolio aggregate (no LIMIT) so total_projects /
+        # projects_over_5pct / total_portfolio_delta are correct beyond
+        # the 10-row LIMIT used for the markdown table below.
+        aggregate_row = await ctx.conn.fetchrow(
+            """
+            SELECT
+                COUNT(*) AS total_projects,
+                SUM(budget_over_under) AS total_delta,
+                COUNT(*) FILTER (
+                    WHERE revised_budget IS NOT NULL
+                      AND revised_budget <> 0
+                      AND ABS(budget_over_under / revised_budget) > 0.05
+                ) AS projects_over_5pct
+            FROM rex.v_financials
+            WHERE project_id = ANY($1::uuid[])
+            """,
+            project_ids,
+        )
+        total_projects = int(aggregate_row["total_projects"] or 0)
+        if total_projects == 0:
+            return self._empty(ctx, len(project_ids))
+        projects_over_5pct = int(aggregate_row["projects_over_5pct"] or 0)
+        total_delta = float(aggregate_row["total_delta"] or 0)
 
         rows = await ctx.conn.fetch(
             """
@@ -58,13 +82,13 @@ class Handler:
             for r in rows
         ]
 
-        over_5pct = sum(1 for r in sample_rows if abs(r["delta_pct"]) > 0.05)
-        total_delta = sum(r["budget_over_under"] for r in sample_rows)
+        # sample_rows is ordered by |delta_pct| DESC, so the worst offender
+        # is always sample_rows[0] even though we capped at LIMIT 10.
         worst = sample_rows[0] if sample_rows else None
 
         stats = {
-            "total_projects": len(sample_rows),
-            "projects_over_5pct": over_5pct,
+            "total_projects": total_projects,
+            "projects_over_5pct": projects_over_5pct,
             "total_portfolio_delta": total_delta,
             "worst_variance_pct": worst["delta_pct"] if worst else None,
             "worst_project_name": worst["project_name"] if worst else None,
@@ -72,7 +96,7 @@ class Handler:
 
         summary = [
             f"Projects tracked: {stats['total_projects']}",
-            f"Projects with |variance| > 5%: {over_5pct}",
+            f"Projects with |variance| > 5%: {projects_over_5pct}",
             f"Portfolio budget over/under total: {total_delta:+,.2f}",
         ]
         if worst:
@@ -93,7 +117,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
@@ -118,7 +142,7 @@ class Handler:
                 "worst_project_name": None,
             },
             sample_rows=[],
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, n_projects),
                 summary_lines=["Projects tracked: 0"],

@@ -14,7 +14,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -41,7 +41,7 @@ class Handler:
             WITH base AS (
                 SELECT
                     pm.*,
-                    EXTRACT(DAY FROM now() - pm.created_at)::int AS days_since_created
+                    (EXTRACT(EPOCH FROM now() - pm.created_at) / 86400)::int AS days_since_created
                 FROM rex.v_project_mgmt pm
                 WHERE pm.entity_type = 'submittal'
                   AND pm.status = ANY($2::text[])
@@ -68,7 +68,7 @@ class Handler:
             SELECT
                 pm.entity_number              AS submittal_number,
                 pm.title                      AS title,
-                EXTRACT(DAY FROM now() - pm.created_at)::int AS days_since_created,
+                (EXTRACT(EPOCH FROM now() - pm.created_at) / 86400)::int AS days_since_created,
                 p.name                        AS project_name
             FROM rex.v_project_mgmt pm
             JOIN rex.projects p ON p.id = pm.project_id
@@ -106,7 +106,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
@@ -120,7 +120,7 @@ class Handler:
         return ActionResult(
             stats=empty_stats,
             sample_rows=[],
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, n_projects),
                 summary_lines=["Total open submittals: 0"],

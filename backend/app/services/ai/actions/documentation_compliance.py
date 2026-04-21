@@ -20,7 +20,7 @@ from app.services.ai.actions.base import (
     ActionContext,
     ActionResult,
     resolve_scope_project_ids,
-    _render_fragment,
+    render_fragment,
 )
 
 
@@ -99,7 +99,7 @@ class Handler:
         return ActionResult(
             stats=stats,
             sample_rows=sample_rows,
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, len(project_ids)),
                 summary_lines=summary,
@@ -116,7 +116,7 @@ class Handler:
         return ActionResult(
             stats={"overdue_items": 0, "due_within_30_days": 0},
             sample_rows=[],
-            prompt_fragment=_render_fragment(
+            prompt_fragment=render_fragment(
                 slug=self.slug,
                 scope_label=self._scope_label(ctx, n_projects),
                 summary_lines=["Overdue items: 0", "Due within 30 days: 0"],

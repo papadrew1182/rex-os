@@ -143,6 +143,109 @@ async def test_budget_variance_project_mode_restricts_to_project(seeded_budgets)
         await conn.close()
 
 
+@pytest_asyncio.fixture
+async def seeded_twelve_projects():
+    """Seed 12 projects: 11 with +3% variance (not flagged), 1 with +10%
+    (flagged). Exercises the COUNT(*) aggregate path — with the previous
+    len(sample_rows) logic, total_projects would incorrectly report 10.
+    """
+    require_live_db()
+    conn = await connect_raw()
+    user_id = uuid4()
+    person_id = uuid4()
+    project_ids: list[UUID] = [uuid4() for _ in range(12)]
+    cost_code_ids: list[UUID] = []
+    line_item_ids: list[UUID] = []
+    try:
+        await conn.execute(
+            "INSERT INTO rex.people (id, first_name, last_name, email, role_type) "
+            "VALUES ($1::uuid, 'Dozen', 'Tester', $2, 'internal')",
+            person_id, f"dozen-{person_id}@test.invalid",
+        )
+        await conn.execute(
+            "INSERT INTO rex.user_accounts (id, person_id, email, password_hash, is_active) "
+            "VALUES ($1::uuid, $2::uuid, $3, 'x', true)",
+            user_id, person_id, f"dozen-{person_id}@test.invalid",
+        )
+        for i, pid in enumerate(project_ids):
+            # 11 projects with +3% variance, last one with +10%
+            orig = 100000
+            rev = 100000
+            over = 10000 if i == 11 else 3000
+            num = f"DOZ-{i:02d}"
+            await conn.execute(
+                "INSERT INTO rex.projects (id, name, status, project_number) "
+                "VALUES ($1::uuid, $2, 'active', $3)",
+                pid, f"Dozen {num}", num,
+            )
+            await conn.execute(
+                "INSERT INTO rex.project_members "
+                "(id, project_id, person_id, is_active, is_primary) "
+                "VALUES (gen_random_uuid(), $1::uuid, $2::uuid, true, false)",
+                pid, person_id,
+            )
+            cc_id = uuid4()
+            cost_code_ids.append(cc_id)
+            await conn.execute(
+                "INSERT INTO rex.cost_codes "
+                "(id, project_id, code, name, cost_type, is_active) "
+                "VALUES ($1::uuid, $2::uuid, $3, $4, 'other', true)",
+                cc_id, pid, f"CC-{num}", f"Cost Code {num}",
+            )
+            li_id = uuid4()
+            line_item_ids.append(li_id)
+            await conn.execute(
+                """
+                INSERT INTO rex.budget_line_items
+                    (id, project_id, cost_code_id,
+                     original_budget, approved_changes, revised_budget,
+                     committed_costs, direct_costs, pending_changes,
+                     projected_cost, over_under)
+                VALUES ($1::uuid, $2::uuid, $3::uuid,
+                        $4::numeric, 0, $5::numeric, 0, 0, 0,
+                        $5::numeric + $6::numeric, $6::numeric)
+                """,
+                li_id, pid, cc_id, orig, rev, over,
+            )
+        yield user_id, project_ids
+    finally:
+        for pid in project_ids:
+            await conn.execute(
+                "DELETE FROM rex.budget_line_items WHERE project_id = $1::uuid", pid,
+            )
+            await conn.execute(
+                "DELETE FROM rex.cost_codes WHERE project_id = $1::uuid", pid,
+            )
+            await conn.execute(
+                "DELETE FROM rex.project_members WHERE project_id = $1::uuid", pid,
+            )
+            await conn.execute("DELETE FROM rex.projects WHERE id = $1::uuid", pid)
+        await conn.execute("DELETE FROM rex.user_accounts WHERE id = $1::uuid", user_id)
+        await conn.execute("DELETE FROM rex.people WHERE id = $1::uuid", person_id)
+        await conn.close()
+
+
+@pytest.mark.asyncio
+async def test_budget_variance_counts_all_projects_beyond_limit_10(seeded_twelve_projects):
+    """Regression: total_projects and projects_over_5pct must come from
+    a COUNT(*) aggregate, not len(sample_rows) (which caps at 10).
+    """
+    user_id, _ = seeded_twelve_projects
+    conn = await connect_raw()
+    try:
+        r = await Handler().run(ActionContext(
+            conn=conn, user_account_id=user_id, project_id=None,
+        ))
+        assert r.stats["total_projects"] == 12
+        assert r.stats["projects_over_5pct"] == 1
+        # Sample rows are still capped at LIMIT 10 for the markdown table.
+        assert len(r.sample_rows) == 10
+        # Worst offender (10% project) is still surfaced — ordered DESC.
+        assert abs(r.sample_rows[0]["delta_pct"] - 0.10) < 1e-6
+    finally:
+        await conn.close()
+
+
 @pytest.mark.asyncio
 async def test_budget_variance_user_without_assignments_returns_empty():
     require_live_db()
