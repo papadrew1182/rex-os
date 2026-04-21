@@ -116,6 +116,26 @@ def test_map_rfi_rfi_number_none_stays_none():
     assert m["rfi_number"] is None
 
 
+def test_map_rfi_rfi_number_decimal_whole_becomes_integer_string():
+    """asyncpg returns numeric(10,2) as Decimal. Decimal('1.00') must
+    render as '1' — we don't want rex.rfis to display 'RFI #1.00'."""
+    from decimal import Decimal
+    raw = _realistic_payload()
+    raw["rfi_number"] = Decimal("1.00")
+    m = map_rfi(raw, PROJECT_CANONICAL_ID)
+    assert m["rfi_number"] == "1"
+
+
+def test_map_rfi_rfi_number_decimal_fractional_preserves_precision():
+    """Decimal('1.25') must render as '1.25' (not '1' — that would
+    lose data on a real fractional RFI number)."""
+    from decimal import Decimal
+    raw = _realistic_payload()
+    raw["rfi_number"] = Decimal("1.25")
+    m = map_rfi(raw, PROJECT_CANONICAL_ID)
+    assert m["rfi_number"] == "1.25"
+
+
 def test_map_rfi_passes_through_impact_fields():
     raw = _realistic_payload()
     raw["cost_impact"] = "yes"
@@ -146,10 +166,13 @@ def test_map_rfi_does_not_emit_source_names_sidecar_keys():
     assert "source_names_rfi_manager"   not in m
 
 
-def test_map_rfi_due_date_iso_timestamp_becomes_date_string():
-    """rex.rfis.due_date is `date`. Payload gives ISO timestamp."""
+def test_map_rfi_due_date_iso_timestamp_becomes_date_object():
+    """rex.rfis.due_date is `date`. Payload gives ISO timestamp; mapper
+    must return a Python date object so asyncpg binds it natively."""
+    from datetime import date
     m = map_rfi(_realistic_payload(), PROJECT_CANONICAL_ID)
-    assert m["due_date"] == "2026-05-01"
+    assert m["due_date"] == date(2026, 5, 1)
+    assert isinstance(m["due_date"], date)
 
 
 def test_map_rfi_due_date_none_stays_none():
@@ -160,11 +183,13 @@ def test_map_rfi_due_date_none_stays_none():
 
 
 def test_map_rfi_answered_date_derived_from_closed_at():
+    from datetime import date
     raw = _realistic_payload()
     raw["closed_at"] = "2026-05-10T14:30:00+00:00"
     raw["status"] = "closed"
     m = map_rfi(raw, PROJECT_CANONICAL_ID)
-    assert m["answered_date"] == "2026-05-10"
+    assert m["answered_date"] == date(2026, 5, 10)
+    assert isinstance(m["answered_date"], date)
 
 
 def test_map_rfi_answered_date_none_when_not_closed():

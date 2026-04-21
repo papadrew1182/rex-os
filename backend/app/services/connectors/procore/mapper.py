@@ -13,6 +13,8 @@ client is wired for real.
 
 from __future__ import annotations
 
+from datetime import date, datetime
+from decimal import Decimal
 from typing import Any
 
 
@@ -40,19 +42,43 @@ def _coerce_rfi_number(value: Any) -> str | None:
         return None
     if isinstance(value, bool):  # bool is a subclass of int in Python
         return str(value)
+    if isinstance(value, Decimal):
+        # procore.rfis.number is numeric(10,2); asyncpg returns Decimal.
+        # Decimal('1.00') -> "1" (not "1.00"); Decimal('1.25') -> "1.25".
+        if value == value.to_integral_value():
+            return str(int(value))
+        return format(value.normalize(), "f")
     if isinstance(value, float) and value.is_integer():
         return str(int(value))
     return str(value)
 
 
-def _iso_date(value: Any) -> str | None:
-    """Reduce an ISO timestamp string ('2026-05-01T00:00:00+00:00') to
-    its date portion ('2026-05-01') so it lands cleanly in a date column.
-    Already-date strings and None pass through unchanged."""
+def _iso_date(value: Any) -> date | None:
+    """Coerce an ISO timestamp string, date-only string, datetime, or date
+    into a Python `date` object so asyncpg can bind it to a rex.* `date`
+    column without a text->date cast.
+
+    Inputs we expect from payloads.build_rfi_payload:
+      - None
+      - ISO timestamp string with 'T' separator: "2026-05-01T00:00:00+00:00"
+      - already-date string:                     "2026-05-01"
+
+    Accepting datetime/date objects is defensive — if a future payload
+    builder ever skips the ISO stringify, we still produce the right type.
+    """
     if value is None:
         return None
-    if isinstance(value, str) and "T" in value:
-        return value.split("T", 1)[0]
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        # Pair with payloads._iso which emits `.isoformat()`. Split off the
+        # time portion if present; the remainder is always YYYY-MM-DD.
+        date_part = value.split("T", 1)[0]
+        return date.fromisoformat(date_part)
+    # Anything else we return unchanged and let asyncpg surface the type
+    # error at bind time — preferable to a silent None here.
     return value
 
 
