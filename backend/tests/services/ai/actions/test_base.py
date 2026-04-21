@@ -1,47 +1,17 @@
-"""Tests for app.services.connectors.ai.actions.base.
+"""Tests for app.services.ai.actions.base.
 
 Covers ``resolve_scope_project_ids`` — returns a list of project UUIDs
 a handler should filter by, given the incoming project_id (or None for
 portfolio mode) and a user_account_id."""
 from __future__ import annotations
 
-import asyncio
-import os
-import ssl
-from uuid import UUID, uuid4
+from uuid import uuid4
 
-import asyncpg
 import pytest
 import pytest_asyncio
 
 from app.services.ai.actions.base import resolve_scope_project_ids
-
-
-def _raw_url() -> str:
-    url = os.environ["DATABASE_URL"]
-    if url.startswith("postgresql+asyncpg://"):
-        url = "postgresql://" + url[len("postgresql+asyncpg://"):]
-    return url
-
-
-async def _connect() -> asyncpg.Connection:
-    url = _raw_url()
-    use_ssl = (
-        "railway.internal" not in url
-        and "localhost" not in url
-        and "127.0.0.1" not in url
-    )
-    ctx = None
-    if use_ssl:
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
-    return await asyncpg.connect(url, ssl=ctx)
-
-
-def _require_db():
-    if not os.environ.get("DATABASE_URL"):
-        pytest.skip("DATABASE_URL not set")
+from tests.services.ai.actions.conftest import connect_raw, require_live_db
 
 
 @pytest_asyncio.fixture
@@ -51,8 +21,8 @@ async def two_projects_for_user():
     Yields ``(user_account_id, accessible_project_id, inaccessible_project_id)``.
     Cleans up on teardown.
     """
-    _require_db()
-    conn = await _connect()
+    require_live_db()
+    conn = await connect_raw()
     try:
         person_id = uuid4()
         user_id = uuid4()
@@ -104,7 +74,7 @@ async def two_projects_for_user():
 @pytest.mark.asyncio
 async def test_portfolio_mode_returns_only_assigned_projects(two_projects_for_user):
     user_id, proj_a, proj_b = two_projects_for_user
-    conn = await _connect()
+    conn = await connect_raw()
     try:
         ids = await resolve_scope_project_ids(
             conn, user_account_id=user_id, project_id=None,
@@ -118,7 +88,7 @@ async def test_portfolio_mode_returns_only_assigned_projects(two_projects_for_us
 @pytest.mark.asyncio
 async def test_project_mode_returns_single_project(two_projects_for_user):
     user_id, proj_a, _ = two_projects_for_user
-    conn = await _connect()
+    conn = await connect_raw()
     try:
         ids = await resolve_scope_project_ids(
             conn, user_account_id=user_id, project_id=proj_a,
@@ -132,7 +102,7 @@ async def test_project_mode_returns_single_project(two_projects_for_user):
 async def test_user_with_no_assignments_returns_empty_list(two_projects_for_user):
     _, _, _ = two_projects_for_user
     lonely_user_id = uuid4()
-    conn = await _connect()
+    conn = await connect_raw()
     try:
         ids = await resolve_scope_project_ids(
             conn, user_account_id=lonely_user_id, project_id=None,
