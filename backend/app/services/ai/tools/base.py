@@ -26,11 +26,13 @@ class ActionContext:
     user_account_id: who the action runs AS.
     args: tool_args passed by the LLM, validated against tool_schema.
     action_id: the rex.action_queue row id.
+    original_result: result from handler, available to compensators.
     """
     conn: asyncpg.Connection
     user_account_id: UUID
     args: dict[str, Any]
     action_id: UUID
+    original_result: dict[str, Any] | None = None
 
 
 @dataclass
@@ -50,6 +52,12 @@ class HandlerFn(Protocol):
     async def __call__(self, ctx: ActionContext) -> ActionResult: ...
 
 
+class CompensatorFn(Protocol):
+    async def __call__(
+        self, original_result: dict[str, Any], ctx: "ActionContext"
+    ) -> ActionResult: ...
+
+
 @dataclass
 class ActionSpec:
     slug: str
@@ -57,6 +65,7 @@ class ActionSpec:
     classify: ClassifyFn
     handler: HandlerFn
     fires_external_effect: bool = False
+    compensator: CompensatorFn | None = None
 
 
 __all__ = [
@@ -64,5 +73,6 @@ __all__ = [
     "ActionResult",
     "ActionSpec",
     "ClassifyFn",
+    "CompensatorFn",
     "HandlerFn",
 ]
