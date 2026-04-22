@@ -34,6 +34,7 @@ from app.services.connectors.procore.payloads import (
     build_daily_log_payload,
     build_project_payload,
     build_rfi_payload,
+    build_schedule_activity_payload,
     build_submittal_payload,
     build_user_payload,
     build_vendor_payload,
@@ -297,8 +298,54 @@ class ProcoreAdapter(ConnectorAdapter):
     async def fetch_change_events(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
 
-    async def fetch_schedule(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+    async def fetch_schedule_activities(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of schedule activities (tasks) from Procore's REST
+        API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the
+        upstream returns only changed rows.
+
+        Mirrors ``fetch_submittals`` / ``fetch_daily_logs`` (Tasks 3/4).
+        Graceful degradation: if Procore env vars aren't configured
+        (``ProcoreNotConfigured``), returns an empty page instead of
+        crashing. The scheduler iterates fetch_* across many accounts;
+        one account's missing OAuth config must not kill the whole run.
+        Any other upstream error (HTTP 4xx/5xx) propagates to the
+        orchestrator so the sync_run is marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_schedule_tasks`` already loops
+        its own page-number pagination until an empty page, so the
+        returned list is the complete changed set for this run.
+        ``next_cursor`` is always None here — the orchestrator uses the
+        source row's ``updated_at`` to decide the next watermark, not a
+        per-page cursor handle.
+
+        Endpoint: ``/rest/v1.0/projects/{id}/schedule/standard_tasks``
+        (ProcoreClient.list_schedule_tasks). The response rows carry
+        ``id``, ``task_number``, ``name``, ``start_date``,
+        ``finish_date``, ``percent_complete``, and ``updated_at`` —
+        build_schedule_activity_payload wraps the whole raw row so the
+        mapper can read any field.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_schedule_tasks(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [
+            build_schedule_activity_payload(project_external_id, r) for r in rows
+        ]
+        return ConnectorPage(items=items, next_cursor=None)
 
     async def fetch_documents(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)

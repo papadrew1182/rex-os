@@ -116,6 +116,16 @@ MIGRATION_ORDER: list[str] = [
     #       already exist from 013) + cursor_watermark column on
     #       rex.sync_runs for per-run updated_since tracking.
     "030_connector_procore_inspections_raw.sql",
+    # 031 = unique (project_id, submittal_number) on rex.submittals so the
+    #       submittals resource orchestrator's ON CONFLICT upsert has a
+    #       matching constraint (Task 3 of Phase 4 Wave 2).
+    "031_rex_submittals_project_number_unique.sql",
+    # 032 = unique (project_id, name) on rex.schedules AND unique
+    #       (schedule_id, activity_number) on rex.schedule_activities so
+    #       the schedule_activities resource orchestrator's two ON
+    #       CONFLICT upserts (schedule bootstrap + activity upsert) have
+    #       matching constraints (Task 5 of Phase 4 Wave 2).
+    "032_rex_schedules_and_schedule_activities_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

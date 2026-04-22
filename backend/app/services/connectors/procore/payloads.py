@@ -296,10 +296,60 @@ def build_daily_log_payload(
     }
 
 
+def build_schedule_activity_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API schedule-task row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_schedule_tasks`` (the
+    ``/rest/v1.0/projects/{id}/schedule/standard_tasks`` endpoint).
+    Mirrors ``build_daily_log_payload`` / ``build_submittal_payload`` —
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_schedule_activity`` can read
+    them via ``raw.get(...)`` without translation.
+
+    Procore's standard_tasks endpoint carries at least:
+      * ``id``         — the task id (canonical natural key here)
+      * ``task_number`` — user-visible task number (mapped to
+        rex.schedule_activities.activity_number)
+      * ``name``        — task name (NOT NULL on the canonical side)
+      * ``start_date`` / ``finish_date`` — both dates; finish_date maps
+        to rex.schedule_activities.end_date
+      * ``percent_complete`` — numeric 0-100
+      * ``updated_at`` — watermark for cursor advancement
+
+    Predecessors/successors and parent/child hierarchy are NOT carried
+    here — the mapper emits None for the canonical parent_id and
+    predecessor rows (a separate rex.activity_links relation table)
+    are a follow-up resource.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "task_number":       raw.get("task_number"),
+        "name":              raw.get("name"),
+        "start_date":        _iso(raw.get("start_date")),
+        "finish_date":       _iso(raw.get("finish_date") or raw.get("end_date")),
+        "percent_complete":  raw.get("percent_complete"),
+        "status":            raw.get("status"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
     "build_daily_log_payload",
     "build_rfi_payload",
     "build_project_payload",
+    "build_schedule_activity_payload",
     "build_submittal_payload",
     "build_user_payload",
     "build_vendor_payload",

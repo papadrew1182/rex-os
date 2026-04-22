@@ -140,6 +140,25 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.daily_logs",
         "fetch_fn_name":   "fetch_daily_logs",
     },
+    "schedule_activities": {
+        # Phase 4 Wave 2 (direct Procore API) — project-scoped resource.
+        # fetch_schedule_activities calls ProcoreClient.list_schedule_tasks
+        # directly against /rest/v1.0/projects/{id}/schedule/standard_tasks.
+        # Like submittals / daily_logs, this resource has no rex-procore
+        # Railway fallback.
+        #
+        # Staging lands in connector_procore.schedule_tasks_raw (created by
+        # migration 013; named after Procore's endpoint noun, not the rex
+        # canonical name). The canonical target is rex.schedule_activities,
+        # which requires a rex.schedules FK — the writer bootstraps a
+        # "Procore default schedule" row per project on the fly. See
+        # _write_schedule_activities for the bootstrap mechanics.
+        "raw_table":       "schedule_tasks_raw",
+        "map_fn":          mapper.map_schedule_activity,
+        "canonical_table": "schedule_activities",   # rex.schedule_activities
+        "source_table":    "procore.schedule_activities",
+        "fetch_fn_name":   "fetch_schedule_activities",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
@@ -573,6 +592,115 @@ async def _write_daily_logs(db: AsyncSession, row: dict[str, Any]) -> UUID:
     return res.scalar_one()
 
 
+async def _write_schedule_activities(
+    db: AsyncSession, row: dict[str, Any]
+) -> UUID:
+    """Upsert a single schedule activity into rex.schedule_activities,
+    bootstrapping the parent rex.schedules row on the fly.
+
+    rex.schedule_activities.schedule_id is a NOT NULL FK to rex.schedules,
+    but Procore's standard_tasks endpoint has no first-class "schedule"
+    concept — tasks come back without a schedule container. rex.schedules
+    is a Rex-specific abstraction. To satisfy the FK without forcing
+    upstream projects to pre-create a schedule row, the writer upserts a
+    "Procore default schedule" row scoped to the project, then resolves
+    its id as schedule_id on the activity.
+
+    Bootstrap schedule shape (matches the rex.schedules CHECK constraints):
+      * project_id     — from the mapper's ``project_id`` sidecar
+      * name           — from the mapper's ``schedule_name`` sidecar
+                         ("Procore default schedule")
+      * schedule_type  — 'master' (the only "whole project" shape in the
+                         rex.schedules CHECK enum; master is the right
+                         classification for Procore's single per-project
+                         task list)
+      * status         — 'active' (DB default fires via omission pattern,
+                         but we set it explicitly so the ON CONFLICT DO
+                         UPDATE doesn't NULL it out on re-sync)
+      * start_date     — CURRENT_DATE at insert time. Updated on conflict
+                         only if null (keeps the original creation date
+                         stable across syncs).
+      * end_date       — None; the schedule has no fixed end date since
+                         activities belong to a continuously-evolving
+                         project plan.
+      * created_by     — None; Procore sync doesn't know which Rex user
+                         triggered it.
+    The (project_id, name) UNIQUE constraint (migration 032) backs the
+    ON CONFLICT upsert; the DO UPDATE is a no-op that just returns the
+    existing id.
+
+    Canonical activity upsert: after the schedule is resolved, the
+    activity INSERT ... ON CONFLICT (schedule_id, activity_number) DO
+    UPDATE keys on the tuple migration 032 makes UNIQUE. The mapper's
+    ``schedule_name`` and ``project_id`` sidecars are stripped before
+    the INSERT splat — they're consumed by the schedule bootstrap only.
+
+    Transactional integrity: both statements run in the same session
+    (no intermediate commit), so if the activity INSERT fails after the
+    schedule row was created, the outer sync_resource's failure path
+    leaves the sync_run marked 'failed' — but the schedule row remains
+    (committed by the explicit ``await db.commit()`` call below, matching
+    the pattern the other _write_* functions use). Idempotent replay
+    catches up cleanly.
+    """
+    # Step 1: upsert the parent rex.schedules row keyed on
+    # (project_id, name). migration 032 adds the UNIQUE constraint.
+    schedule_stmt = text(
+        """
+        INSERT INTO rex.schedules (
+            id, project_id, name, schedule_type, status,
+            start_date, end_date, created_by,
+            created_at, updated_at
+        )
+        VALUES (
+            gen_random_uuid(), :project_id, :schedule_name,
+            'master', 'active',
+            CURRENT_DATE, NULL, NULL,
+            now(), now()
+        )
+        ON CONFLICT (project_id, name)
+        DO UPDATE SET updated_at = rex.schedules.updated_at
+        RETURNING id
+        """
+    )
+    schedule_result = await db.execute(schedule_stmt, {
+        "project_id":    row["project_id"],
+        "schedule_name": row["schedule_name"],
+    })
+    schedule_id = schedule_result.scalar_one()
+
+    # Step 2: strip the bootstrap sidecars — ``schedule_name`` and
+    # ``project_id`` are NOT rex.schedule_activities columns — and
+    # build the activity payload with the resolved schedule_id.
+    activity_row = {
+        k: v for k, v in row.items()
+        if k not in ("schedule_name", "project_id")
+    }
+    activity_row["schedule_id"] = schedule_id
+
+    cols = list(activity_row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    # Never rewrite the identity tuple on conflict. Everything else
+    # converges on the Procore-side values after each sync.
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}"
+        for c in cols
+        if c not in ("schedule_id", "activity_number")
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.schedule_activities (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (schedule_id, activity_number)
+        DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, activity_row)
+    await db.commit()
+    return res.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
@@ -583,12 +711,13 @@ async def _write_daily_logs(db: AsyncSession, row: dict[str, Any]) -> UUID:
 _CANONICAL_WRITERS: dict[
     str, Callable[[AsyncSession, dict[str, Any]], Awaitable[UUID]]
 ] = {
-    "rfis":       _write_rfis,
-    "projects":   _write_projects,
-    "people":     _write_users,
-    "companies":  _write_vendors,
-    "submittals": _write_submittals,
-    "daily_logs": _write_daily_logs,
+    "rfis":                 _write_rfis,
+    "projects":             _write_projects,
+    "people":               _write_users,
+    "companies":            _write_vendors,
+    "submittals":           _write_submittals,
+    "daily_logs":           _write_daily_logs,
+    "schedule_activities":  _write_schedule_activities,
 }
 
 

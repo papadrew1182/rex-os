@@ -1217,3 +1217,199 @@ async def test_sync_resource_daily_logs_end_to_end(
             "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
         ), {"a": procore_connector_account})
         await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_schedule_activities_end_to_end(
+    db_session,
+    procore_connector_account,
+    project_with_source_link,
+    monkeypatch,
+):
+    """Full project-scoped pipeline for schedule_activities (Phase 4 Wave
+    2 direct API). Mirrors the submittals / daily_logs end-to-end tests
+    with an additional assertion on the rex.schedules bootstrap.
+
+    Unique to this resource: rex.schedule_activities.schedule_id is a
+    NOT NULL FK to rex.schedules, and Procore's standard_tasks endpoint
+    has no first-class "schedule" concept. The writer bootstraps a
+    "Procore default schedule" row per project on the fly. The test
+    asserts that after the sync, exactly one rex.schedules row exists
+    for the project with the expected name.
+
+    Pipeline assertions:
+      1. Staging landed in connector_procore.schedule_tasks_raw (with
+         project_source_id='42')
+      2. A rex.schedules row was bootstrapped for the project
+      3. Canonical rex.schedule_activities rows exist, keyed on
+         (schedule_id, activity_number)
+      4. rex.connector_mappings source_links point
+         procore.schedule_activities external_ids at rex.schedule_activities
+         canonical ids
+      5. sync_runs row marked 'succeeded' with correct counts
+    """
+    from unittest.mock import AsyncMock, patch
+
+    # Fake Procore API response that ProcoreClient.list_schedule_tasks
+    # would return for project 42. Shape mirrors what the standard_tasks
+    # endpoint emits: ``id``, ``task_number``, ``name``, ``start_date``,
+    # ``finish_date``, ``percent_complete``, ``updated_at``.
+    # build_schedule_activity_payload normalizes this; the mapper
+    # defaults activity_type to 'task' and bootstraps the schedule name.
+    fake_rows = [
+        {
+            "id": 901,
+            "task_number": "A-100",
+            "name": "Pour footings",
+            "start_date": "2026-05-01",
+            "finish_date": "2026-05-05",
+            "percent_complete": 25,
+            "updated_at": "2026-04-22T15:00:00Z",
+        },
+        {
+            "id": 902,
+            "task_number": "A-200",
+            "name": "Form walls",
+            "start_date": "2026-05-06",
+            "finish_date": "2026-05-10",
+            "percent_complete": 0,
+            "updated_at": "2026-04-22T16:00:00Z",
+        },
+    ]
+
+    fake_client = AsyncMock()
+    fake_client.list_schedule_tasks = AsyncMock(return_value=fake_rows)
+
+    try:
+        with patch(
+            "app.services.ai.tools.procore_api.ProcoreClient.from_env",
+            return_value=fake_client,
+        ):
+            result = await sync_resource(
+                db_session,
+                account_id=procore_connector_account,
+                resource_type="schedule_activities",
+            )
+
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Staging: connector_procore.schedule_tasks_raw got both rows
+        # scoped to the right project_source_id.
+        staged = await db_session.execute(text(
+            "SELECT source_id, project_source_id, "
+            "       payload->>'name' AS name "
+            "FROM connector_procore.schedule_tasks_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('901','902') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [
+            (r["source_id"], r["project_source_id"], r["name"])
+            for r in staged.mappings().all()
+        ]
+        assert staged_rows == [
+            ("901", "42", "Pour footings"),
+            ("902", "42", "Form walls"),
+        ]
+
+        # Bootstrap: exactly one rex.schedules row for the project with
+        # the expected name. The writer should converge on the same
+        # schedule row for both activities (not create a second one on
+        # the second activity's upsert).
+        schedules = await db_session.execute(text(
+            "SELECT name, schedule_type, status "
+            "FROM rex.schedules "
+            "WHERE project_id = :pid "
+            "  AND name = 'Procore default schedule'"
+        ), {"pid": project_with_source_link})
+        sched_rows = schedules.mappings().all()
+        assert len(sched_rows) == 1
+        assert sched_rows[0]["name"] == "Procore default schedule"
+        assert sched_rows[0]["schedule_type"] == "master"
+        assert sched_rows[0]["status"] == "active"
+
+        # Canonical: rex.schedule_activities rows keyed on
+        # (schedule_id, activity_number). Both should attach to the
+        # single bootstrapped schedule.
+        import datetime as _dt
+        canonical = await db_session.execute(text(
+            "SELECT sa.activity_number, sa.name, sa.activity_type, "
+            "       sa.start_date, sa.end_date, sa.percent_complete "
+            "FROM rex.schedule_activities sa "
+            "JOIN rex.schedules s ON s.id = sa.schedule_id "
+            "WHERE s.project_id = :pid "
+            "  AND sa.activity_number IN ('A-100', 'A-200') "
+            "ORDER BY sa.activity_number"
+        ), {"pid": project_with_source_link})
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        # Row 0: A-100 — Pour footings (task, 25% complete)
+        assert rows[0]["activity_number"] == "A-100"
+        assert rows[0]["name"] == "Pour footings"
+        assert rows[0]["activity_type"] == "task"
+        assert rows[0]["start_date"] == _dt.date(2026, 5, 1)
+        assert rows[0]["end_date"] == _dt.date(2026, 5, 5)
+        assert rows[0]["percent_complete"] == 25
+        # Row 1: A-200 — Form walls (task, 0% complete)
+        assert rows[1]["activity_number"] == "A-200"
+        assert rows[1]["name"] == "Form walls"
+        assert rows[1]["percent_complete"] == 0
+
+        # source_links: one per seeded procore schedule task, pointing at
+        # rex.schedule_activities canonical rows.
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.schedule_activities' "
+            "  AND external_id IN ('901','902')"
+        ))
+        assert links.scalar_one() == 2
+
+        # sync_runs row: succeeded with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a "
+            "  AND resource_type='schedule_activities' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+    finally:
+        # Teardown: mappings first (FK to rex.schedule_activities via
+        # rex_id), then canonical activity rows, then the bootstrapped
+        # schedule row, then staging + run state.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.schedule_activities' "
+            "  AND external_id IN ('901','902')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.schedule_activities sa "
+            "USING rex.schedules s "
+            "WHERE sa.schedule_id = s.id "
+            "  AND s.project_id = :pid "
+            "  AND sa.activity_number IN ('A-100', 'A-200')"
+        ), {"pid": project_with_source_link})
+        await db_session.execute(text(
+            "DELETE FROM rex.schedules "
+            "WHERE project_id = :pid "
+            "  AND name = 'Procore default schedule'"
+        ), {"pid": project_with_source_link})
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.schedule_tasks_raw "
+            "WHERE account_id = :a AND source_id IN ('901','902')"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()

@@ -38,6 +38,7 @@ from app.services.connectors.procore.mapper import (
     map_daily_log,
     map_project,
     map_rfi,
+    map_schedule_activity,
     map_submittal,
     map_user,
     map_vendor,
@@ -1139,6 +1140,173 @@ def test_map_daily_log_emits_only_canonical_columns():
     }
     assert set(m.keys()) == expected, (
         f"daily_log mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_schedule_activity ────────────────────────────────────────────────
+
+
+def _schedule_activity_payload() -> dict:
+    """Mirror ``payloads.build_schedule_activity_payload`` output for a
+    representative Procore standard_tasks row."""
+    return {
+        "id":                "4001",
+        "project_source_id": "42",
+        "task_number":       "A-1000",
+        "name":              "Pour footings",
+        "start_date":        "2026-05-01",
+        "finish_date":       "2026-05-05",
+        "percent_complete":  25,
+        "status":            None,
+        "created_at":        "2026-04-22T08:00:00+00:00",
+        "updated_at":        "2026-04-22T15:00:00+00:00",
+    }
+
+
+def test_map_schedule_activity_maps_project_scope_via_schedule_name():
+    """The mapper does NOT emit ``project_id`` directly — schedule
+    activities attach to rex.schedules, not rex.projects. Instead the
+    mapper emits a ``schedule_name`` sidecar the orchestrator's writer
+    uses to look up (or bootstrap) a rex.schedules row scoped to the
+    project, then resolves that row's uuid into ``schedule_id`` at
+    write time.
+
+    The project_canonical_id argument is still threaded through so the
+    writer knows which project to bootstrap the schedule under.
+    """
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["schedule_name"] == "Procore default schedule"
+    assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_schedule_activity_does_not_emit_source_id():
+    """source_id is NOT a rex.schedule_activities column. Orchestrator
+    reads the procore id directly from the raw payload (item["id"])
+    for the source_links writer — same convention as map_daily_log /
+    map_submittal."""
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
+
+
+def test_map_schedule_activity_maps_activity_number_from_task_number():
+    """Procore's ``task_number`` is the user-visible task identifier
+    (A-1000, 001, etc). It maps directly to
+    rex.schedule_activities.activity_number — the natural key the
+    writer's ON CONFLICT (schedule_id, activity_number) upsert relies
+    on."""
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["activity_number"] == "A-1000"
+
+
+def test_map_schedule_activity_missing_task_number_falls_back_to_id():
+    """If Procore's response omits ``task_number`` (rare but possible
+    for ad-hoc tasks), fall back to the stringified Procore id so the
+    (schedule_id, activity_number) upsert key stays deterministic.
+    Without this fallback, a NULL activity_number would defeat the
+    upsert — UNIQUE indexes treat NULLs as distinct."""
+    raw = _schedule_activity_payload()
+    raw["task_number"] = None
+    m = map_schedule_activity(raw, PROJECT_CANONICAL_ID)
+    assert m["activity_number"] == "4001"
+
+
+def test_map_schedule_activity_maps_dates_as_date_objects():
+    """rex.schedule_activities.start_date + end_date are typed ``date``
+    and both NOT NULL. The mapper must emit ``date`` objects (not ISO
+    strings) so asyncpg binds them natively. Procore's ``finish_date``
+    maps to rex's ``end_date`` — the column name in the canonical
+    table is ``end_date`` (matches the rex.schedules.end_date pattern)."""
+    from datetime import date
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["start_date"] == date(2026, 5, 1)
+    assert m["end_date"] == date(2026, 5, 5)
+    assert isinstance(m["start_date"], date)
+    assert isinstance(m["end_date"], date)
+
+
+def test_map_schedule_activity_percent_complete_passthrough():
+    """Procore's percent_complete is already in 0-100 range (matches
+    rex's CHECK constraint). Pass through unchanged."""
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["percent_complete"] == 25
+
+
+def test_map_schedule_activity_missing_percent_complete_defaults_to_zero():
+    """rex.schedule_activities.percent_complete is NOT NULL DEFAULT 0.
+    When Procore's response omits the field, emit 0 explicitly rather
+    than None — the column has a DB default but defaults don't fire
+    when the INSERT includes the column with NULL."""
+    raw = _schedule_activity_payload()
+    raw["percent_complete"] = None
+    m = map_schedule_activity(raw, PROJECT_CANONICAL_ID)
+    assert m["percent_complete"] == 0
+
+
+def test_map_schedule_activity_defaults_activity_type_to_task():
+    """rex.schedule_activities.activity_type is NOT NULL CHECK IN
+    ('task','milestone','section','hammock'). Procore's standard_tasks
+    endpoint doesn't expose a reliable activity_type classifier — every
+    row is a "task" from Procore's POV. Default to 'task' so the
+    CHECK constraint passes. An admin can re-classify milestones in a
+    follow-up UI pass."""
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["activity_type"] == "task"
+
+
+def test_map_schedule_activity_parent_and_assignments_are_none():
+    """parent_id (hierarchy), assigned_company_id, assigned_person_id,
+    cost_code_id are uuid FKs the mapper leaves as None pending
+    follow-up enrichment passes. Predecessor/successor links live in
+    rex.activity_links (a separate relation table) and are NOT this
+    mapper's concern."""
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    assert m["parent_id"] is None
+    assert m["assigned_company_id"] is None
+    assert m["assigned_person_id"] is None
+    assert m["cost_code_id"] is None
+
+
+def test_map_schedule_activity_emits_only_expected_keys():
+    """Every key the mapper emits is either a real rex.schedule_activities
+    column OR a sidecar the writer consumes before the INSERT.
+
+    The ``schedule_name`` + ``project_id`` sidecars are NOT canonical
+    columns — they're consumed by _write_schedule_activities to
+    bootstrap a rex.schedules row and resolve schedule_id before the
+    canonical INSERT runs. The writer strips them from the row dict
+    before splatting into the INSERT.
+
+    Excluded from the output:
+    - id, created_at, updated_at (DB-managed)
+    - is_critical, is_manually_scheduled (DB defaults false; omitted so
+      defaults fire)
+    - duration_days, baseline_start, baseline_end, variance_days,
+      float_days, location, notes, sort_order (not carried on the
+      Procore standard_tasks response today)
+    - schedule_id (resolved by the writer from schedule_name+project_id
+      sidecars, NOT emitted by the mapper).
+    """
+    m = map_schedule_activity(_schedule_activity_payload(), PROJECT_CANONICAL_ID)
+    expected = {
+        # Sidecars the writer consumes before the INSERT
+        "schedule_name",
+        "project_id",
+        # Real rex.schedule_activities columns
+        "activity_number",
+        "name",
+        "activity_type",
+        "start_date",
+        "end_date",
+        "percent_complete",
+        "parent_id",
+        "assigned_company_id",
+        "assigned_person_id",
+        "cost_code_id",
+    }
+    assert set(m.keys()) == expected, (
+        f"schedule_activity mapper keys differ from expected set.\n"
         f"  missing: {expected - set(m.keys())}\n"
         f"  extra:   {set(m.keys()) - expected}"
     )

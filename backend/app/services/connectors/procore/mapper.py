@@ -686,11 +686,138 @@ def map_vendor(raw: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def map_schedule_activity(
+    raw: dict[str, Any], project_canonical_id: str
+) -> dict[str, Any]:
+    """Map a Procore schedule-task payload (as produced by
+    ``payloads.build_schedule_activity_payload``) to a dict keyed by
+    rex.schedule_activities canonical columns PLUS two sidecars the
+    writer consumes before the canonical INSERT.
+
+    Canonical rex.schedule_activities columns (from
+    migrations/rex2_canonical_ddl.sql lines 191-216):
+
+        id                     uuid PK                 -- db-generated; NOT emitted
+        schedule_id            uuid NOT NULL           -- resolved by the writer
+                                                          from (schedule_name,
+                                                          project_id) sidecars;
+                                                          NOT emitted here
+        parent_id              uuid                    -- hierarchy; None
+        activity_number        text                    -- natural key (with
+                                                          schedule_id) for the
+                                                          writer's upsert
+        name                   text NOT NULL
+        activity_type          text NOT NULL CHECK IN  -- defaulted to 'task'
+                                (task|milestone|section|hammock)
+        start_date             date NOT NULL
+        end_date               date NOT NULL           -- <- payload.finish_date
+        duration_days          int                     -- not in payload; omitted
+        percent_complete       numeric NOT NULL DEFAULT 0
+                                                       -- 0-100; defaults fire
+                                                          only when key is
+                                                          omitted, so the
+                                                          mapper emits 0
+                                                          explicitly when
+                                                          Procore returns None
+        is_critical            bool NOT NULL DEFAULT false
+                                                       -- OMITTED (let DB default)
+        is_manually_scheduled  bool NOT NULL DEFAULT false
+                                                       -- OMITTED (let DB default)
+        baseline_start         date                    -- not in payload; omitted
+        baseline_end           date                    -- not in payload; omitted
+        variance_days          int                     -- not in payload; omitted
+        float_days             int                     -- not in payload; omitted
+        assigned_company_id    uuid                    -- resolve later; None
+        assigned_person_id     uuid                    -- resolve later; None
+        cost_code_id           uuid                    -- resolve later; None
+        location               text                    -- not in payload; omitted
+        notes                  text                    -- not in payload; omitted
+        sort_order             int NOT NULL DEFAULT 0  -- OMITTED (let DB default)
+        created_at / updated_at                        -- DB-managed; NOT emitted
+
+    Sidecars (NOT rex.schedule_activities columns — stripped by the
+    writer before the INSERT):
+        schedule_name          text — name of the rex.schedules row
+                                this activity attaches to. The writer
+                                upserts a rex.schedules row keyed on
+                                (project_id, name) and resolves
+                                schedule_id from it.
+        project_id             uuid — the canonical rex.projects.id this
+                                activity's schedule belongs under.
+
+    Contract:
+    * Output contains canonical rex.schedule_activities columns AND the
+      two sidecars the writer consumes to bootstrap the schedule FK.
+      The writer pops both sidecars before splatting the remaining keys
+      into the INSERT.
+    * ``source_id`` is NOT emitted — orchestrator reads ``item["id"]``
+      directly from the raw payload for the source_links writer (same
+      convention as map_daily_log / map_submittal / map_rfi).
+    * ``schedule_id`` is NOT emitted — the writer resolves it from the
+      (schedule_name, project_id) pair via an INSERT ... ON CONFLICT
+      upsert against rex.schedules in the same transaction.
+    * Name->UUID resolution for assigned_company_id / assigned_person_id
+      is left as None. The enrichment pass reads names from the raw
+      payload, not from this mapper's output.
+    * ``activity_number`` falls back to the stringified Procore id when
+      Procore's ``task_number`` is missing — the (schedule_id,
+      activity_number) upsert key must never be NULL or the UNIQUE
+      index treats rows as distinct (NULL != NULL in SQL).
+    * ``activity_type`` defaults to 'task' — Procore's standard_tasks
+      endpoint returns generic tasks without a milestone classifier.
+      Admin re-classifies milestones post-sync.
+
+    Schedule bootstrap: the canonical rex.schedule_activities row needs
+    a valid ``schedule_id`` FK. Procore's concept of "schedule tasks"
+    doesn't cleanly map to rex.schedules as a first-class entity —
+    rex.schedules is a rex-specific abstraction. The writer handles the
+    bootstrap: first INSERT-ON-CONFLICT a rex.schedules row keyed on
+    (project_id, name) == (project_canonical_id, "Procore default
+    schedule"), then insert the activity with the resolved schedule_id.
+    This way the mapper stays logical (what data does Procore carry)
+    and the writer owns the FK bookkeeping.
+    """
+    # activity_number: prefer task_number; fall back to str(id) so the
+    # (schedule_id, activity_number) upsert key is never NULL.
+    task_number = raw.get("task_number")
+    if not task_number:
+        task_number = str(raw.get("id", ""))
+
+    # percent_complete: emit 0 explicitly when Procore returns None —
+    # the DB default only fires when the column is omitted from the
+    # INSERT, but we DO include percent_complete in the splat, so we
+    # need a concrete value.
+    pct = raw.get("percent_complete")
+    if pct is None:
+        pct = 0
+
+    return {
+        # Sidecars the writer consumes before the INSERT (stripped).
+        "schedule_name":       "Procore default schedule",
+        "project_id":          project_canonical_id,
+
+        # Direct canonical fields
+        "activity_number":     task_number,
+        "name":                raw.get("name"),
+        "activity_type":       "task",
+        "start_date":          _iso_date(raw.get("start_date")),
+        "end_date":             _iso_date(raw.get("finish_date") or raw.get("end_date")),
+        "percent_complete":    pct,
+
+        # FKs pending enrichment
+        "parent_id":            None,
+        "assigned_company_id":  None,
+        "assigned_person_id":   None,
+        "cost_code_id":         None,
+    }
+
+
 __all__ = [
     "map_project",
     "map_rfi",
     "map_submittal",
     "map_daily_log",
+    "map_schedule_activity",
     "map_commitment",
     "map_user",
     "map_vendor",
