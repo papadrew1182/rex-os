@@ -23,6 +23,12 @@ from app.jobs import schedule_snapshot  # noqa: F401
 from app.jobs import aging_alerts  # noqa: F401
 from app.jobs import session_purge  # noqa: F401
 
+# Phase 4 Wave 2 — direct Procore API sync. The @register_job decorator
+# fires on import; the job then appears in JOB_REGISTRY and, when
+# REX_ENABLE_SCHEDULER is set, gets wired into AsyncIOScheduler at
+# startup on its cron trigger.
+from app.services.connectors.procore import scheduler_job  # noqa: F401
+
 __all__ = [
     "JOB_REGISTRY",
     "JobDefinition",
