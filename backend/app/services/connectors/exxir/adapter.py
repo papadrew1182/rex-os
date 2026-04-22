@@ -33,7 +33,7 @@ class ExxirAdapter(ConnectorAdapter):
             "fetch_rfis",
             "fetch_submittals",
             "fetch_daily_logs",
-            "fetch_schedule",
+            "fetch_schedule_activities",
         }
     )
 
@@ -78,7 +78,7 @@ class ExxirAdapter(ConnectorAdapter):
     async def fetch_daily_logs(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
 
-    async def fetch_schedule(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
+    async def fetch_schedule_activities(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
 
     # Financial + documents — Exxir's primary surface.

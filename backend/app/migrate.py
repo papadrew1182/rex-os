@@ -110,6 +110,37 @@ MIGRATION_ORDER: list[str] = [
     #       get their own heavier schema in rex.pending_decisions — notes
     #       stay separate for MVP clarity.
     "029_rex_notes.sql",
+    # ── Phase 4 Wave 2 (feat/phase4-wave2-direct) lane ──────────────────
+    # 030 = connector_procore.inspections_raw staging table (the one
+    #       migration 013 didn't create; the other 4 Wave 2 staging tables
+    #       already exist from 013) + cursor_watermark column on
+    #       rex.sync_runs for per-run updated_since tracking.
+    "030_connector_procore_inspections_raw.sql",
+    # 031 = unique (project_id, submittal_number) on rex.submittals so the
+    #       submittals resource orchestrator's ON CONFLICT upsert has a
+    #       matching constraint (Task 3 of Phase 4 Wave 2).
+    "031_rex_submittals_project_number_unique.sql",
+    # 032 = unique (project_id, name) on rex.schedules AND unique
+    #       (schedule_id, activity_number) on rex.schedule_activities so
+    #       the schedule_activities resource orchestrator's two ON
+    #       CONFLICT upserts (schedule bootstrap + activity upsert) have
+    #       matching constraints (Task 5 of Phase 4 Wave 2).
+    "032_rex_schedules_and_schedule_activities_unique.sql",
+    # 033 = unique (project_id, event_number) on rex.change_events so the
+    #       change_events resource orchestrator's ON CONFLICT upsert has
+    #       a matching constraint (Task 6 of Phase 4 Wave 2). The canonical
+    #       DDL does not declare this natural-key UNIQUE, so a supplementary
+    #       migration is required. Shared with Phase 6b Wave 2's
+    #       ``create_change_event`` LLM tool, which uses the same natural
+    #       key for ON CONFLICT DO UPDATE.
+    "033_rex_change_events_project_number_unique.sql",
+    # 034 = unique (project_id, inspection_number) on rex.inspections so
+    #       the inspections resource orchestrator's ON CONFLICT upsert has
+    #       a matching constraint (Task 7 of Phase 4 Wave 2 — the fifth
+    #       and final end-to-end resource). The canonical DDL does not
+    #       declare this natural-key UNIQUE, so a supplementary migration
+    #       is required.
+    "034_rex_inspections_project_number_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

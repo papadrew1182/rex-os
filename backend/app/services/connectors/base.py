@@ -132,10 +132,17 @@ class ConnectorAdapter(ABC):
     # ── schedule + documents ─────────────────────────────────────────
 
     @abstractmethod
-    async def fetch_schedule(
+    async def fetch_schedule_activities(
         self, project_external_id: str, cursor: str | None = None
     ) -> ConnectorPage:
-        """Return schedule tasks / milestones for a project."""
+        """Return schedule tasks / milestones for a project.
+
+        Renamed from ``fetch_schedule`` in Phase 4 Wave 2 Task 5 to match
+        the ``_RESOURCE_CONFIG`` key (``schedule_activities``) and the
+        canonical table name (``rex.schedule_activities``). Keeps the
+        adapter method names consistent with the rest of the Wave 2
+        direct-Procore resources (fetch_submittals, fetch_daily_logs).
+        """
 
     @abstractmethod
     async def fetch_documents(
@@ -158,7 +165,7 @@ class ConnectorAdapter(ABC):
             "list_projects", "list_users", "fetch_project_directory",
             "fetch_rfis", "fetch_submittals", "fetch_daily_logs",
             "fetch_budget", "fetch_commitments", "fetch_change_events",
-            "fetch_schedule", "fetch_documents",
+            "fetch_schedule_activities", "fetch_documents",
         }
 
 

@@ -201,9 +201,288 @@ def build_vendor_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_submittal_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API submittals row -> staging payload.
+
+    Unlike ``build_rfi_payload`` (which reads a flat asyncpg row from the
+    rex-procore Railway DB), this builder consumes a dict returned
+    directly by Procore's REST API via ``ProcoreClient.list_submittals``.
+    The project scope comes from the adapter's
+    ``project_external_id`` argument rather than the row itself, because
+    Procore's ``/rest/v1.0/projects/{id}/submittals`` endpoint already
+    scopes by path — the response rows don't redundantly carry
+    ``project_id``.
+
+    Shape is deliberately parallel to ``build_rfi_payload``: ``id`` and
+    ``project_source_id`` are top-level string keys (what staging's
+    ``upsert_raw`` reads), ``updated_at`` is the ISO-stringified
+    watermark, and every other payload key mirrors the Procore API field
+    name. Keep the keys stable — ``mapper.map_submittal`` reads them via
+    ``raw.get(...)``.
+
+    Procore's submittal status vocabulary (``Open``, ``Closed``, etc.)
+    and type vocabulary (``Shop Drawings``, ``Product Data``, etc.) stay
+    as-is here; the mapper normalizes them to the rex.submittals CHECK
+    constraint's enum.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "submittal_number":  raw.get("number"),
+        "title":             raw.get("title"),
+        "status":            raw.get("status"),
+        "submittal_type":    raw.get("submittal_type") or raw.get("type"),
+        "spec_section":      raw.get("spec_section"),
+        "due_date":          _iso(raw.get("due_date")),
+        "submitted_date":    _iso(raw.get("submit_by") or raw.get("submitted_date")),
+        "approved_date":     _iso(raw.get("approved_date")),
+        "assignee":          raw.get("assignee") or raw.get("ball_in_court"),
+        "ball_in_court":     raw.get("ball_in_court"),
+        "responsible_contractor": raw.get("responsible_contractor"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
+def build_daily_log_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API daily-log row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_daily_logs`` (the
+    ``/rest/v1.0/projects/{id}/daily_logs/construction_report_logs``
+    endpoint). Mirrors ``build_submittal_payload`` — the project scope
+    comes from the adapter's ``project_external_id`` argument rather
+    than the row itself, because Procore's endpoint already scopes by
+    path.
+
+    Shape is deliberately parallel to ``build_submittal_payload``: ``id``
+    and ``project_source_id`` are top-level string keys (what staging's
+    ``upsert_raw`` reads), ``updated_at`` is the ISO-stringified
+    watermark. Every other payload key mirrors the Procore API field
+    name so ``mapper.map_daily_log`` can read them via ``raw.get(...)``
+    without translation.
+
+    Procore's construction-report daily-log shape carries:
+      * ``date`` — the log_date (rex.daily_logs.log_date is NOT NULL)
+      * ``is_published`` (bool) — published logs are 'submitted' in
+        rex's 3-value enum; unpublished logs stay 'draft'.
+      * Weather: nested ``weather_conditions`` field with subfields
+        including ``temperature`` variations and free-text
+        ``conditions``. We stash the whole weather sub-object alongside
+        a pre-flattened summary so the mapper can either use the
+        convenience strings or dig into the full structured object.
+      * Notes: ``notes`` (free-text, the main log body). Procore does
+        not natively split work/delay/safety/visitor notes, so we
+        only populate ``work_summary`` and leave the rest None.
+
+    Keys unknown-to-Procore-but-known-to-rex are intentionally NOT
+    fabricated here — the mapper emits None for them.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "log_date":          _iso(raw.get("date") or raw.get("log_date")),
+        "is_published":      raw.get("is_published"),
+        "status":            raw.get("status"),
+        "notes":             raw.get("notes"),
+        "weather":           raw.get("weather_conditions") or raw.get("weather"),
+        "weather_conditions": raw.get("weather_conditions"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
+def build_schedule_activity_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API schedule-task row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_schedule_tasks`` (the
+    ``/rest/v1.0/projects/{id}/schedule/standard_tasks`` endpoint).
+    Mirrors ``build_daily_log_payload`` / ``build_submittal_payload`` —
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_schedule_activity`` can read
+    them via ``raw.get(...)`` without translation.
+
+    Procore's standard_tasks endpoint carries at least:
+      * ``id``         — the task id (canonical natural key here)
+      * ``task_number`` — user-visible task number (mapped to
+        rex.schedule_activities.activity_number)
+      * ``name``        — task name (NOT NULL on the canonical side)
+      * ``start_date`` / ``finish_date`` — both dates; finish_date maps
+        to rex.schedule_activities.end_date
+      * ``percent_complete`` — numeric 0-100
+      * ``updated_at`` — watermark for cursor advancement
+
+    Predecessors/successors and parent/child hierarchy are NOT carried
+    here — the mapper emits None for the canonical parent_id and
+    predecessor rows (a separate rex.activity_links relation table)
+    are a follow-up resource.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "task_number":       raw.get("task_number"),
+        "name":              raw.get("name"),
+        "start_date":        _iso(raw.get("start_date")),
+        "finish_date":       _iso(raw.get("finish_date") or raw.get("end_date")),
+        "percent_complete":  raw.get("percent_complete"),
+        "status":            raw.get("status"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
+def build_change_event_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API change-event row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_change_events`` (the
+    ``/rest/v1.0/projects/{id}/change_events`` endpoint). Mirrors
+    ``build_daily_log_payload`` / ``build_schedule_activity_payload``:
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_change_event`` can read them
+    via ``raw.get(...)`` without translation.
+
+    Procore's change_events endpoint carries at least:
+      * ``id``                — change event id (canonical natural key
+        flows through ``number`` below; this ``id`` is preserved for
+        staging's (account_id, source_id) dedup key).
+      * ``number``            — user-visible change event number
+        (mapped to rex.change_events.event_number — the natural key
+        with project_id for ON CONFLICT upserts).
+      * ``title``             — NOT NULL on the canonical side.
+      * ``description``       — free-text description.
+      * ``status``            — Procore status string (Open, Pending,
+        Approved, Closed, Void); the mapper normalizes to rex's CHECK
+        enum.
+      * ``change_reason``     — reason classifier (Owner Change, Design
+        Change, Unforeseen, Allowance, Contingency); normalized to
+        rex's CHECK enum.
+      * ``event_type``        — type classifier (TBD, Allowance,
+        Contingency, Owner Change, Transfer); normalized to rex's CHECK
+        enum.
+      * ``scope``             — scope classifier (In Scope, Out of
+        Scope, TBD); normalized to rex's CHECK enum.
+      * ``estimated_amount``  — numeric dollar estimate.
+      * ``updated_at``        — watermark for cursor advancement.
+
+    FKs (rfi_id, prime_contract_id, created_by) are NOT carried on the
+    Procore change_events row in a form that resolves to canonical rex
+    UUIDs; the mapper emits None for them. A follow-up enrichment pass
+    can populate them by joining on other sync_service state.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "number":            raw.get("number"),
+        "title":             raw.get("title"),
+        "description":       raw.get("description"),
+        "status":            raw.get("status"),
+        "change_reason":     raw.get("change_reason"),
+        "event_type":        raw.get("event_type"),
+        "scope":             raw.get("scope"),
+        "estimated_amount":  raw.get("estimated_amount"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
+def build_inspection_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API inspection row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_inspections`` (the
+    ``/rest/v1.0/projects/{id}/inspection_lists`` endpoint). Mirrors
+    ``build_change_event_payload`` / ``build_schedule_activity_payload`` —
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_inspection`` can read them
+    via ``raw.get(...)`` without translation.
+
+    Procore's inspection_lists endpoint carries at least:
+      * ``id``                — inspection id (canonical natural key
+        flows through ``inspection_number`` below).
+      * ``inspection_number`` — user-visible inspection number (mapped
+        to rex.inspections.inspection_number — the natural key with
+        project_id for ON CONFLICT upserts).
+      * ``name`` / ``title``  — NOT NULL on the canonical side
+        (rex.inspections.title). Procore APIs variously expose this
+        as ``name`` or ``title`` depending on the endpoint flavor.
+      * ``inspection_type``   — type classifier; the mapper normalizes
+        to rex's CHECK enum (municipal|quality|safety|pre_concrete|
+        framing|mep_rough|mep_final|other).
+      * ``status``            — Procore status string (Scheduled,
+        In Progress, Passed, Failed, Partial, Cancelled); the mapper
+        normalizes to rex's CHECK enum.
+      * ``scheduled_date``    — NOT NULL on the canonical side.
+      * ``completed_date``    — nullable date.
+      * ``inspector_name``    — free-text name (NOT resolved to a
+        people FK today; the mapper passes through).
+      * ``location``          — free-text location.
+      * ``comments``          — free-text comments.
+      * ``updated_at``        — watermark for cursor advancement.
+
+    FKs (inspecting_company_id, responsible_person_id, activity_id,
+    created_by) are NOT carried on the Procore inspections row in a form
+    that resolves to canonical rex UUIDs; the mapper emits None for them.
+    A follow-up enrichment pass can populate them by joining on other
+    sync_service state.
+    """
+    return {
+        "id":                 str(raw["id"]),
+        "project_source_id":  str(project_external_id),
+        "inspection_number":  raw.get("inspection_number") or raw.get("number"),
+        "title":              raw.get("title") or raw.get("name"),
+        "inspection_type":    raw.get("inspection_type") or raw.get("type"),
+        "status":             raw.get("status"),
+        "scheduled_date":     _iso(raw.get("scheduled_date") or raw.get("start_date")),
+        "completed_date":     _iso(raw.get("completed_date") or raw.get("end_date")),
+        "inspector_name":     raw.get("inspector_name") or raw.get("inspector"),
+        "location":           raw.get("location"),
+        "comments":           raw.get("comments") or raw.get("description"),
+        "created_at":         _iso(raw.get("created_at")),
+        "updated_at":         _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
+    "build_change_event_payload",
+    "build_daily_log_payload",
+    "build_inspection_payload",
     "build_rfi_payload",
     "build_project_payload",
+    "build_schedule_activity_payload",
+    "build_submittal_payload",
     "build_user_payload",
     "build_vendor_payload",
 ]

@@ -1,25 +1,43 @@
 """Procore connector adapter.
 
-Reads from the "Rex App" Railway Postgres (old rex-procore sync app)
-via RexAppDbClient. No longer talks to Procore's HTTP API directly —
-the old app already does that and we consume its flattened tables.
+Hybrid read model:
 
-Only fetch_rfis is wired for real in this commit; the other fetch_*
-methods land in the follow-up resource-rollout plan.
+* **Phase 4a resources** (projects, users, vendors, rfis) read from the
+  "Rex App" Railway Postgres (old rex-procore sync app) via
+  RexAppDbClient — the old app already syncs Procore's API on a cron
+  and we consume its flattened ``procore.*`` tables.
+
+* **Phase 4 Wave 2 resources** (submittals + follow-ups: daily_logs,
+  schedule_activities, change_events, inspections) call Procore's REST
+  API directly via ``ProcoreClient`` from
+  ``app.services.ai.tools.procore_api``. These resources were never
+  ingested into the rex-procore app, so going direct is the only
+  way to get them without building a full parallel ingest first.
+
+Each ``fetch_<resource>`` picks the right path per its comment. The
+adapter's public ConnectorPage shape is the same across both paths —
+callers don't need to know which way the data came in.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
+from app.services.ai.tools.procore_api import ProcoreClient, ProcoreNotConfigured
 from app.services.connectors.base import (
     ConnectorAdapter,
     ConnectorHealth,
     ConnectorPage,
 )
 from app.services.connectors.procore.payloads import (
+    build_change_event_payload,
+    build_daily_log_payload,
+    build_inspection_payload,
     build_project_payload,
     build_rfi_payload,
+    build_schedule_activity_payload,
+    build_submittal_payload,
     build_user_payload,
     build_vendor_payload,
 )
@@ -189,11 +207,89 @@ class ProcoreAdapter(ConnectorAdapter):
             next_cursor = last_updated
         return ConnectorPage(items=items, next_cursor=next_cursor)
 
-    async def fetch_submittals(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+    async def fetch_submittals(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of submittals from Procore's REST API directly.
 
-    async def fetch_daily_logs(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the upstream
+        returns only changed rows.
+
+        Graceful degradation: if Procore env vars aren't configured
+        (``ProcoreNotConfigured``), returns an empty page instead of
+        crashing. The scheduler iterates fetch_* across many accounts;
+        one account's missing OAuth config must not kill the whole run.
+        Any other upstream error (HTTP 4xx/5xx) propagates to the
+        orchestrator so the sync_run is marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_submittals`` already loops its
+        own page-number pagination until an empty page, so the returned
+        list is the complete changed set for this run. ``next_cursor``
+        is always None here — the orchestrator uses the source row's
+        ``updated_at`` to decide the next watermark, not a per-page
+        cursor handle.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_submittals(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [build_submittal_payload(project_external_id, r) for r in rows]
+        return ConnectorPage(items=items, next_cursor=None)
+
+    async def fetch_daily_logs(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of daily logs from Procore's REST API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the upstream
+        returns only changed rows.
+
+        Mirrors ``fetch_submittals`` (Task 3). Graceful degradation: if
+        Procore env vars aren't configured (``ProcoreNotConfigured``),
+        returns an empty page instead of crashing. The scheduler iterates
+        fetch_* across many accounts; one account's missing OAuth config
+        must not kill the whole run. Any other upstream error (HTTP
+        4xx/5xx) propagates to the orchestrator so the sync_run is marked
+        'failed'.
+
+        Pagination: ``ProcoreClient.list_daily_logs`` already loops its
+        own page-number pagination until an empty page, so the returned
+        list is the complete changed set for this run. ``next_cursor``
+        is always None here — the orchestrator uses the source row's
+        ``updated_at`` to decide the next watermark, not a per-page
+        cursor handle.
+
+        Note: ``ProcoreClient.list_daily_logs`` coerces ``updated_since``
+        to a ``log_date`` query param (Procore's construction_report_logs
+        endpoint filters by log date rather than update time). The
+        watermark semantics are still "give me rows on/after this
+        moment" — the fidelity is day-level instead of timestamp-level,
+        which is fine for daily logs (one row per day per project).
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_daily_logs(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [build_daily_log_payload(project_external_id, r) for r in rows]
+        return ConnectorPage(items=items, next_cursor=None)
 
     async def fetch_budget(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
@@ -201,11 +297,158 @@ class ProcoreAdapter(ConnectorAdapter):
     async def fetch_commitments(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
 
-    async def fetch_change_events(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+    async def fetch_change_events(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of change events from Procore's REST API directly.
 
-    async def fetch_schedule(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the
+        upstream returns only changed rows.
+
+        Mirrors ``fetch_submittals`` / ``fetch_daily_logs`` /
+        ``fetch_schedule_activities`` (Tasks 3-5). Graceful degradation:
+        if Procore env vars aren't configured (``ProcoreNotConfigured``),
+        returns an empty page instead of crashing. The scheduler iterates
+        fetch_* across many accounts; one account's missing OAuth config
+        must not kill the whole run. Any other upstream error (HTTP
+        4xx/5xx) propagates to the orchestrator so the sync_run is
+        marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_change_events`` already loops
+        its own page-number pagination until an empty page, so the
+        returned list is the complete changed set for this run.
+        ``next_cursor`` is always None here — the orchestrator uses the
+        source row's ``updated_at`` to decide the next watermark, not a
+        per-page cursor handle.
+
+        Endpoint: ``/rest/v1.0/projects/{id}/change_events``
+        (ProcoreClient.list_change_events). The response rows carry
+        ``id``, ``number``, ``title``, ``status``, ``change_reason``,
+        ``event_type``, ``scope``, ``estimated_amount``, and
+        ``updated_at`` — build_change_event_payload wraps the whole raw
+        row so the mapper can read any field.
+
+        Overlap with the LLM ``create_change_event`` tool: Phase 6b Wave
+        2 shipped a tool that inserts into ``rex.change_events``
+        directly. Both the tool and this sync path upsert to the same
+        ``(project_id, event_number)`` natural key via ON CONFLICT,
+        so the two sources converge cleanly on one canonical row.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_change_events(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [
+            build_change_event_payload(project_external_id, r) for r in rows
+        ]
+        return ConnectorPage(items=items, next_cursor=None)
+
+    async def fetch_schedule_activities(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of schedule activities (tasks) from Procore's REST
+        API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the
+        upstream returns only changed rows.
+
+        Mirrors ``fetch_submittals`` / ``fetch_daily_logs`` (Tasks 3/4).
+        Graceful degradation: if Procore env vars aren't configured
+        (``ProcoreNotConfigured``), returns an empty page instead of
+        crashing. The scheduler iterates fetch_* across many accounts;
+        one account's missing OAuth config must not kill the whole run.
+        Any other upstream error (HTTP 4xx/5xx) propagates to the
+        orchestrator so the sync_run is marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_schedule_tasks`` already loops
+        its own page-number pagination until an empty page, so the
+        returned list is the complete changed set for this run.
+        ``next_cursor`` is always None here — the orchestrator uses the
+        source row's ``updated_at`` to decide the next watermark, not a
+        per-page cursor handle.
+
+        Endpoint: ``/rest/v1.0/projects/{id}/schedule/standard_tasks``
+        (ProcoreClient.list_schedule_tasks). The response rows carry
+        ``id``, ``task_number``, ``name``, ``start_date``,
+        ``finish_date``, ``percent_complete``, and ``updated_at`` —
+        build_schedule_activity_payload wraps the whole raw row so the
+        mapper can read any field.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_schedule_tasks(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [
+            build_schedule_activity_payload(project_external_id, r) for r in rows
+        ]
+        return ConnectorPage(items=items, next_cursor=None)
+
+    async def fetch_inspections(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of inspections from Procore's REST API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the
+        upstream returns only changed rows.
+
+        Mirrors ``fetch_submittals`` / ``fetch_daily_logs`` /
+        ``fetch_schedule_activities`` / ``fetch_change_events`` (Tasks
+        3-6). Graceful degradation: if Procore env vars aren't configured
+        (``ProcoreNotConfigured``), returns an empty page instead of
+        crashing. The scheduler iterates fetch_* across many accounts;
+        one account's missing OAuth config must not kill the whole run.
+        Any other upstream error (HTTP 4xx/5xx) propagates to the
+        orchestrator so the sync_run is marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_inspections`` already loops its
+        own page-number pagination until an empty page, so the returned
+        list is the complete changed set for this run. ``next_cursor``
+        is always None here — the orchestrator uses the source row's
+        ``updated_at`` to decide the next watermark, not a per-page
+        cursor handle.
+
+        Endpoint: ``/rest/v1.0/projects/{id}/inspection_lists``
+        (ProcoreClient.list_inspections). The response rows carry
+        ``id``, ``inspection_number``, ``name``/``title``,
+        ``inspection_type``, ``status``, ``scheduled_date``,
+        ``completed_date``, and ``updated_at`` — build_inspection_payload
+        wraps the whole raw row so the mapper can read any field.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_inspections(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [
+            build_inspection_payload(project_external_id, r) for r in rows
+        ]
+        return ConnectorPage(items=items, next_cursor=None)
 
     async def fetch_documents(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
