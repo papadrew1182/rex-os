@@ -78,7 +78,7 @@ WITH seed AS (
     "description": "Open and unpriced change events across all projects",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "adapter_pending",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -678,7 +678,7 @@ WITH seed AS (
     "description": "Inspection results - flags failures and overdue items",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "adapter_pending",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -1009,7 +1009,7 @@ WITH seed AS (
     "description": "Tasks behind schedule - flags critical path with negative float",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "adapter_pending",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
@@ -1033,7 +1033,7 @@ WITH seed AS (
     "description": "Active lookaheads by project - flags gaps in weekly planning",
     "params_schema": [],
     "risk_tier": "read_only",
-    "readiness_state": "adapter_pending",
+    "readiness_state": "live",
     "required_connectors": [
       "procore"
     ],
