@@ -9,6 +9,13 @@ function truncate(s, n = 120) {
   return str.length > n ? str.slice(0, n - 1) + "…" : str;
 }
 
+function fmtMoney(n) {
+  if (n === null || n === undefined) return null;
+  const num = Number(n);
+  if (Number.isNaN(num)) return null;
+  return "$" + num.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
 const HANDLERS = {
   create_task: (args, result) => ({
     primary: "Create task",
@@ -47,6 +54,52 @@ const HANDLERS = {
   delete_note: (args, result) => ({
     primary: "Delete note",
     secondary: truncate(result?.snapshot?.content ?? `note ${args?.note_id ?? "?"}`),
+  }),
+  create_change_event: (args) => ({
+    primary: "Create change event",
+    secondary: truncate(
+      [
+        args?.event_number,
+        args?.title,
+        fmtMoney(args?.estimated_amount),
+      ].filter(Boolean).join(" · "),
+    ),
+  }),
+  create_pco: (args) => ({
+    primary: "Create PCO",
+    secondary: truncate(
+      [
+        args?.pco_number,
+        args?.title,
+        fmtMoney(args?.amount),
+      ].filter(Boolean).join(" · "),
+    ),
+  }),
+  pay_application: (args) => ({
+    primary: "Draft pay application",
+    secondary: truncate(
+      [
+        args?.pay_app_number ? `#${args.pay_app_number}` : null,
+        fmtMoney(args?.this_period_amount ?? args?.net_payment_due),
+        args?.period_start && args?.period_end
+          ? `${args.period_start} → ${args.period_end}`
+          : null,
+      ].filter(Boolean).join(" · "),
+    ),
+  }),
+  lien_waiver: (args) => ({
+    primary: "Record lien waiver",
+    secondary: truncate(
+      [
+        args?.waiver_type,
+        fmtMoney(args?.amount),
+        args?.through_date ? `through ${args.through_date}` : null,
+      ].filter(Boolean).join(" · "),
+    ),
+  }),
+  create_decision: (args) => ({
+    primary: "Flag decision",
+    secondary: truncate(args?.title ?? "(no title)"),
   }),
 };
 

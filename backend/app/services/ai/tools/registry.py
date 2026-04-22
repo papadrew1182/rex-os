@@ -14,6 +14,11 @@ from app.services.ai.tools import (
     create_alert as _create_alert,
     delete_task as _delete_task,
     delete_note as _delete_note,
+    create_change_event as _create_change_event,
+    create_pco as _create_pco,
+    pay_application as _pay_application,
+    lien_waiver as _lien_waiver,
+    create_decision as _create_decision,
 )
 
 _REGISTER: list[ActionSpec] = [
@@ -26,6 +31,11 @@ _REGISTER: list[ActionSpec] = [
     _create_alert.SPEC,
     _delete_task.SPEC,
     _delete_note.SPEC,
+    _create_change_event.SPEC,
+    _create_pco.SPEC,
+    _pay_application.SPEC,
+    _lien_waiver.SPEC,
+    _create_decision.SPEC,
 ]
 
 _BY_SLUG: dict[str, ActionSpec] = {s.slug: s for s in _REGISTER}
