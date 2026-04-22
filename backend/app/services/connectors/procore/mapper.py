@@ -812,12 +812,152 @@ def map_schedule_activity(
     }
 
 
+def map_change_event(
+    raw: dict[str, Any], project_canonical_id: str
+) -> dict[str, Any]:
+    """Map a Procore change-event payload (as produced by
+    ``payloads.build_change_event_payload``) to a dict keyed by
+    rex.change_events canonical columns.
+
+    Canonical rex.change_events columns (from
+    migrations/rex2_canonical_ddl.sql lines 619-637):
+
+        id                  uuid PK                  -- db-generated; NOT emitted
+        project_id          uuid NOT NULL
+        event_number        text NOT NULL
+        title               text NOT NULL
+        description         text
+        status              text NOT NULL DEFAULT 'open' CHECK IN
+                            (open|pending|approved|closed|void)
+        change_reason       text NOT NULL CHECK IN
+                            (owner_change|design_change|unforeseen|
+                             allowance|contingency)
+        event_type          text NOT NULL CHECK IN
+                            (tbd|allowance|contingency|owner_change|
+                             transfer)
+        scope               text NOT NULL DEFAULT 'tbd' CHECK IN
+                            (in_scope|out_of_scope|tbd)
+        estimated_amount    numeric NOT NULL DEFAULT 0
+        rfi_id              uuid                     -- deferred FK; None
+        prime_contract_id   uuid                     -- FK; None (no resolver)
+        created_by          uuid                     -- FK; None (no resolver)
+        created_at / updated_at                      -- DB-managed; NOT emitted
+
+    Contract:
+    * Output contains ONLY canonical rex.change_events column keys so
+      orchestrator._write_change_events can splat them into INSERT ...
+      ON CONFLICT directly.
+    * ``source_id`` is NOT emitted — orchestrator reads ``item["id"]``
+      directly from the raw payload for the source_links writer (same
+      convention as map_daily_log / map_submittal / map_schedule_activity).
+    * ``event_number`` is the natural key (with project_id) for the ON
+      CONFLICT upsert. The canonical DDL does not declare this UNIQUE —
+      migration 033 adds the UNIQUE (project_id, event_number) index the
+      writer relies on.
+    * All three CHECK-constrained classifiers (``change_reason``,
+      ``event_type``, ``scope``) normalize Procore's title-cased strings
+      ("Owner Change", "In Scope") to the lowercase-underscore enum the
+      CHECK allows. Unknown values fall back to sensible defaults
+      (``owner_change`` / ``tbd`` / ``tbd``) rather than crashing the
+      sync.
+    * ``status`` default on the DB is ``'open'`` but the mapper still
+      emits a concrete value — the default only fires when the column is
+      omitted from the INSERT, and we always include it.
+    * ``estimated_amount`` is forced to a float(0) fallback when Procore
+      returns None; NOT NULL DEFAULT 0 on the DB only fires on omission.
+
+    LLM-tool overlap: Phase 6b Wave 2 shipped a ``create_change_event``
+    LLM tool that inserts into ``rex.change_events`` directly. Both
+    paths converge on the same ``(project_id, event_number)`` natural
+    key via the writer's ON CONFLICT DO UPDATE — the Procore sync is
+    idempotent against existing LLM-created rows and vice versa.
+    """
+    # Status normalization: Procore returns title-cased strings; rex
+    # CHECK enum is lowercase. Default missing/unknown to 'open'.
+    status_raw = (raw.get("status") or "").strip().lower().replace(" ", "_")
+    canonical_status = {
+        "open":     "open",
+        "pending":  "pending",
+        "approved": "approved",
+        "closed":   "closed",
+        "void":     "void",
+        "":         "open",
+    }.get(status_raw, "open")
+
+    # change_reason normalization: Procore returns "Owner Change",
+    # "Design Change", "Unforeseen", etc. Lowercase + underscore.
+    # Default missing/unknown to 'owner_change' (most-common case in
+    # the target book of business).
+    reason_raw = (raw.get("change_reason") or "").strip().lower().replace(" ", "_")
+    canonical_reason = {
+        "owner_change":  "owner_change",
+        "design_change": "design_change",
+        "unforeseen":    "unforeseen",
+        "allowance":     "allowance",
+        "contingency":   "contingency",
+    }.get(reason_raw, "owner_change")
+
+    # event_type normalization. Default missing/unknown to 'tbd'.
+    type_raw = (raw.get("event_type") or "").strip().lower().replace(" ", "_")
+    canonical_type = {
+        "tbd":          "tbd",
+        "allowance":    "allowance",
+        "contingency":  "contingency",
+        "owner_change": "owner_change",
+        "transfer":     "transfer",
+    }.get(type_raw, "tbd")
+
+    # scope normalization. Default missing/unknown to 'tbd'.
+    scope_raw = (raw.get("scope") or "").strip().lower().replace(" ", "_")
+    canonical_scope = {
+        "in_scope":     "in_scope",
+        "out_of_scope": "out_of_scope",
+        "tbd":          "tbd",
+    }.get(scope_raw, "tbd")
+
+    # event_number: the natural key (with project_id). Fall back to
+    # stringified Procore id so the (project_id, event_number) upsert
+    # key is never NULL — UNIQUE indexes treat NULLs as distinct.
+    event_number = raw.get("number")
+    if not event_number:
+        event_number = str(raw.get("id", ""))
+
+    # estimated_amount: rex column is NUMERIC NOT NULL DEFAULT 0. We
+    # include it in every INSERT (DB default only fires on omission),
+    # so coerce None -> 0.
+    amount = raw.get("estimated_amount")
+    if amount is None:
+        amount = 0
+    else:
+        try:
+            amount = float(amount)
+        except (TypeError, ValueError):
+            amount = 0
+
+    return {
+        "project_id":        project_canonical_id,
+        "event_number":      event_number,
+        "title":              raw.get("title") or "(untitled change event)",
+        "description":        raw.get("description"),
+        "status":             canonical_status,
+        "change_reason":      canonical_reason,
+        "event_type":         canonical_type,
+        "scope":              canonical_scope,
+        "estimated_amount":   amount,
+        # FKs pending enrichment (no resolver)
+        "rfi_id":             None,
+        "prime_contract_id":  None,
+        "created_by":         None,
+    }
+
+
 __all__ = [
     "map_project",
     "map_rfi",
     "map_submittal",
     "map_daily_log",
     "map_schedule_activity",
+    "map_change_event",
     "map_commitment",
     "map_user",
     "map_vendor",

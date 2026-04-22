@@ -345,7 +345,72 @@ def build_schedule_activity_payload(
     }
 
 
+def build_change_event_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API change-event row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_change_events`` (the
+    ``/rest/v1.0/projects/{id}/change_events`` endpoint). Mirrors
+    ``build_daily_log_payload`` / ``build_schedule_activity_payload``:
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_change_event`` can read them
+    via ``raw.get(...)`` without translation.
+
+    Procore's change_events endpoint carries at least:
+      * ``id``                — change event id (canonical natural key
+        flows through ``number`` below; this ``id`` is preserved for
+        staging's (account_id, source_id) dedup key).
+      * ``number``            — user-visible change event number
+        (mapped to rex.change_events.event_number — the natural key
+        with project_id for ON CONFLICT upserts).
+      * ``title``             — NOT NULL on the canonical side.
+      * ``description``       — free-text description.
+      * ``status``            — Procore status string (Open, Pending,
+        Approved, Closed, Void); the mapper normalizes to rex's CHECK
+        enum.
+      * ``change_reason``     — reason classifier (Owner Change, Design
+        Change, Unforeseen, Allowance, Contingency); normalized to
+        rex's CHECK enum.
+      * ``event_type``        — type classifier (TBD, Allowance,
+        Contingency, Owner Change, Transfer); normalized to rex's CHECK
+        enum.
+      * ``scope``             — scope classifier (In Scope, Out of
+        Scope, TBD); normalized to rex's CHECK enum.
+      * ``estimated_amount``  — numeric dollar estimate.
+      * ``updated_at``        — watermark for cursor advancement.
+
+    FKs (rfi_id, prime_contract_id, created_by) are NOT carried on the
+    Procore change_events row in a form that resolves to canonical rex
+    UUIDs; the mapper emits None for them. A follow-up enrichment pass
+    can populate them by joining on other sync_service state.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "number":            raw.get("number"),
+        "title":             raw.get("title"),
+        "description":       raw.get("description"),
+        "status":            raw.get("status"),
+        "change_reason":     raw.get("change_reason"),
+        "event_type":        raw.get("event_type"),
+        "scope":             raw.get("scope"),
+        "estimated_amount":  raw.get("estimated_amount"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
+    "build_change_event_payload",
     "build_daily_log_payload",
     "build_rfi_payload",
     "build_project_payload",

@@ -1413,3 +1413,184 @@ async def test_sync_resource_schedule_activities_end_to_end(
             "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
         ), {"a": procore_connector_account})
         await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_change_events_end_to_end(
+    db_session,
+    procore_connector_account,
+    project_with_source_link,
+    monkeypatch,
+):
+    """Full project-scoped pipeline for change_events (Phase 4 Wave 2
+    direct API). Mirrors submittals / daily_logs end-to-end tests: no
+    parent bootstrap needed because rex.change_events has a direct
+    (project_id, event_number) natural key — unlike schedule_activities,
+    which needed a rex.schedules FK bootstrap.
+
+    Overlap with the LLM create_change_event tool: Phase 6b Wave 2
+    ships a tool that inserts into rex.change_events on the same
+    natural key. This test's seeded event_numbers (CE-E2E-701/702) are
+    distinct from any tool-written rows, and the writer's ON CONFLICT
+    DO UPDATE would converge them anyway if they overlapped.
+
+    Pipeline assertions:
+      1. Staging landed in connector_procore.change_events_raw (with
+         project_source_id='42')
+      2. Canonical rex.change_events rows exist, keyed on (project_id,
+         event_number), with normalized enum values
+      3. rex.connector_mappings source_links point
+         procore.change_events external_ids at rex.change_events
+         canonical ids
+      4. sync_runs row marked 'succeeded' with correct counts
+    """
+    from unittest.mock import AsyncMock, patch
+
+    # Fake Procore API response that ProcoreClient.list_change_events
+    # would return for project 42. Shape mirrors what the change_events
+    # endpoint emits: ``id``, ``number``, ``title``, ``description``,
+    # ``status``, ``change_reason``, ``event_type``, ``scope``,
+    # ``estimated_amount``, ``updated_at``. The mapper normalizes the
+    # title-cased classifier values to the rex CHECK enum.
+    fake_rows = [
+        {
+            "id": 701,
+            "number": "CE-E2E-701",
+            "title": "Differing site conditions",
+            "description": "Rock encountered at 4' BFG",
+            "status": "Open",
+            "change_reason": "Unforeseen",
+            "event_type": "TBD",
+            "scope": "In Scope",
+            "estimated_amount": 12500.00,
+            "updated_at": "2026-04-22T15:00:00Z",
+        },
+        {
+            "id": 702,
+            "number": "CE-E2E-702",
+            "title": "Owner-requested finish upgrade",
+            "description": "Upgrade lobby flooring to stone",
+            "status": "Pending",
+            "change_reason": "Owner Change",
+            "event_type": "Owner Change",
+            "scope": "In Scope",
+            "estimated_amount": 8000.00,
+            "updated_at": "2026-04-22T16:00:00Z",
+        },
+    ]
+
+    fake_client = AsyncMock()
+    fake_client.list_change_events = AsyncMock(return_value=fake_rows)
+
+    try:
+        with patch(
+            "app.services.ai.tools.procore_api.ProcoreClient.from_env",
+            return_value=fake_client,
+        ):
+            result = await sync_resource(
+                db_session,
+                account_id=procore_connector_account,
+                resource_type="change_events",
+            )
+
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Staging: connector_procore.change_events_raw got both rows
+        # scoped to the right project_source_id.
+        staged = await db_session.execute(text(
+            "SELECT source_id, project_source_id, "
+            "       payload->>'title' AS title "
+            "FROM connector_procore.change_events_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('701','702') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [
+            (r["source_id"], r["project_source_id"], r["title"])
+            for r in staged.mappings().all()
+        ]
+        assert staged_rows == [
+            ("701", "42", "Differing site conditions"),
+            ("702", "42", "Owner-requested finish upgrade"),
+        ]
+
+        # Canonical: rex.change_events rows keyed on (project_id,
+        # event_number) with normalized enum values. Procore returned
+        # "Open" / "Pending" / "Unforeseen" / "Owner Change" / "TBD" /
+        # "In Scope"; the mapper lowercases + underscores them.
+        canonical = await db_session.execute(text(
+            "SELECT event_number, title, status, change_reason, "
+            "       event_type, scope, estimated_amount "
+            "FROM rex.change_events "
+            "WHERE project_id = :pid "
+            "  AND event_number IN ('CE-E2E-701', 'CE-E2E-702') "
+            "ORDER BY event_number"
+        ), {"pid": project_with_source_link})
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        # Row 0: CE-E2E-701 — Unforeseen, open, TBD type, in scope
+        assert rows[0]["event_number"] == "CE-E2E-701"
+        assert rows[0]["title"] == "Differing site conditions"
+        assert rows[0]["status"] == "open"
+        assert rows[0]["change_reason"] == "unforeseen"
+        assert rows[0]["event_type"] == "tbd"
+        assert rows[0]["scope"] == "in_scope"
+        assert float(rows[0]["estimated_amount"]) == 12500.00
+        # Row 1: CE-E2E-702 — Owner Change / owner_change event_type
+        assert rows[1]["event_number"] == "CE-E2E-702"
+        assert rows[1]["status"] == "pending"
+        assert rows[1]["change_reason"] == "owner_change"
+        assert rows[1]["event_type"] == "owner_change"
+        assert rows[1]["scope"] == "in_scope"
+        assert float(rows[1]["estimated_amount"]) == 8000.00
+
+        # source_links: one per seeded procore change event, pointing at
+        # rex.change_events canonical rows.
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.change_events' "
+            "  AND external_id IN ('701','702')"
+        ))
+        assert links.scalar_one() == 2
+
+        # sync_runs row: succeeded with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a "
+            "  AND resource_type='change_events' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+    finally:
+        # Teardown: mappings first (FK to rex.change_events via rex_id),
+        # then canonical rows, then staging + run state.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.change_events' "
+            "  AND external_id IN ('701','702')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.change_events "
+            "WHERE project_id = :pid "
+            "  AND event_number IN ('CE-E2E-701', 'CE-E2E-702')"
+        ), {"pid": project_with_source_link})
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.change_events_raw "
+            "WHERE account_id = :a AND source_id IN ('701','702')"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()

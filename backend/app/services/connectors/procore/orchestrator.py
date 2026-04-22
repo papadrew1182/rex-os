@@ -159,6 +159,24 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.schedule_activities",
         "fetch_fn_name":   "fetch_schedule_activities",
     },
+    "change_events": {
+        # Phase 4 Wave 2 (direct Procore API) — project-scoped resource.
+        # fetch_change_events calls ProcoreClient.list_change_events
+        # directly against /rest/v1.0/projects/{id}/change_events. Like
+        # submittals / daily_logs / schedule_activities, this resource
+        # has no rex-procore Railway fallback.
+        #
+        # LLM-tool overlap: Phase 6b Wave 2 shipped a ``create_change_event``
+        # LLM tool that inserts into rex.change_events directly. Both
+        # paths upsert on the ``(project_id, event_number)`` natural key
+        # via ON CONFLICT DO UPDATE, so the sync-vs-tool write sources
+        # converge cleanly on one canonical row.
+        "raw_table":       "change_events_raw",
+        "map_fn":          mapper.map_change_event,
+        "canonical_table": "change_events",           # rex.change_events
+        "source_table":    "procore.change_events",
+        "fetch_fn_name":   "fetch_change_events",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
@@ -701,6 +719,65 @@ async def _write_schedule_activities(
     return res.scalar_one()
 
 
+async def _write_change_events(
+    db: AsyncSession, row: dict[str, Any]
+) -> UUID:
+    """Upsert a single change-event row into rex.change_events keyed on
+    (project_id, event_number).
+
+    Migration 033 adds the UNIQUE (project_id, event_number) constraint
+    this ON CONFLICT relies on — it is NOT declared in the canonical
+    DDL (rex2_canonical_ddl.sql line 619) so a supplementary migration
+    is required. Without it, Postgres fails at plan time with "there is
+    no unique or exclusion constraint matching the ON CONFLICT
+    specification".
+
+    Overlap note: Phase 6b Wave 2's ``create_change_event`` LLM tool
+    also inserts into rex.change_events. The (project_id, event_number)
+    ON CONFLICT upsert is shared between the tool and this sync writer,
+    so both paths converge on a single canonical row. If the LLM tool
+    pre-creates a row for an event_number the Procore sync later
+    discovers, the DO UPDATE overwrites the title/description/status/
+    reason/type/scope/estimated_amount with Procore's values (Procore is
+    the authoritative source of truth for this resource in production).
+
+    ``row``'s keys are mapper.map_change_event's canonical-column output
+    — splatted dynamically as the INSERT column list so the mapper stays
+    the single source of truth for which columns get written. The
+    identity tuple (project_id, event_number) is never rewritten on
+    conflict; everything else converges on the Procore-side values after
+    each sync.
+    """
+    stmt = text(
+        """
+        INSERT INTO rex.change_events (
+            id, project_id, event_number, title, description,
+            status, change_reason, event_type, scope, estimated_amount,
+            rfi_id, prime_contract_id, created_by,
+            created_at, updated_at
+        ) VALUES (
+            gen_random_uuid(), :project_id, :event_number, :title, :description,
+            :status, :change_reason, :event_type, :scope, :estimated_amount,
+            :rfi_id, :prime_contract_id, :created_by,
+            now(), now()
+        )
+        ON CONFLICT (project_id, event_number) DO UPDATE SET
+            title = EXCLUDED.title,
+            description = EXCLUDED.description,
+            status = EXCLUDED.status,
+            change_reason = EXCLUDED.change_reason,
+            event_type = EXCLUDED.event_type,
+            scope = EXCLUDED.scope,
+            estimated_amount = EXCLUDED.estimated_amount,
+            updated_at = now()
+        RETURNING id
+        """
+    )
+    result = await db.execute(stmt, row)
+    await db.commit()
+    return result.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
@@ -718,6 +795,7 @@ _CANONICAL_WRITERS: dict[
     "submittals":           _write_submittals,
     "daily_logs":           _write_daily_logs,
     "schedule_activities":  _write_schedule_activities,
+    "change_events":        _write_change_events,
 }
 
 

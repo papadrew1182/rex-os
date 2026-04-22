@@ -126,6 +126,14 @@ MIGRATION_ORDER: list[str] = [
     #       CONFLICT upserts (schedule bootstrap + activity upsert) have
     #       matching constraints (Task 5 of Phase 4 Wave 2).
     "032_rex_schedules_and_schedule_activities_unique.sql",
+    # 033 = unique (project_id, event_number) on rex.change_events so the
+    #       change_events resource orchestrator's ON CONFLICT upsert has
+    #       a matching constraint (Task 6 of Phase 4 Wave 2). The canonical
+    #       DDL does not declare this natural-key UNIQUE, so a supplementary
+    #       migration is required. Shared with Phase 6b Wave 2's
+    #       ``create_change_event`` LLM tool, which uses the same natural
+    #       key for ON CONFLICT DO UPDATE.
+    "033_rex_change_events_project_number_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

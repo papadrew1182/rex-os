@@ -35,6 +35,7 @@ Mapper contract:
 """
 
 from app.services.connectors.procore.mapper import (
+    map_change_event,
     map_daily_log,
     map_project,
     map_rfi,
@@ -1307,6 +1308,219 @@ def test_map_schedule_activity_emits_only_expected_keys():
     }
     assert set(m.keys()) == expected, (
         f"schedule_activity mapper keys differ from expected set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_change_event ─────────────────────────────────────────────────────
+
+
+def _change_event_payload() -> dict:
+    """Mirror ``payloads.build_change_event_payload`` output for a
+    representative Procore change_events row. Procore returns
+    title-cased strings for the three CHECK-enum classifiers
+    (change_reason, event_type, scope); the mapper normalizes them."""
+    return {
+        "id":                "5001",
+        "project_source_id": "42",
+        "number":            "CE-042",
+        "title":             "Differing site conditions at SE corner",
+        "description":       "Rock encountered at 4' BFG; additional "
+                             "excavation required.",
+        "status":            "Open",
+        "change_reason":     "Unforeseen",
+        "event_type":        "TBD",
+        "scope":             "In Scope",
+        "estimated_amount":  12500.00,
+        "created_at":        "2026-04-22T08:00:00+00:00",
+        "updated_at":        "2026-04-22T15:00:00+00:00",
+    }
+
+
+def test_map_change_event_maps_project_id_from_argument():
+    """The project_canonical_id argument threads directly onto
+    rex.change_events.project_id (the NOT NULL FK). This is the
+    canonical rex.projects.id — NOT the Procore project_source_id
+    (bigint-as-string). The orchestrator resolves the canonical id via
+    rex.connector_mappings before calling the mapper."""
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_change_event_does_not_emit_source_id():
+    """source_id is NOT a rex.change_events column. Orchestrator reads
+    the procore id directly from the raw payload (item["id"]) for the
+    source_links writer — same convention as map_daily_log /
+    map_submittal / map_schedule_activity."""
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
+
+
+def test_map_change_event_maps_event_number_from_number():
+    """Procore's ``number`` is the user-visible change event identifier.
+    It maps directly to rex.change_events.event_number — the natural
+    key (with project_id) for the writer's ON CONFLICT upsert that
+    migration 033 backs with a UNIQUE constraint."""
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    assert m["event_number"] == "CE-042"
+
+
+def test_map_change_event_missing_number_falls_back_to_id():
+    """If Procore's response omits ``number`` (rare), fall back to the
+    stringified Procore id so the (project_id, event_number) upsert
+    key stays deterministic. UNIQUE indexes treat NULLs as distinct,
+    so a NULL event_number would defeat idempotency."""
+    raw = _change_event_payload()
+    raw["number"] = None
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["event_number"] == "5001"
+
+
+def test_map_change_event_normalizes_status_to_lowercase_enum():
+    """Procore returns title-cased status strings (``Open``, ``Pending``).
+    rex CHECK enum is lowercase (``open``, ``pending``, ``approved``,
+    ``closed``, ``void``). Lowercase + strip."""
+    raw = _change_event_payload()
+    raw["status"] = "Pending"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "pending"
+
+
+def test_map_change_event_missing_status_defaults_to_open():
+    """rex.change_events.status is NOT NULL DEFAULT 'open'. The mapper
+    always emits a concrete value (defaults don't fire on explicit
+    inclusion), so None / empty / unknown falls back to 'open'."""
+    raw = _change_event_payload()
+    raw["status"] = None
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "open"
+
+
+def test_map_change_event_normalizes_change_reason_title_case():
+    """Procore's ``change_reason`` comes back title-cased ("Owner
+    Change", "Design Change", "Unforeseen"). rex CHECK enum is
+    lowercase-underscore. Normalize."""
+    raw = _change_event_payload()
+    raw["change_reason"] = "Owner Change"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["change_reason"] == "owner_change"
+
+
+def test_map_change_event_unknown_change_reason_falls_back_to_owner_change():
+    """rex.change_events.change_reason is NOT NULL CHECK IN
+    (owner_change|design_change|unforeseen|allowance|contingency).
+    Unknown/missing Procore values fall back to 'owner_change' —
+    dominant case in the target book of business — rather than
+    crashing the sync."""
+    raw = _change_event_payload()
+    raw["change_reason"] = "Weird Unknown Value"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["change_reason"] == "owner_change"
+
+
+def test_map_change_event_normalizes_event_type_title_case():
+    """Procore's ``event_type`` comes back title-cased ("TBD",
+    "Owner Change"). rex CHECK enum is lowercase-underscore. Normalize."""
+    raw = _change_event_payload()
+    raw["event_type"] = "Owner Change"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["event_type"] == "owner_change"
+
+
+def test_map_change_event_unknown_event_type_falls_back_to_tbd():
+    """rex.change_events.event_type is NOT NULL CHECK IN
+    (tbd|allowance|contingency|owner_change|transfer). Unknown /
+    missing values fall back to 'tbd' (the catch-all)."""
+    raw = _change_event_payload()
+    raw["event_type"] = None
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["event_type"] == "tbd"
+
+
+def test_map_change_event_normalizes_scope_title_case():
+    """Procore's ``scope`` comes back title-cased ("In Scope",
+    "Out of Scope"). rex CHECK enum is lowercase-underscore. Normalize."""
+    raw = _change_event_payload()
+    raw["scope"] = "Out of Scope"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["scope"] == "out_of_scope"
+
+
+def test_map_change_event_unknown_scope_falls_back_to_tbd():
+    """rex.change_events.scope is NOT NULL DEFAULT 'tbd' CHECK IN
+    (in_scope|out_of_scope|tbd). Unknown / missing values fall back
+    to 'tbd'."""
+    raw = _change_event_payload()
+    raw["scope"] = "Gibberish"
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["scope"] == "tbd"
+
+
+def test_map_change_event_estimated_amount_passthrough():
+    """estimated_amount coerces to float. rex column is NUMERIC — any
+    numeric binds natively via asyncpg."""
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    assert m["estimated_amount"] == 12500.00
+
+
+def test_map_change_event_missing_estimated_amount_defaults_to_zero():
+    """rex.change_events.estimated_amount is NUMERIC NOT NULL DEFAULT
+    0. The mapper always includes the column in the INSERT, so DB
+    default won't fire; coerce None -> 0."""
+    raw = _change_event_payload()
+    raw["estimated_amount"] = None
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["estimated_amount"] == 0
+
+
+def test_map_change_event_title_falls_back_when_missing():
+    """rex.change_events.title is NOT NULL. Procore is expected to
+    always carry a title in practice, but be defensive: fall back to
+    a placeholder rather than crashing the sync with a NULL violation."""
+    raw = _change_event_payload()
+    raw["title"] = None
+    m = map_change_event(raw, PROJECT_CANONICAL_ID)
+    assert m["title"] == "(untitled change event)"
+
+
+def test_map_change_event_fks_are_none():
+    """rfi_id / prime_contract_id / created_by are uuid FKs the mapper
+    leaves as None pending follow-up enrichment passes. There is no
+    resolver for these on the Procore change_events response today."""
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    assert m["rfi_id"] is None
+    assert m["prime_contract_id"] is None
+    assert m["created_by"] is None
+
+
+def test_map_change_event_emits_only_expected_keys():
+    """Every key the mapper emits is a real rex.change_events column.
+    No sidecars — change_events has a direct (project_id, event_number)
+    natural key and doesn't need a parent-bootstrap like
+    schedule_activities does for rex.schedules.
+
+    Excluded:
+    - id, created_at, updated_at (DB-managed)
+    - source_id (orchestrator reads it from the raw payload directly)
+    """
+    m = map_change_event(_change_event_payload(), PROJECT_CANONICAL_ID)
+    expected = {
+        "project_id",
+        "event_number",
+        "title",
+        "description",
+        "status",
+        "change_reason",
+        "event_type",
+        "scope",
+        "estimated_amount",
+        "rfi_id",
+        "prime_contract_id",
+        "created_by",
+    }
+    assert set(m.keys()) == expected, (
+        f"change_event mapper keys differ from expected set.\n"
         f"  missing: {expected - set(m.keys())}\n"
         f"  extra:   {set(m.keys()) - expected}"
     )
