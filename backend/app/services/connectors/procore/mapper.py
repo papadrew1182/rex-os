@@ -218,14 +218,141 @@ def map_rfi(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
     }
 
 
+_SUBMITTAL_STATUS_MAP: dict[str, str] = {
+    # Canonical-enum pass-through
+    "draft":             "draft",
+    "pending":           "pending",
+    "submitted":         "submitted",
+    "approved":          "approved",
+    "approved_as_noted": "approved_as_noted",
+    "rejected":          "rejected",
+    "closed":            "closed",
+    # Procore-native variants seen in the wild — normalize to canonical.
+    # Procore's common submittal states: "Open", "Closed",
+    # "Approved", "Approved as Noted", "Rejected", "Revise and Resubmit",
+    # "For Record Only", "Pending", "Submitted". Map each to the closest
+    # canonical value; anything unrecognized falls back to 'draft' via
+    # the map.get(..., 'draft') guard below.
+    "open":                 "pending",
+    "approved as noted":    "approved_as_noted",
+    "revise and resubmit":  "rejected",
+    "for record only":      "closed",
+    "in review":            "submitted",
+    "for information only": "closed",
+}
+
+
+_SUBMITTAL_TYPE_MAP: dict[str, str] = {
+    # Canonical-enum pass-through
+    "shop_drawing": "shop_drawing",
+    "product_data": "product_data",
+    "sample":       "sample",
+    "mock_up":      "mock_up",
+    "test_report":  "test_report",
+    "other":        "other",
+    # Procore-native label variants (title-cased / spaced in the API)
+    # normalized here. Anything unrecognized falls back to 'other' via
+    # the map.get(..., 'other') guard below so the CHECK constraint
+    # passes rather than blocking the whole sync on one oddball type.
+    "shop drawings":           "shop_drawing",
+    "shop drawing":            "shop_drawing",
+    "product data":            "product_data",
+    "samples":                 "sample",
+    "mock up":                 "mock_up",
+    "mock-up":                 "mock_up",
+    "mockup":                  "mock_up",
+    "test reports":            "test_report",
+    "quality submittal":       "test_report",
+    "informational submittal": "other",
+    "informational":           "other",
+}
+
+
 def map_submittal(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
+    """Map a Procore submittal payload (as produced by
+    ``payloads.build_submittal_payload``) to a dict keyed by rex.submittals
+    canonical columns.
+
+    Canonical rex.submittals columns (from migrations/rex2_canonical_ddl.sql
+    lines 869-896):
+
+        id                      uuid PK                    -- db-generated; NOT emitted
+        project_id              uuid NOT NULL              -- <- project_canonical_id
+        submittal_package_id    uuid                       -- not in payload; None
+        submittal_number        text NOT NULL
+        title                   text NOT NULL
+        status                  text NOT NULL              -- 7-value enum; see _SUBMITTAL_STATUS_MAP
+        submittal_type          text NOT NULL              -- 6-value enum; see _SUBMITTAL_TYPE_MAP
+        spec_section            text
+        current_revision        int NOT NULL DEFAULT 0     -- OMITTED (let DB default fire)
+        cost_code_id            uuid                       -- resolve later; None
+        schedule_activity_id    uuid                       -- resolve later; None
+        assigned_to             uuid                       -- resolve name->person_id later; None
+        ball_in_court           uuid                       -- resolve name->person_id later; None
+        responsible_contractor  uuid                       -- resolve name->company_id later; None
+        created_by              uuid                       -- not in payload; None
+        due_date                date
+        submitted_date          date
+        approved_date           date
+        lead_time_days          int                        -- not in payload; None
+        required_on_site        date                       -- not in payload; None
+        location                text                       -- not in payload; None
+        created_at / updated_at                             -- DB-managed; NOT emitted
+
+    Contract:
+
+    * Output contains ONLY canonical rex.submittals column keys -- safe
+      to splat into a generic INSERT without "column does not exist".
+    * ``current_revision`` is OMITTED on purpose. The column is NOT NULL
+      DEFAULT 0, but defaults don't fire when the column is included in
+      the INSERT with a NULL value. Omitting the key lets the DB default
+      apply cleanly.
+    * ``source_id`` is NOT emitted here -- orchestrator reads ``item["id"]``
+      directly from the raw payload for the source_links writer (same
+      convention as map_rfi).
+    * Name->person-UUID / name->company-UUID resolution for
+      ``assigned_to``, ``ball_in_court``, ``responsible_contractor`` is
+      left as None here. The enrichment pass reads names from the raw
+      payload, not from this mapper's output.
+    * ``title`` and ``submittal_number`` are NOT NULL on the canonical
+      table; if the payload is missing either, the INSERT will fail
+      loud rather than silently invent a natural key.
+    """
+    status_raw = (raw.get("status") or "").strip().lower()
+    status = _SUBMITTAL_STATUS_MAP.get(status_raw, "draft")
+
+    type_raw = (raw.get("submittal_type") or "").strip().lower()
+    submittal_type = _SUBMITTAL_TYPE_MAP.get(type_raw, "other")
+
     return {
-        "source_id": str(raw.get("id", "")),
-        "project_id": project_canonical_id,
-        "submittal_number": raw.get("number"),
-        "title": raw.get("title"),
-        "status": raw.get("status"),
-        "submittal_type": raw.get("submittal_type"),
+        # Identity / links
+        "project_id":            project_canonical_id,
+
+        # Direct canonical fields
+        "submittal_number":      raw.get("submittal_number") or raw.get("number"),
+        "title":                 raw.get("title"),
+        "status":                status,
+        "submittal_type":        submittal_type,
+        "spec_section":          raw.get("spec_section"),
+
+        # People / company FKs -- resolve name->uuid in a later pass
+        "assigned_to":           None,
+        "ball_in_court":         None,
+        "responsible_contractor": None,
+        "created_by":            None,
+
+        # Dates
+        "due_date":              _iso_date(raw.get("due_date")),
+        "submitted_date":        _iso_date(raw.get("submitted_date")),
+        "approved_date":         _iso_date(raw.get("approved_date")),
+
+        # Canonical columns with no payload counterpart today
+        "submittal_package_id":  None,
+        "cost_code_id":          None,
+        "schedule_activity_id":  None,
+        "lead_time_days":        None,
+        "required_on_site":      None,
+        "location":              None,
     }
 
 

@@ -37,6 +37,7 @@ Mapper contract:
 from app.services.connectors.procore.mapper import (
     map_project,
     map_rfi,
+    map_submittal,
     map_user,
     map_vendor,
 )
@@ -729,6 +730,232 @@ def test_map_vendor_emits_only_canonical_columns():
         "license_number",
         "insurance_expiry",
         "insurance_carrier",
+    }
+    assert set(m.keys()) == expected, (
+        f"mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_submittal ─────────────────────────────────────────────────────────
+
+
+def _submittal_payload() -> dict:
+    """Mirror ``payloads.build_submittal_payload`` output for a representative
+    Procore submittal row. Procore's submittal API returns title-cased
+    status ('Open') and human-readable submittal_type ('Shop Drawings');
+    the mapper normalizes both to the rex.submittals enum."""
+    return {
+        "id":                      "7001",
+        "project_source_id":       "42",
+        "submittal_number":        "SUB-0001",
+        "title":                   "Structural steel shop drawings",
+        "status":                  "Open",
+        "submittal_type":          "Shop Drawings",
+        "spec_section":            "05 12 00",
+        "due_date":                "2026-05-15T00:00:00+00:00",
+        "submitted_date":          "2026-04-20T00:00:00+00:00",
+        "approved_date":           None,
+        "assignee":                "Jane Smith",
+        "ball_in_court":           "Architect",
+        "responsible_contractor":  "Acme Steel",
+        "created_at":              "2026-04-01T00:00:00+00:00",
+        "updated_at":              "2026-04-22T10:00:00+00:00",
+    }
+
+
+def test_map_submittal_maps_project_fk():
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_submittal_does_not_emit_source_id():
+    """source_id is NOT a rex.submittals column. Orchestrator reads the
+    procore id directly from the raw payload (item["id"]) for the
+    source_links writer — same convention as map_rfi."""
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
+
+
+def test_map_submittal_maps_core_text_fields():
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["submittal_number"] == "SUB-0001"
+    assert m["title"] == "Structural steel shop drawings"
+    assert m["spec_section"] == "05 12 00"
+
+
+def test_map_submittal_submittal_number_falls_back_to_number_key():
+    """Some upstream shapes emit the natural-key field under the key
+    ``number`` rather than ``submittal_number``. Accept both so a
+    future payload-builder tweak doesn't silently null the natural key."""
+    raw = _submittal_payload()
+    del raw["submittal_number"]
+    raw["number"] = "SUB-1234"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["submittal_number"] == "SUB-1234"
+
+
+def test_map_submittal_normalizes_open_status_to_pending():
+    """Procore's native 'Open' status has no direct rex.submittals enum
+    equivalent; the closest semantic match is 'pending' (awaiting action)."""
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["status"] == "pending"
+
+
+def test_map_submittal_normalizes_approved_as_noted():
+    """'Approved as Noted' (with spaces) -> canonical 'approved_as_noted'."""
+    raw = _submittal_payload()
+    raw["status"] = "Approved as Noted"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "approved_as_noted"
+
+
+def test_map_submittal_normalizes_revise_and_resubmit_to_rejected():
+    """'Revise and Resubmit' is Procore's way of saying 'rejected — try
+    again'. Map to the canonical 'rejected' state so action queues can
+    filter on a single meaning."""
+    raw = _submittal_payload()
+    raw["status"] = "Revise and Resubmit"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "rejected"
+
+
+def test_map_submittal_canonical_status_passthrough():
+    raw = _submittal_payload()
+    raw["status"] = "approved"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "approved"
+
+
+def test_map_submittal_unknown_status_defaults_to_draft():
+    """rex.submittals.status is NOT NULL CHECK in a 7-value enum. Procore
+    has free-text one-offs in the wild (custom statuses per company);
+    unknown values must default to 'draft' rather than break the CHECK."""
+    raw = _submittal_payload()
+    raw["status"] = "SomeOrgCustomStatus"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "draft"
+
+
+def test_map_submittal_missing_status_defaults_to_draft():
+    raw = _submittal_payload()
+    raw["status"] = None
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "draft"
+
+
+def test_map_submittal_normalizes_shop_drawings_type():
+    """'Shop Drawings' (human-readable, plural) -> canonical 'shop_drawing'."""
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["submittal_type"] == "shop_drawing"
+
+
+def test_map_submittal_normalizes_product_data_type():
+    raw = _submittal_payload()
+    raw["submittal_type"] = "Product Data"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["submittal_type"] == "product_data"
+
+
+def test_map_submittal_canonical_type_passthrough():
+    raw = _submittal_payload()
+    raw["submittal_type"] = "sample"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["submittal_type"] == "sample"
+
+
+def test_map_submittal_unknown_type_defaults_to_other():
+    """rex.submittals.submittal_type is NOT NULL CHECK in a 6-value enum
+    ending in 'other'. Unknown types from Procore default to 'other'
+    rather than break the CHECK."""
+    raw = _submittal_payload()
+    raw["submittal_type"] = "WeirdCustomType"
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["submittal_type"] == "other"
+
+
+def test_map_submittal_missing_type_defaults_to_other():
+    raw = _submittal_payload()
+    raw["submittal_type"] = None
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["submittal_type"] == "other"
+
+
+def test_map_submittal_dates_become_date_objects():
+    """rex.submittals.due_date / submitted_date / approved_date are typed
+    ``date``; the mapper must emit ``date`` objects (not ISO strings)
+    so asyncpg binds them natively."""
+    from datetime import date
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["due_date"] == date(2026, 5, 15)
+    assert isinstance(m["due_date"], date)
+    assert m["submitted_date"] == date(2026, 4, 20)
+    assert m["approved_date"] is None
+
+
+def test_map_submittal_none_dates_stay_none():
+    raw = _submittal_payload()
+    raw["due_date"] = None
+    raw["submitted_date"] = None
+    raw["approved_date"] = None
+    m = map_submittal(raw, PROJECT_CANONICAL_ID)
+    assert m["due_date"] is None
+    assert m["submitted_date"] is None
+    assert m["approved_date"] is None
+
+
+def test_map_submittal_people_and_company_fks_are_none_pending_resolution():
+    """assigned_to, ball_in_court, responsible_contractor, created_by are
+    uuid columns but the payload carries names. Resolution happens in a
+    later pass (same convention as map_rfi)."""
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert m["assigned_to"] is None
+    assert m["ball_in_court"] is None
+    assert m["responsible_contractor"] is None
+    assert m["created_by"] is None
+
+
+def test_map_submittal_omits_current_revision_so_db_default_fires():
+    """rex.submittals.current_revision is NOT NULL DEFAULT 0. If the
+    mapper emitted current_revision=None, the INSERT would pass NULL
+    and violate the NOT NULL constraint (defaults don't fire when the
+    column is present with NULL). Omit the key so the DB default
+    applies."""
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    assert "current_revision" not in m
+
+
+def test_map_submittal_emits_only_canonical_columns():
+    """Every key the mapper emits must be a real rex.submittals column
+    so orchestrator._write_submittals' INSERT ... ON CONFLICT splat
+    doesn't reference a nonexistent column.
+
+    Excluded from the output:
+    - id, created_at, updated_at (DB-managed)
+    - current_revision (DB default 0; omitted so default fires)
+    """
+    m = map_submittal(_submittal_payload(), PROJECT_CANONICAL_ID)
+    expected = {
+        "project_id",
+        "submittal_package_id",
+        "submittal_number",
+        "title",
+        "status",
+        "submittal_type",
+        "spec_section",
+        "cost_code_id",
+        "schedule_activity_id",
+        "assigned_to",
+        "ball_in_court",
+        "responsible_contractor",
+        "created_by",
+        "due_date",
+        "submitted_date",
+        "approved_date",
+        "lead_time_days",
+        "required_on_site",
+        "location",
     }
     assert set(m.keys()) == expected, (
         f"mapper keys differ from expected canonical set.\n"

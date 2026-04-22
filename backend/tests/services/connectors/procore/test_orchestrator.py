@@ -427,12 +427,18 @@ async def test_sync_resource_unknown_resource_type_raises(
 ):
     """Unsupported resource types must raise NotImplementedError
     rather than silently no-op, so adding a new resource forces a
-    code change in _RESOURCE_CONFIG (not just a DB row somewhere)."""
-    with pytest.raises(NotImplementedError, match="submittals"):
+    code change in _RESOURCE_CONFIG (not just a DB row somewhere).
+
+    We use ``documents`` as the sentinel here — it's a Wave 2/3 scope
+    resource that hasn't landed its _RESOURCE_CONFIG entry yet. The
+    earlier sentinel ``submittals`` graduated to real support in
+    Phase 4 Wave 2 Task 3 and moved out of the not-implemented set.
+    """
+    with pytest.raises(NotImplementedError, match="documents"):
         await sync_resource(
             db_session,
             account_id=procore_connector_account,
-            resource_type="submittals",
+            resource_type="documents",
         )
 
 
@@ -871,3 +877,168 @@ async def test_sync_resource_users_end_to_end(
         if mod2._pool:
             await mod2._pool.close()
             mod2._pool = None
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_submittals_end_to_end(
+    db_session,
+    procore_connector_account,
+    project_with_source_link,
+    monkeypatch,
+):
+    """Full project-scoped pipeline for submittals (Phase 4 Wave 2 direct API).
+
+    Unlike the rfis path that reads procore.rfis via RexAppDbClient, this
+    resource calls ProcoreClient.list_submittals directly. We mock
+    ``ProcoreClient.from_env`` so the adapter returns a canned 2-row
+    response without needing real Procore OAuth env vars.
+
+    The ``project_with_source_link`` fixture seeds a rex.projects row
+    mapped to procore project_id=42 via rex.connector_mappings — the
+    orchestrator's per-project loop discovers the project, the adapter
+    is called with project_external_id='42', and the mocked client
+    returns the two canned rows.
+
+    Asserts the full pipeline:
+      1. Staging landed in connector_procore.submittals_raw (with
+         project_source_id='42')
+      2. Canonical rex.submittals rows exist, keyed on (project_id,
+         submittal_number)
+      3. rex.connector_mappings source_links point procore.submittals
+         external_ids at rex.submittals canonical ids
+      4. sync_runs row marked 'succeeded' with correct counts
+    """
+    from unittest.mock import AsyncMock, patch
+
+    # Fake Procore API response that ProcoreClient.list_submittals would
+    # return for project 42. Shape mirrors what the real API emits:
+    # ``id``, ``number``, ``title``, ``status``, ``submittal_type``,
+    # ``updated_at``, etc. build_submittal_payload normalizes this; the
+    # mapper further normalizes status/type to canonical enums.
+    fake_rows = [
+        {
+            "id": 701,
+            "number": "SUB-P4W2-ALPHA",
+            "title": "Alpha shop drawings",
+            "status": "Open",
+            "submittal_type": "Shop Drawings",
+            "spec_section": "05 12 00",
+            "due_date": "2026-05-15",
+            "updated_at": "2026-04-22T10:00:00Z",
+        },
+        {
+            "id": 702,
+            "number": "SUB-P4W2-BETA",
+            "title": "Beta product data",
+            "status": "Approved",
+            "submittal_type": "Product Data",
+            "spec_section": "09 91 00",
+            "due_date": "2026-06-01",
+            "updated_at": "2026-04-22T11:00:00Z",
+        },
+    ]
+
+    fake_client = AsyncMock()
+    fake_client.list_submittals = AsyncMock(return_value=fake_rows)
+
+    try:
+        with patch(
+            "app.services.ai.tools.procore_api.ProcoreClient.from_env",
+            return_value=fake_client,
+        ):
+            result = await sync_resource(
+                db_session,
+                account_id=procore_connector_account,
+                resource_type="submittals",
+            )
+
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Staging: connector_procore.submittals_raw got both rows scoped
+        # to the right project_source_id.
+        staged = await db_session.execute(text(
+            "SELECT source_id, project_source_id, "
+            "       payload->>'title' AS title "
+            "FROM connector_procore.submittals_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('701','702') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [
+            (r["source_id"], r["project_source_id"], r["title"])
+            for r in staged.mappings().all()
+        ]
+        assert staged_rows == [
+            ("701", "42", "Alpha shop drawings"),
+            ("702", "42", "Beta product data"),
+        ]
+
+        # Canonical: rex.submittals rows with normalized status/type enums.
+        canonical = await db_session.execute(text(
+            "SELECT submittal_number, title, status, submittal_type, "
+            "       spec_section "
+            "FROM rex.submittals "
+            "WHERE project_id = :pid "
+            "  AND submittal_number LIKE 'SUB-P4W2-%' "
+            "ORDER BY submittal_number"
+        ), {"pid": project_with_source_link})
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        # Row 0: 'Open' -> 'pending', 'Shop Drawings' -> 'shop_drawing'
+        assert rows[0]["submittal_number"] == "SUB-P4W2-ALPHA"
+        assert rows[0]["title"] == "Alpha shop drawings"
+        assert rows[0]["status"] == "pending"
+        assert rows[0]["submittal_type"] == "shop_drawing"
+        assert rows[0]["spec_section"] == "05 12 00"
+        # Row 1: 'Approved' -> 'approved', 'Product Data' -> 'product_data'
+        assert rows[1]["submittal_number"] == "SUB-P4W2-BETA"
+        assert rows[1]["status"] == "approved"
+        assert rows[1]["submittal_type"] == "product_data"
+
+        # source_links: one per seeded procore submittal
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.submittals' "
+            "  AND external_id IN ('701','702')"
+        ))
+        assert links.scalar_one() == 2
+
+        # sync_runs row: succeeded with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a AND resource_type='submittals' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+    finally:
+        # Teardown: mappings first (FK to rex.submittals via rex_id),
+        # then canonical rows, then staging + run state.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.submittals' "
+            "  AND external_id IN ('701','702')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.submittals "
+            "WHERE submittal_number LIKE 'SUB-P4W2-%'"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.submittals_raw "
+            "WHERE account_id = :a AND source_id IN ('701','702')"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()

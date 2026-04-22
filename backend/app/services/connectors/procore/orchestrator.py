@@ -115,6 +115,18 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.vendors",
         "fetch_fn_name":   "list_vendors",
     },
+    "submittals": {
+        # Phase 4 Wave 2 (direct Procore API) — project-scoped resource.
+        # fetch_submittals calls ProcoreClient.list_submittals directly;
+        # the rex-procore Railway DB does NOT have a procore.submittals
+        # table, so unlike rfis this resource can't fall back to the
+        # flattened source.
+        "raw_table":       "submittals_raw",
+        "map_fn":          mapper.map_submittal,
+        "canonical_table": "submittals",            # rex.submittals
+        "source_table":    "procore.submittals",
+        "fetch_fn_name":   "fetch_submittals",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
@@ -473,6 +485,43 @@ async def _write_vendors(db: AsyncSession, row: dict[str, Any]) -> UUID:
     return res.scalar_one()
 
 
+async def _write_submittals(db: AsyncSession, row: dict[str, Any]) -> UUID:
+    """Upsert a single submittal row into rex.submittals keyed on
+    (project_id, submittal_number).
+
+    Migration 031 adds the UNIQUE (project_id, submittal_number)
+    constraint this ON CONFLICT relies on. Without it, Postgres fails
+    at plan time with "there is no unique or exclusion constraint
+    matching the ON CONFLICT specification".
+
+    ``row``'s keys are mapper.map_submittal's canonical-column output —
+    splatted dynamically as the INSERT column list so the mapper stays
+    the single source of truth for which columns get written. The
+    identity tuple (project_id, submittal_number) is never rewritten
+    on conflict; everything else converges on the Procore-side values
+    after each sync.
+    """
+    cols = list(row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}"
+        for c in cols
+        if c not in ("project_id", "submittal_number")
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.submittals (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (project_id, submittal_number)
+        DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, row)
+    await db.commit()
+    return res.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
@@ -483,10 +532,11 @@ async def _write_vendors(db: AsyncSession, row: dict[str, Any]) -> UUID:
 _CANONICAL_WRITERS: dict[
     str, Callable[[AsyncSession, dict[str, Any]], Awaitable[UUID]]
 ] = {
-    "rfis":      _write_rfis,
-    "projects":  _write_projects,
-    "people":    _write_users,
-    "companies": _write_vendors,
+    "rfis":       _write_rfis,
+    "projects":   _write_projects,
+    "people":     _write_users,
+    "companies":  _write_vendors,
+    "submittals": _write_submittals,
 }
 
 

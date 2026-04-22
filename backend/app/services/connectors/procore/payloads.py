@@ -201,9 +201,55 @@ def build_vendor_payload(row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def build_submittal_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API submittals row -> staging payload.
+
+    Unlike ``build_rfi_payload`` (which reads a flat asyncpg row from the
+    rex-procore Railway DB), this builder consumes a dict returned
+    directly by Procore's REST API via ``ProcoreClient.list_submittals``.
+    The project scope comes from the adapter's
+    ``project_external_id`` argument rather than the row itself, because
+    Procore's ``/rest/v1.0/projects/{id}/submittals`` endpoint already
+    scopes by path — the response rows don't redundantly carry
+    ``project_id``.
+
+    Shape is deliberately parallel to ``build_rfi_payload``: ``id`` and
+    ``project_source_id`` are top-level string keys (what staging's
+    ``upsert_raw`` reads), ``updated_at`` is the ISO-stringified
+    watermark, and every other payload key mirrors the Procore API field
+    name. Keep the keys stable — ``mapper.map_submittal`` reads them via
+    ``raw.get(...)``.
+
+    Procore's submittal status vocabulary (``Open``, ``Closed``, etc.)
+    and type vocabulary (``Shop Drawings``, ``Product Data``, etc.) stay
+    as-is here; the mapper normalizes them to the rex.submittals CHECK
+    constraint's enum.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "submittal_number":  raw.get("number"),
+        "title":             raw.get("title"),
+        "status":            raw.get("status"),
+        "submittal_type":    raw.get("submittal_type") or raw.get("type"),
+        "spec_section":      raw.get("spec_section"),
+        "due_date":          _iso(raw.get("due_date")),
+        "submitted_date":    _iso(raw.get("submit_by") or raw.get("submitted_date")),
+        "approved_date":     _iso(raw.get("approved_date")),
+        "assignee":          raw.get("assignee") or raw.get("ball_in_court"),
+        "ball_in_court":     raw.get("ball_in_court"),
+        "responsible_contractor": raw.get("responsible_contractor"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
     "build_rfi_payload",
     "build_project_payload",
+    "build_submittal_payload",
     "build_user_payload",
     "build_vendor_payload",
 ]

@@ -1,17 +1,30 @@
 """Procore connector adapter.
 
-Reads from the "Rex App" Railway Postgres (old rex-procore sync app)
-via RexAppDbClient. No longer talks to Procore's HTTP API directly —
-the old app already does that and we consume its flattened tables.
+Hybrid read model:
 
-Only fetch_rfis is wired for real in this commit; the other fetch_*
-methods land in the follow-up resource-rollout plan.
+* **Phase 4a resources** (projects, users, vendors, rfis) read from the
+  "Rex App" Railway Postgres (old rex-procore sync app) via
+  RexAppDbClient — the old app already syncs Procore's API on a cron
+  and we consume its flattened ``procore.*`` tables.
+
+* **Phase 4 Wave 2 resources** (submittals + follow-ups: daily_logs,
+  schedule_activities, change_events, inspections) call Procore's REST
+  API directly via ``ProcoreClient`` from
+  ``app.services.ai.tools.procore_api``. These resources were never
+  ingested into the rex-procore app, so going direct is the only
+  way to get them without building a full parallel ingest first.
+
+Each ``fetch_<resource>`` picks the right path per its comment. The
+adapter's public ConnectorPage shape is the same across both paths —
+callers don't need to know which way the data came in.
 """
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any
 
+from app.services.ai.tools.procore_api import ProcoreClient, ProcoreNotConfigured
 from app.services.connectors.base import (
     ConnectorAdapter,
     ConnectorHealth,
@@ -20,6 +33,7 @@ from app.services.connectors.base import (
 from app.services.connectors.procore.payloads import (
     build_project_payload,
     build_rfi_payload,
+    build_submittal_payload,
     build_user_payload,
     build_vendor_payload,
 )
@@ -189,8 +203,43 @@ class ProcoreAdapter(ConnectorAdapter):
             next_cursor = last_updated
         return ConnectorPage(items=items, next_cursor=next_cursor)
 
-    async def fetch_submittals(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+    async def fetch_submittals(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of submittals from Procore's REST API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the upstream
+        returns only changed rows.
+
+        Graceful degradation: if Procore env vars aren't configured
+        (``ProcoreNotConfigured``), returns an empty page instead of
+        crashing. The scheduler iterates fetch_* across many accounts;
+        one account's missing OAuth config must not kill the whole run.
+        Any other upstream error (HTTP 4xx/5xx) propagates to the
+        orchestrator so the sync_run is marked 'failed'.
+
+        Pagination: ``ProcoreClient.list_submittals`` already loops its
+        own page-number pagination until an empty page, so the returned
+        list is the complete changed set for this run. ``next_cursor``
+        is always None here — the orchestrator uses the source row's
+        ``updated_at`` to decide the next watermark, not a per-page
+        cursor handle.
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_submittals(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [build_submittal_payload(project_external_id, r) for r in rows]
+        return ConnectorPage(items=items, next_cursor=None)
 
     async def fetch_daily_logs(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
