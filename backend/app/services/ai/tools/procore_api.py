@@ -13,15 +13,20 @@ OAuth: refresh-token flow. Env vars:
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any
 
 import httpx
 
 log = logging.getLogger("rex.ai.tools.procore_api")
+
+
+DEFAULT_PAGE_SIZE = 100
 
 
 class ProcoreNotConfigured(RuntimeError):
@@ -125,6 +130,131 @@ class ProcoreClient:
                 f"answer_rfi failed: HTTP {r.status_code}: {r.text[:200]}"
             )
         return r.json()
+
+    async def _auth_headers(self) -> dict[str, str]:
+        token = await self._ensure_token()
+        return {
+            "Authorization": f"Bearer {token}",
+            "Procore-Company-Id": self.company_id,
+        }
+
+    async def _paginate(
+        self,
+        path: str,
+        *,
+        params: dict | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        """Loop Procore's page-number pagination until an empty page. Respects 429."""
+        rows: list[dict] = []
+        page = 1
+        while True:
+            q = dict(params or {})
+            q["page"] = page
+            q["per_page"] = per_page
+            headers = await self._auth_headers()
+            client = await self._get_client()
+            r = await client.get(path, params=q, headers=headers)
+            if r.status_code == 429:
+                for _attempt in range(3):
+                    retry_after = int(r.headers.get("Retry-After", "5"))
+                    await asyncio.sleep(retry_after)
+                    r = await client.get(path, params=q, headers=headers)
+                    if r.status_code != 429:
+                        break
+                if r.status_code == 429:
+                    raise ProcoreApiError(
+                        f"rate limit exhausted on {path} page={page}"
+                    )
+            r.raise_for_status()
+            body = r.json()
+            batch = body if isinstance(body, list) else body.get("data", [])
+            if not batch:
+                return rows
+            rows.extend(batch)
+            if len(batch) < per_page:
+                return rows
+            page += 1
+
+    async def list_submittals(
+        self,
+        *,
+        project_id: str,
+        updated_since: datetime | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        params: dict = {}
+        if updated_since is not None:
+            params["filters[updated_at]"] = updated_since.isoformat()
+        return await self._paginate(
+            f"/rest/v1.0/projects/{project_id}/submittals",
+            params=params,
+            per_page=per_page,
+        )
+
+    async def list_daily_logs(
+        self,
+        *,
+        project_id: str,
+        updated_since: datetime | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        params: dict = {}
+        if updated_since is not None:
+            params["log_date"] = updated_since.date().isoformat()
+        return await self._paginate(
+            f"/rest/v1.0/projects/{project_id}/daily_logs/construction_report_logs",
+            params=params,
+            per_page=per_page,
+        )
+
+    async def list_schedule_tasks(
+        self,
+        *,
+        project_id: str,
+        updated_since: datetime | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        params: dict = {}
+        if updated_since is not None:
+            params["updated_at_min"] = updated_since.isoformat()
+        return await self._paginate(
+            f"/rest/v1.0/projects/{project_id}/schedule/standard_tasks",
+            params=params,
+            per_page=per_page,
+        )
+
+    async def list_change_events(
+        self,
+        *,
+        project_id: str,
+        updated_since: datetime | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        params: dict = {}
+        if updated_since is not None:
+            params["filters[updated_at]"] = updated_since.isoformat()
+        return await self._paginate(
+            f"/rest/v1.0/projects/{project_id}/change_events",
+            params=params,
+            per_page=per_page,
+        )
+
+    async def list_inspections(
+        self,
+        *,
+        project_id: str,
+        updated_since: datetime | None = None,
+        per_page: int = DEFAULT_PAGE_SIZE,
+    ) -> list[dict]:
+        params: dict = {}
+        if updated_since is not None:
+            params["updated_at"] = updated_since.isoformat()
+        return await self._paginate(
+            f"/rest/v1.0/projects/{project_id}/inspection_lists",
+            params=params,
+            per_page=per_page,
+        )
 
     async def close(self) -> None:
         if self._client is not None:
