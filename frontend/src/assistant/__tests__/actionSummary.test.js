@@ -118,4 +118,55 @@ import { formatActionSummary } from "../actionSummary.js";
   assert.ok(typeof s.secondary === "string");
 }
 
+// create_change_event
+{
+  const s = formatActionSummary("create_change_event",
+    { project_id: "p", event_number: "CE-42", title: "Owner-change: canopy revision", estimated_amount: 12500 },
+    null);
+  assert.equal(s.primary, "Create change event");
+  assert.ok(s.secondary.includes("Owner-change"));
+  assert.ok(s.secondary.includes("CE-42") || s.secondary.includes("canopy"));
+}
+
+// create_pco
+{
+  const s = formatActionSummary("create_pco",
+    { change_event_id: "ce", commitment_id: "c", pco_number: "PCO-7", title: "Add glulam beam at gridline C", amount: 18400 },
+    null);
+  assert.equal(s.primary, "Create PCO");
+  assert.ok(s.secondary.includes("PCO-7"));
+  assert.ok(s.secondary.includes("glulam") || s.secondary.includes("beam"));
+}
+
+// pay_application
+{
+  const s = formatActionSummary("pay_application",
+    { commitment_id: "c", billing_period_id: "b", pay_app_number: 4, this_period_amount: 45000,
+      period_start: "2026-04-01", period_end: "2026-04-30" },
+    null);
+  assert.equal(s.primary, "Draft pay application");
+  assert.ok(s.secondary.includes("#4"));
+  assert.ok(s.secondary.includes("45,000") || s.secondary.includes("45000"));
+}
+
+// lien_waiver
+{
+  const s = formatActionSummary("lien_waiver",
+    { payment_application_id: "pa", vendor_id: "v",
+      waiver_type: "conditional_progress", through_date: "2026-04-30", amount: 45000 },
+    null);
+  assert.equal(s.primary, "Record lien waiver");
+  assert.ok(/conditional/i.test(s.secondary));
+  assert.ok(s.secondary.includes("45,000") || s.secondary.includes("45000"));
+}
+
+// create_decision
+{
+  const s = formatActionSummary("create_decision",
+    { project_id: "p", title: "Detail A-501 vs A-502 at grid B/4", priority: "high" },
+    null);
+  assert.equal(s.primary, "Flag decision");
+  assert.ok(s.secondary.startsWith("Detail A-501"));
+}
+
 console.log("actionSummary: all tests passed");
