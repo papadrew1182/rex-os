@@ -110,6 +110,12 @@ MIGRATION_ORDER: list[str] = [
     #       get their own heavier schema in rex.pending_decisions — notes
     #       stay separate for MVP clarity.
     "029_rex_notes.sql",
+    # ── Phase 4 Wave 2 (feat/phase4-wave2-direct) lane ──────────────────
+    # 030 = connector_procore.inspections_raw staging table (the one
+    #       migration 013 didn't create; the other 4 Wave 2 staging tables
+    #       already exist from 013) + cursor_watermark column on
+    #       rex.sync_runs for per-run updated_since tracking.
+    "030_connector_procore_inspections_raw.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────
