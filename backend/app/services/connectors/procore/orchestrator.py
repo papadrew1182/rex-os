@@ -127,6 +127,19 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.submittals",
         "fetch_fn_name":   "fetch_submittals",
     },
+    "daily_logs": {
+        # Phase 4 Wave 2 (direct Procore API) — project-scoped resource.
+        # fetch_daily_logs calls ProcoreClient.list_daily_logs directly
+        # against /rest/v1.0/projects/{id}/daily_logs/
+        # construction_report_logs. Like submittals, this resource has
+        # no rex-procore Railway fallback — going direct is the only
+        # path to a rex.daily_logs row.
+        "raw_table":       "daily_logs_raw",
+        "map_fn":          mapper.map_daily_log,
+        "canonical_table": "daily_logs",            # rex.daily_logs
+        "source_table":    "procore.daily_logs",
+        "fetch_fn_name":   "fetch_daily_logs",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
@@ -522,6 +535,44 @@ async def _write_submittals(db: AsyncSession, row: dict[str, Any]) -> UUID:
     return res.scalar_one()
 
 
+async def _write_daily_logs(db: AsyncSession, row: dict[str, Any]) -> UUID:
+    """Upsert a single daily-log row into rex.daily_logs keyed on
+    (project_id, log_date).
+
+    The canonical DDL (rex2_canonical_ddl.sql line 285) already carries
+    the ``UNIQUE (project_id, log_date)`` constraint this ON CONFLICT
+    relies on — no supplementary migration is required for this
+    resource (unlike rfis / submittals whose unique constraints were
+    added retroactively in migrations 024 / 031).
+
+    ``row``'s keys are mapper.map_daily_log's canonical-column output —
+    splatted dynamically as the INSERT column list so the mapper stays
+    the single source of truth for which columns get written. The
+    identity tuple (project_id, log_date) is never rewritten on
+    conflict; everything else converges on the Procore-side values
+    after each sync.
+    """
+    cols = list(row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}"
+        for c in cols
+        if c not in ("project_id", "log_date")
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.daily_logs (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (project_id, log_date)
+        DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, row)
+    await db.commit()
+    return res.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
@@ -537,6 +588,7 @@ _CANONICAL_WRITERS: dict[
     "people":     _write_users,
     "companies":  _write_vendors,
     "submittals": _write_submittals,
+    "daily_logs": _write_daily_logs,
 }
 
 

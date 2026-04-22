@@ -35,6 +35,7 @@ Mapper contract:
 """
 
 from app.services.connectors.procore.mapper import (
+    map_daily_log,
     map_project,
     map_rfi,
     map_submittal,
@@ -959,6 +960,185 @@ def test_map_submittal_emits_only_canonical_columns():
     }
     assert set(m.keys()) == expected, (
         f"mapper keys differ from expected canonical set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_daily_log ─────────────────────────────────────────────────────────
+
+
+def _daily_log_payload() -> dict:
+    """Mirror ``payloads.build_daily_log_payload`` output for a
+    representative Procore daily-log row from the
+    construction_report_logs endpoint."""
+    return {
+        "id":                 "5001",
+        "project_source_id":  "42",
+        "log_date":           "2026-04-22",
+        "is_published":       True,
+        "status":             None,
+        "notes":              "Poured slab on grade north wing.",
+        "weather":            {
+            "conditions":           "Partly cloudy",
+            "temperature_high":     72,
+            "temperature_low":      55,
+            "precipitation_inches": 0.0,
+        },
+        "weather_conditions": {
+            "conditions":           "Partly cloudy",
+            "temperature_high":     72,
+            "temperature_low":      55,
+            "precipitation_inches": 0.0,
+        },
+        "created_at":         "2026-04-22T08:00:00+00:00",
+        "updated_at":         "2026-04-22T15:00:00+00:00",
+    }
+
+
+def test_map_daily_log_maps_project_fk():
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_daily_log_does_not_emit_source_id():
+    """source_id is NOT a rex.daily_logs column. Orchestrator reads the
+    procore id directly from the raw payload (item["id"]) for the
+    source_links writer — same convention as map_submittal."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
+
+
+def test_map_daily_log_maps_log_date_as_date_object():
+    """rex.daily_logs.log_date is typed ``date`` (NOT NULL); the mapper
+    must emit a ``date`` object (not an ISO string) so asyncpg binds it
+    natively."""
+    from datetime import date
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["log_date"] == date(2026, 4, 22)
+    assert isinstance(m["log_date"], date)
+
+
+def test_map_daily_log_published_is_submitted():
+    """Procore's ``is_published=True`` means the log has been finalized
+    for the day; rex's equivalent status is 'submitted'."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["status"] == "submitted"
+
+
+def test_map_daily_log_unpublished_is_draft():
+    """An unpublished (is_published=False) log is still in progress —
+    rex's 'draft' state."""
+    raw = _daily_log_payload()
+    raw["is_published"] = False
+    m = map_daily_log(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "draft"
+
+
+def test_map_daily_log_missing_is_published_defaults_to_draft():
+    """If Procore's response omits is_published (shape varies across
+    endpoint revisions), default to 'draft' so the CHECK constraint
+    passes. Don't assume published — a missing signal is NOT a signal
+    of readiness."""
+    raw = _daily_log_payload()
+    raw["is_published"] = None
+    m = map_daily_log(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "draft"
+
+
+def test_map_daily_log_canonical_status_passthrough():
+    """If the payload already carries a rex-canonical status (e.g. from
+    a future payload-builder revision that pre-normalizes), pass it
+    through unchanged."""
+    raw = _daily_log_payload()
+    raw["status"] = "approved"
+    m = map_daily_log(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "approved"
+
+
+def test_map_daily_log_flattens_weather_to_summary_and_temps():
+    """Procore's weather is a nested structured object. The mapper
+    flattens the conditions string into weather_summary and pulls
+    numeric highs/lows into their canonical columns."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["weather_summary"] == "Partly cloudy"
+    assert m["temp_high_f"] == 72
+    assert m["temp_low_f"] == 55
+
+
+def test_map_daily_log_missing_weather_is_none_fields():
+    """If Procore's weather field is entirely absent, every weather
+    column on the mapper output is None (rex columns are nullable
+    except is_weather_delay which gets False)."""
+    raw = _daily_log_payload()
+    raw["weather"] = None
+    raw["weather_conditions"] = None
+    m = map_daily_log(raw, PROJECT_CANONICAL_ID)
+    assert m["weather_summary"] is None
+    assert m["temp_high_f"] is None
+    assert m["temp_low_f"] is None
+
+
+def test_map_daily_log_notes_land_in_work_summary():
+    """Procore's single 'notes' field is the main narrative body.
+    Rex splits notes into work/delay/safety/visitor columns; the
+    Procore response does not distinguish those so we land the whole
+    narrative in work_summary and leave the other three None."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["work_summary"] == "Poured slab on grade north wing."
+    assert m["delay_notes"] is None
+    assert m["safety_notes"] is None
+    assert m["visitor_notes"] is None
+
+
+def test_map_daily_log_people_fks_are_none_pending_resolution():
+    """created_by, approved_by are uuid columns but the payload
+    carries no person names here. Resolution happens in a later
+    pass (same convention as map_submittal)."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert m["created_by"] is None
+    assert m["approved_by"] is None
+    assert m["approved_at"] is None
+
+
+def test_map_daily_log_omits_is_weather_delay_when_unknown():
+    """rex.daily_logs.is_weather_delay is NOT NULL DEFAULT false. If the
+    mapper emitted is_weather_delay=None, the INSERT would pass NULL
+    and violate the NOT NULL constraint (defaults don't fire when the
+    column is present with NULL). Omit the key so the DB default
+    applies when Procore's response doesn't carry a delay signal."""
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    assert "is_weather_delay" not in m
+
+
+def test_map_daily_log_emits_only_canonical_columns():
+    """Every key the mapper emits must be a real rex.daily_logs column
+    so orchestrator._write_daily_logs' INSERT ... ON CONFLICT splat
+    doesn't reference a nonexistent column.
+
+    Excluded from the output:
+    - id, created_at, updated_at (DB-managed)
+    - is_weather_delay (DB default false; omitted so default fires
+      when Procore's response doesn't carry a delay signal)
+    """
+    m = map_daily_log(_daily_log_payload(), PROJECT_CANONICAL_ID)
+    expected = {
+        "project_id",
+        "log_date",
+        "status",
+        "weather_summary",
+        "temp_high_f",
+        "temp_low_f",
+        "work_summary",
+        "delay_notes",
+        "safety_notes",
+        "visitor_notes",
+        "created_by",
+        "approved_by",
+        "approved_at",
+    }
+    assert set(m.keys()) == expected, (
+        f"daily_log mapper keys differ from expected canonical set.\n"
         f"  missing: {expected - set(m.keys())}\n"
         f"  extra:   {set(m.keys()) - expected}"
     )

@@ -356,6 +356,159 @@ def map_submittal(raw: dict[str, Any], project_canonical_id: str) -> dict[str, A
     }
 
 
+_DAILY_LOG_STATUS_MAP: dict[str, str] = {
+    # Canonical-enum pass-through (rex.daily_logs.status CHECK IN
+    # ('draft','submitted','approved')).
+    "draft":     "draft",
+    "submitted": "submitted",
+    "approved":  "approved",
+    # Procore-native variants (the construction_report_logs endpoint
+    # doesn't carry a free-text status — the is_published bool is the
+    # main signal — but accept these for defensive compatibility with
+    # sibling endpoints that do).
+    "published":   "submitted",
+    "unpublished": "draft",
+}
+
+
+def _coerce_temp(value: Any) -> int | None:
+    """Coerce a Procore temperature value (int / float / numeric string)
+    to a plain int. Returns None for None or anything unparseable.
+
+    rex.daily_logs.temp_high_f and temp_low_f are typed ``int`` (not
+    numeric). Procore's construction_report_logs endpoint sometimes
+    returns integers, sometimes floats; a string is defensive.
+    """
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        # bool is a subclass of int; reject outright rather than
+        # silently coerce True/False to 1/0.
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        try:
+            return int(float(value))
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def map_daily_log(
+    raw: dict[str, Any], project_canonical_id: str
+) -> dict[str, Any]:
+    """Map a Procore daily-log payload (as produced by
+    ``payloads.build_daily_log_payload``) to a dict keyed by
+    rex.daily_logs canonical columns.
+
+    Canonical rex.daily_logs columns (from migrations/rex2_canonical_ddl.sql
+    lines 267-286):
+
+        id               uuid PK                   -- db-generated; NOT emitted
+        project_id       uuid NOT NULL             -- <- project_canonical_id
+        log_date         date NOT NULL             -- <- payload["log_date"] / "date"
+        status           text NOT NULL DEFAULT 'draft'
+                         CHECK IN ('draft','submitted','approved')
+        weather_summary  text                      -- flattened from weather.conditions
+        temp_high_f      int
+        temp_low_f       int
+        is_weather_delay boolean NOT NULL DEFAULT false  -- OMITTED (let DB default fire)
+        work_summary     text                      -- <- payload["notes"]
+        delay_notes      text                      -- None (Procore doesn't split)
+        safety_notes     text                      -- None
+        visitor_notes    text                      -- None
+        created_by       uuid                      -- resolve later; None
+        approved_by      uuid                      -- resolve later; None
+        approved_at      timestamptz               -- None (not in payload)
+        created_at/updated_at — DB-managed
+
+    Contract:
+
+    * Output contains ONLY canonical rex.daily_logs column keys — safe
+      to splat into a generic INSERT without "column does not exist".
+    * ``is_weather_delay`` is OMITTED on purpose. The column is NOT NULL
+      DEFAULT false, but defaults don't fire when the column is included
+      in the INSERT with a NULL value. Omitting the key lets the DB
+      default apply cleanly when Procore's response doesn't carry a
+      delay signal.
+    * ``source_id`` is NOT emitted — orchestrator reads ``item["id"]``
+      directly from the raw payload for the source_links writer (same
+      convention as map_submittal / map_rfi).
+    * Name->person-UUID resolution for created_by / approved_by is left
+      as None here. The enrichment pass reads names from the raw
+      payload, not from this mapper's output.
+    * ``log_date`` is NOT NULL on the canonical table; if the payload
+      is missing it, the INSERT will fail loud rather than silently
+      invent a date.
+
+    Status policy: Procore's construction_report_logs endpoint does not
+    carry a text status — the ``is_published`` bool is the main signal.
+    Published logs map to 'submitted'; unpublished (or missing) log to
+    'draft'. If the payload already carries a rex-canonical status (a
+    future payload-builder revision could pre-normalize), pass it
+    through.
+
+    Weather shape: Procore's weather is a nested structured object with
+    subfields ``conditions`` (free text like "Partly cloudy") and
+    ``temperature_high`` / ``temperature_low`` (numeric). The mapper
+    flattens ``conditions`` into ``weather_summary`` and coerces the
+    highs/lows to int. Falls back to None on all three when the weather
+    object is missing or shaped differently.
+    """
+    # Status: prefer an already-canonical payload value; else derive
+    # from is_published; else default to 'draft'.
+    status_raw = (raw.get("status") or "").strip().lower() if raw.get("status") else ""
+    if status_raw and status_raw in _DAILY_LOG_STATUS_MAP:
+        status = _DAILY_LOG_STATUS_MAP[status_raw]
+    else:
+        is_published = raw.get("is_published")
+        status = "submitted" if is_published is True else "draft"
+
+    # Weather: accept either the aliased ``weather`` key or the
+    # Procore-native ``weather_conditions`` subobject.
+    weather = raw.get("weather") or raw.get("weather_conditions") or {}
+    if not isinstance(weather, dict):
+        weather = {}
+    weather_summary = weather.get("conditions") or weather.get("summary")
+    temp_high = _coerce_temp(
+        weather.get("temperature_high") or weather.get("temp_high_f")
+    )
+    temp_low = _coerce_temp(
+        weather.get("temperature_low") or weather.get("temp_low_f")
+    )
+
+    return {
+        # Identity / links
+        "project_id":       project_canonical_id,
+
+        # Direct canonical fields
+        "log_date":         _iso_date(raw.get("log_date") or raw.get("date")),
+        "status":           status,
+
+        # Weather
+        "weather_summary":  weather_summary,
+        "temp_high_f":      temp_high,
+        "temp_low_f":       temp_low,
+
+        # Notes — Procore carries a single free-text "notes" field
+        # that becomes the main work narrative; rex's delay/safety/
+        # visitor columns have no Procore counterpart on this
+        # endpoint.
+        "work_summary":     raw.get("notes"),
+        "delay_notes":      None,
+        "safety_notes":     None,
+        "visitor_notes":    None,
+
+        # People FKs — resolve name->uuid in a later pass
+        "created_by":       None,
+        "approved_by":      None,
+        "approved_at":      None,
+    }
+
+
 def map_commitment(raw: dict[str, Any], project_canonical_id: str) -> dict[str, Any]:
     return {
         "source_id": str(raw.get("id", "")),
@@ -537,6 +690,7 @@ __all__ = [
     "map_project",
     "map_rfi",
     "map_submittal",
+    "map_daily_log",
     "map_commitment",
     "map_user",
     "map_vendor",

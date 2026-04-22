@@ -246,7 +246,58 @@ def build_submittal_payload(
     }
 
 
+def build_daily_log_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API daily-log row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_daily_logs`` (the
+    ``/rest/v1.0/projects/{id}/daily_logs/construction_report_logs``
+    endpoint). Mirrors ``build_submittal_payload`` — the project scope
+    comes from the adapter's ``project_external_id`` argument rather
+    than the row itself, because Procore's endpoint already scopes by
+    path.
+
+    Shape is deliberately parallel to ``build_submittal_payload``: ``id``
+    and ``project_source_id`` are top-level string keys (what staging's
+    ``upsert_raw`` reads), ``updated_at`` is the ISO-stringified
+    watermark. Every other payload key mirrors the Procore API field
+    name so ``mapper.map_daily_log`` can read them via ``raw.get(...)``
+    without translation.
+
+    Procore's construction-report daily-log shape carries:
+      * ``date`` — the log_date (rex.daily_logs.log_date is NOT NULL)
+      * ``is_published`` (bool) — published logs are 'submitted' in
+        rex's 3-value enum; unpublished logs stay 'draft'.
+      * Weather: nested ``weather_conditions`` field with subfields
+        including ``temperature`` variations and free-text
+        ``conditions``. We stash the whole weather sub-object alongside
+        a pre-flattened summary so the mapper can either use the
+        convenience strings or dig into the full structured object.
+      * Notes: ``notes`` (free-text, the main log body). Procore does
+        not natively split work/delay/safety/visitor notes, so we
+        only populate ``work_summary`` and leave the rest None.
+
+    Keys unknown-to-Procore-but-known-to-rex are intentionally NOT
+    fabricated here — the mapper emits None for them.
+    """
+    return {
+        "id":                str(raw["id"]),
+        "project_source_id": str(project_external_id),
+        "log_date":          _iso(raw.get("date") or raw.get("log_date")),
+        "is_published":      raw.get("is_published"),
+        "status":            raw.get("status"),
+        "notes":             raw.get("notes"),
+        "weather":           raw.get("weather_conditions") or raw.get("weather"),
+        "weather_conditions": raw.get("weather_conditions"),
+        "created_at":        _iso(raw.get("created_at")),
+        "updated_at":        _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
+    "build_daily_log_payload",
     "build_rfi_payload",
     "build_project_payload",
     "build_submittal_payload",

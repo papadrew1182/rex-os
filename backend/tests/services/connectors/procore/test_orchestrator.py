@@ -1042,3 +1042,178 @@ async def test_sync_resource_submittals_end_to_end(
             "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
         ), {"a": procore_connector_account})
         await db_session.commit()
+
+
+@pytest.mark.asyncio
+async def test_sync_resource_daily_logs_end_to_end(
+    db_session,
+    procore_connector_account,
+    project_with_source_link,
+    monkeypatch,
+):
+    """Full project-scoped pipeline for daily_logs (Phase 4 Wave 2 direct API).
+
+    Mirrors the submittals end-to-end test. Unlike the rfis path that
+    reads procore.rfis via RexAppDbClient, this resource calls
+    ProcoreClient.list_daily_logs directly. We mock
+    ``ProcoreClient.from_env`` so the adapter returns a canned 2-row
+    response without needing real Procore OAuth env vars.
+
+    The ``project_with_source_link`` fixture seeds a rex.projects row
+    mapped to procore project_id=42 via rex.connector_mappings — the
+    orchestrator's per-project loop discovers the project, the adapter
+    is called with project_external_id='42', and the mocked client
+    returns the two canned rows.
+
+    Asserts the full pipeline:
+      1. Staging landed in connector_procore.daily_logs_raw (with
+         project_source_id='42')
+      2. Canonical rex.daily_logs rows exist, keyed on (project_id,
+         log_date)
+      3. rex.connector_mappings source_links point procore.daily_logs
+         external_ids at rex.daily_logs canonical ids
+      4. sync_runs row marked 'succeeded' with correct counts
+    """
+    from unittest.mock import AsyncMock, patch
+
+    # Fake Procore API response that ProcoreClient.list_daily_logs would
+    # return for project 42. Shape mirrors what the construction_report_logs
+    # endpoint emits: ``id``, ``date``, ``is_published``, ``weather_conditions``
+    # subobject, ``notes``, ``updated_at``. build_daily_log_payload normalizes
+    # this; the mapper further derives status from is_published and
+    # flattens weather.
+    fake_rows = [
+        {
+            "id": 801,
+            "date": "2026-04-22",
+            "is_published": True,
+            "notes": "Poured slab north wing.",
+            "weather_conditions": {
+                "conditions":       "Partly cloudy",
+                "temperature_high": 72,
+                "temperature_low":  55,
+            },
+            "updated_at": "2026-04-22T15:00:00Z",
+        },
+        {
+            "id": 802,
+            "date": "2026-04-21",
+            "is_published": False,
+            "notes": "Framing continues.",
+            "weather_conditions": {
+                "conditions":       "Clear",
+                "temperature_high": 68,
+                "temperature_low":  52,
+            },
+            "updated_at": "2026-04-21T15:00:00Z",
+        },
+    ]
+
+    fake_client = AsyncMock()
+    fake_client.list_daily_logs = AsyncMock(return_value=fake_rows)
+
+    try:
+        with patch(
+            "app.services.ai.tools.procore_api.ProcoreClient.from_env",
+            return_value=fake_client,
+        ):
+            result = await sync_resource(
+                db_session,
+                account_id=procore_connector_account,
+                resource_type="daily_logs",
+            )
+
+        assert result["rows_fetched"] == 2
+        assert result["rows_upserted"] == 2
+
+        # Staging: connector_procore.daily_logs_raw got both rows scoped
+        # to the right project_source_id.
+        staged = await db_session.execute(text(
+            "SELECT source_id, project_source_id, "
+            "       payload->>'log_date' AS log_date "
+            "FROM connector_procore.daily_logs_raw "
+            "WHERE account_id = :a "
+            "  AND source_id IN ('801','802') "
+            "ORDER BY source_id"
+        ), {"a": procore_connector_account})
+        staged_rows = [
+            (r["source_id"], r["project_source_id"], r["log_date"])
+            for r in staged.mappings().all()
+        ]
+        assert staged_rows == [
+            ("801", "42", "2026-04-22"),
+            ("802", "42", "2026-04-21"),
+        ]
+
+        # Canonical: rex.daily_logs rows with derived status from
+        # is_published and flattened weather.
+        import datetime as _dt
+        canonical = await db_session.execute(text(
+            "SELECT log_date, status, weather_summary, "
+            "       temp_high_f, temp_low_f, work_summary "
+            "FROM rex.daily_logs "
+            "WHERE project_id = :pid "
+            "  AND log_date IN ('2026-04-22', '2026-04-21') "
+            "ORDER BY log_date DESC"
+        ), {"pid": project_with_source_link})
+        rows = canonical.mappings().all()
+        assert len(rows) == 2
+        # Row 0: 2026-04-22, published -> 'submitted'
+        assert rows[0]["log_date"] == _dt.date(2026, 4, 22)
+        assert rows[0]["status"] == "submitted"
+        assert rows[0]["weather_summary"] == "Partly cloudy"
+        assert rows[0]["temp_high_f"] == 72
+        assert rows[0]["temp_low_f"] == 55
+        assert rows[0]["work_summary"] == "Poured slab north wing."
+        # Row 1: 2026-04-21, unpublished -> 'draft'
+        assert rows[1]["log_date"] == _dt.date(2026, 4, 21)
+        assert rows[1]["status"] == "draft"
+        assert rows[1]["weather_summary"] == "Clear"
+
+        # source_links: one per seeded procore daily_log
+        links = await db_session.execute(text(
+            "SELECT COUNT(*) FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.daily_logs' "
+            "  AND external_id IN ('801','802')"
+        ))
+        assert links.scalar_one() == 2
+
+        # sync_runs row: succeeded with correct counts
+        sr = await db_session.execute(text(
+            "SELECT status, rows_fetched, rows_upserted "
+            "FROM rex.sync_runs "
+            "WHERE connector_account_id=:a AND resource_type='daily_logs' "
+            "ORDER BY started_at DESC LIMIT 1"
+        ), {"a": procore_connector_account})
+        run = sr.mappings().first()
+        assert run is not None
+        assert run["status"] == "succeeded"
+        assert run["rows_fetched"] == 2
+        assert run["rows_upserted"] == 2
+
+    finally:
+        # Teardown: mappings first (FK to rex.daily_logs via rex_id),
+        # then canonical rows, then staging + run state.
+        await db_session.execute(text(
+            "DELETE FROM rex.connector_mappings "
+            "WHERE connector='procore' "
+            "  AND source_table='procore.daily_logs' "
+            "  AND external_id IN ('801','802')"
+        ))
+        await db_session.execute(text(
+            "DELETE FROM rex.daily_logs "
+            "WHERE project_id = :pid "
+            "  AND log_date IN ('2026-04-22', '2026-04-21')"
+        ), {"pid": project_with_source_link})
+        await db_session.execute(text(
+            "DELETE FROM connector_procore.daily_logs_raw "
+            "WHERE account_id = :a AND source_id IN ('801','802')"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_runs WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.execute(text(
+            "DELETE FROM rex.sync_cursors WHERE connector_account_id = :a"
+        ), {"a": procore_connector_account})
+        await db_session.commit()

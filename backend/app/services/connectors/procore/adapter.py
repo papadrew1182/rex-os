@@ -31,6 +31,7 @@ from app.services.connectors.base import (
     ConnectorPage,
 )
 from app.services.connectors.procore.payloads import (
+    build_daily_log_payload,
     build_project_payload,
     build_rfi_payload,
     build_submittal_payload,
@@ -241,8 +242,51 @@ class ProcoreAdapter(ConnectorAdapter):
         items = [build_submittal_payload(project_external_id, r) for r in rows]
         return ConnectorPage(items=items, next_cursor=None)
 
-    async def fetch_daily_logs(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
-        return ConnectorPage(items=[], next_cursor=None)
+    async def fetch_daily_logs(
+        self, project_external_id: str, cursor: str | None = None,
+    ) -> ConnectorPage:
+        """Fetch a page of daily logs from Procore's REST API directly.
+
+        ``project_external_id`` is the Procore project id (bigint as
+        string) the adapter was given by the orchestrator's per-project
+        loop. ``cursor``, if present, is an ISO timestamp — the
+        ``updated_at`` watermark of the last successful run — which we
+        forward to Procore as the ``updated_since`` filter so the upstream
+        returns only changed rows.
+
+        Mirrors ``fetch_submittals`` (Task 3). Graceful degradation: if
+        Procore env vars aren't configured (``ProcoreNotConfigured``),
+        returns an empty page instead of crashing. The scheduler iterates
+        fetch_* across many accounts; one account's missing OAuth config
+        must not kill the whole run. Any other upstream error (HTTP
+        4xx/5xx) propagates to the orchestrator so the sync_run is marked
+        'failed'.
+
+        Pagination: ``ProcoreClient.list_daily_logs`` already loops its
+        own page-number pagination until an empty page, so the returned
+        list is the complete changed set for this run. ``next_cursor``
+        is always None here — the orchestrator uses the source row's
+        ``updated_at`` to decide the next watermark, not a per-page
+        cursor handle.
+
+        Note: ``ProcoreClient.list_daily_logs`` coerces ``updated_since``
+        to a ``log_date`` query param (Procore's construction_report_logs
+        endpoint filters by log date rather than update time). The
+        watermark semantics are still "give me rows on/after this
+        moment" — the fidelity is day-level instead of timestamp-level,
+        which is fine for daily logs (one row per day per project).
+        """
+        try:
+            client = ProcoreClient.from_env()
+        except ProcoreNotConfigured:
+            return ConnectorPage(items=[], next_cursor=None)
+        updated_since = datetime.fromisoformat(cursor) if cursor else None
+        rows = await client.list_daily_logs(
+            project_id=project_external_id,
+            updated_since=updated_since,
+        )
+        items = [build_daily_log_payload(project_external_id, r) for r in rows]
+        return ConnectorPage(items=items, next_cursor=None)
 
     async def fetch_budget(self, project_external_id: str, cursor: str | None = None) -> ConnectorPage:
         return ConnectorPage(items=[], next_cursor=None)
