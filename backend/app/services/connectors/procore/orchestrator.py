@@ -177,6 +177,25 @@ _RESOURCE_CONFIG: dict[str, dict[str, Any]] = {
         "source_table":    "procore.change_events",
         "fetch_fn_name":   "fetch_change_events",
     },
+    "inspections": {
+        # Phase 4 Wave 2 (direct Procore API) — project-scoped resource.
+        # fetch_inspections calls ProcoreClient.list_inspections directly
+        # against /rest/v1.0/projects/{id}/inspection_lists. This is the
+        # fifth and final Wave 2 resource; like submittals / daily_logs
+        # / schedule_activities / change_events it has no rex-procore
+        # Railway fallback.
+        #
+        # Staging lands in connector_procore.inspections_raw (created by
+        # migration 030 — the other 4 Wave 2 staging tables already
+        # existed from migration 013). The canonical target is
+        # rex.inspections with the natural key (project_id,
+        # inspection_number) backed by migration 034.
+        "raw_table":       "inspections_raw",
+        "map_fn":          mapper.map_inspection,
+        "canonical_table": "inspections",              # rex.inspections
+        "source_table":    "procore.inspections",
+        "fetch_fn_name":   "fetch_inspections",
+    },
 }
 
 # Resources with no parent-project scope. Their ``map_fn`` takes ONE arg
@@ -778,6 +797,47 @@ async def _write_change_events(
     return result.scalar_one()
 
 
+async def _write_inspections(
+    db: AsyncSession, row: dict[str, Any]
+) -> UUID:
+    """Upsert a single inspection row into rex.inspections keyed on
+    (project_id, inspection_number).
+
+    Migration 034 adds the UNIQUE (project_id, inspection_number)
+    constraint this ON CONFLICT relies on — it is NOT declared in the
+    canonical DDL (rex2_canonical_ddl.sql line 329) so a supplementary
+    migration is required. Without it, Postgres fails at plan time with
+    "there is no unique or exclusion constraint matching the ON
+    CONFLICT specification".
+
+    ``row``'s keys are mapper.map_inspection's canonical-column output —
+    splatted dynamically as the INSERT column list so the mapper stays
+    the single source of truth for which columns get written. The
+    identity tuple (project_id, inspection_number) is never rewritten
+    on conflict; everything else converges on the Procore-side values
+    after each sync.
+    """
+    cols = list(row.keys())
+    col_sql = ", ".join(cols)
+    val_sql = ", ".join(f":{c}" for c in cols)
+    update_sql = ", ".join(
+        f"{c} = EXCLUDED.{c}"
+        for c in cols
+        if c not in ("project_id", "inspection_number")
+    )
+
+    sql = text(f"""
+        INSERT INTO rex.inspections (id, {col_sql})
+        VALUES (gen_random_uuid(), {val_sql})
+        ON CONFLICT (project_id, inspection_number)
+        DO UPDATE SET {update_sql}
+        RETURNING id
+    """)
+    res = await db.execute(sql, row)
+    await db.commit()
+    return res.scalar_one()
+
+
 # Per-resource canonical writers. Each writer owns the INSERT ... ON CONFLICT
 # for its rex.<table>. Add a new entry here when a sibling resource lands —
 # keep the signature (db, row) -> UUID so _upsert_canonical's dispatch holds.
@@ -796,6 +856,7 @@ _CANONICAL_WRITERS: dict[
     "daily_logs":           _write_daily_logs,
     "schedule_activities":  _write_schedule_activities,
     "change_events":        _write_change_events,
+    "inspections":          _write_inspections,
 }
 
 

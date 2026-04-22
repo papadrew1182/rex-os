@@ -38,6 +38,7 @@ ALLOWED_TABLES = {
     "commitments_raw",
     "change_events_raw",
     "schedule_tasks_raw",
+    "inspections_raw",
     "documents_raw",
 }
 

@@ -951,6 +951,137 @@ def map_change_event(
     }
 
 
+def map_inspection(
+    raw: dict[str, Any], project_canonical_id: str
+) -> dict[str, Any]:
+    """Map a Procore inspection payload (as produced by
+    ``payloads.build_inspection_payload``) to a dict keyed by
+    rex.inspections canonical columns.
+
+    Canonical rex.inspections columns (from
+    migrations/rex2_canonical_ddl.sql lines 329-350):
+
+        id                      uuid PK                  -- db-generated; NOT emitted
+        project_id              uuid NOT NULL
+        inspection_number       text NOT NULL
+        title                   text NOT NULL
+        inspection_type         text NOT NULL CHECK IN
+                                (municipal|quality|safety|pre_concrete|
+                                 framing|mep_rough|mep_final|other)
+        status                  text NOT NULL DEFAULT 'scheduled' CHECK IN
+                                (scheduled|in_progress|passed|failed|
+                                 partial|cancelled)
+        scheduled_date          date NOT NULL
+        completed_date          date
+        inspector_name          text
+        inspecting_company_id   uuid                     -- FK; None (no resolver)
+        responsible_person_id   uuid                     -- FK; None (no resolver)
+        location                text
+        activity_id             uuid                     -- FK; None (no resolver)
+        comments                text
+        created_by              uuid                     -- FK; None (no resolver)
+        created_at / updated_at                          -- DB-managed; NOT emitted
+
+    Contract:
+    * Output contains ONLY canonical rex.inspections column keys so
+      orchestrator._write_inspections can splat them into INSERT ...
+      ON CONFLICT directly.
+    * ``source_id`` is NOT emitted — orchestrator reads ``item["id"]``
+      directly from the raw payload for the source_links writer (same
+      convention as map_change_event / map_daily_log / map_submittal /
+      map_schedule_activity).
+    * ``inspection_number`` is the natural key (with project_id) for the
+      ON CONFLICT upsert. The canonical DDL does not declare this UNIQUE
+      — migration 034 adds the UNIQUE (project_id, inspection_number)
+      index the writer relies on.
+    * Both CHECK-constrained classifiers (``inspection_type``,
+      ``status``) normalize Procore's title-cased strings ("Safety
+      Inspection", "In Progress") to the lowercase-underscore enum the
+      CHECK allows. Unknown values fall back to safe defaults
+      (``other`` / ``scheduled``) rather than crashing the sync.
+    * ``title`` is NOT NULL on the canonical side. Procore is expected
+      to always carry a name/title; be defensive with a placeholder
+      fallback rather than crashing on NULL violation.
+    * ``scheduled_date`` is NOT NULL on the canonical side. If the
+      payload is missing it, fall back to CURRENT_DATE via Python's
+      ``date.today()`` so the INSERT still succeeds. Admin can
+      re-classify post-sync.
+
+    FKs (inspecting_company_id, responsible_person_id, activity_id,
+    created_by) are left as None. The enrichment pass reads names from
+    the raw payload, not from this mapper's output.
+    """
+    # inspection_type normalization. Procore may return titles like
+    # "Safety Inspection", "Municipal Inspection", "Quality". Lowercase,
+    # strip " inspection" suffix, and collapse spaces to underscores.
+    # Default missing/unknown to 'other' (the catch-all in the CHECK
+    # enum) rather than crashing.
+    type_raw = (raw.get("inspection_type") or "").strip().lower()
+    # Strip a trailing " inspection" if present (e.g. "Safety Inspection"
+    # -> "safety") so both variants normalize to the same enum value.
+    if type_raw.endswith(" inspection"):
+        type_raw = type_raw[: -len(" inspection")]
+    type_key = type_raw.replace(" ", "_").replace("-", "_")
+    canonical_type = {
+        "municipal":      "municipal",
+        "quality":        "quality",
+        "safety":         "safety",
+        "pre_concrete":   "pre_concrete",
+        "pre_pour":       "pre_concrete",  # common Procore alias
+        "framing":        "framing",
+        "mep_rough":      "mep_rough",
+        "mep_final":      "mep_final",
+        "other":          "other",
+    }.get(type_key, "other")
+
+    # status normalization. Procore returns title-cased strings; rex
+    # CHECK enum is lowercase-underscore. Default missing/unknown to
+    # 'scheduled'.
+    status_raw = (raw.get("status") or "").strip().lower().replace(" ", "_").replace("-", "_")
+    canonical_status = {
+        "scheduled":    "scheduled",
+        "in_progress":  "in_progress",
+        "passed":       "passed",
+        "failed":       "failed",
+        "partial":      "partial",
+        "cancelled":    "cancelled",
+        "canceled":     "cancelled",  # US-spelling alias
+        "":             "scheduled",
+    }.get(status_raw, "scheduled")
+
+    # inspection_number: the natural key (with project_id). Fall back to
+    # stringified Procore id so the (project_id, inspection_number)
+    # upsert key is never NULL — UNIQUE indexes treat NULLs as distinct.
+    inspection_number = raw.get("inspection_number")
+    if not inspection_number:
+        inspection_number = str(raw.get("id", ""))
+
+    # scheduled_date is NOT NULL on rex. Procore is expected to always
+    # carry it; fall back to today's date rather than failing the INSERT.
+    scheduled = _iso_date(raw.get("scheduled_date"))
+    if scheduled is None:
+        from datetime import date as _date
+        scheduled = _date.today()
+
+    return {
+        "project_id":             project_canonical_id,
+        "inspection_number":      inspection_number,
+        "title":                  raw.get("title") or "(untitled inspection)",
+        "inspection_type":        canonical_type,
+        "status":                 canonical_status,
+        "scheduled_date":         scheduled,
+        "completed_date":         _iso_date(raw.get("completed_date")),
+        "inspector_name":         raw.get("inspector_name"),
+        "location":               raw.get("location"),
+        "comments":               raw.get("comments"),
+        # FKs pending enrichment (no resolver)
+        "inspecting_company_id":  None,
+        "responsible_person_id":  None,
+        "activity_id":            None,
+        "created_by":             None,
+    }
+
+
 __all__ = [
     "map_project",
     "map_rfi",
@@ -958,6 +1089,7 @@ __all__ = [
     "map_daily_log",
     "map_schedule_activity",
     "map_change_event",
+    "map_inspection",
     "map_commitment",
     "map_user",
     "map_vendor",

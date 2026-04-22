@@ -37,6 +37,7 @@ Mapper contract:
 from app.services.connectors.procore.mapper import (
     map_change_event,
     map_daily_log,
+    map_inspection,
     map_project,
     map_rfi,
     map_schedule_activity,
@@ -1521,6 +1522,218 @@ def test_map_change_event_emits_only_expected_keys():
     }
     assert set(m.keys()) == expected, (
         f"change_event mapper keys differ from expected set.\n"
+        f"  missing: {expected - set(m.keys())}\n"
+        f"  extra:   {set(m.keys()) - expected}"
+    )
+
+
+# ── map_inspection ───────────────────────────────────────────────────────
+
+
+def _inspection_payload() -> dict:
+    """Mirror ``payloads.build_inspection_payload`` output for a
+    representative Procore inspection row. Procore often returns
+    title-cased strings for the CHECK-enum classifiers
+    (inspection_type, status); the mapper normalizes them."""
+    return {
+        "id":                "5001",
+        "project_source_id": "42",
+        "inspection_number": "INS-042",
+        "title":             "Pre-pour footing inspection",
+        "inspection_type":   "Safety Inspection",
+        "status":            "Scheduled",
+        "scheduled_date":    "2026-05-01",
+        "completed_date":    None,
+        "inspector_name":    "Jane Doe",
+        "location":          "SE corner, grid C3",
+        "comments":          "Rebar spacing concern noted on prior run",
+        "created_at":        "2026-04-20T08:00:00+00:00",
+        "updated_at":        "2026-04-22T15:00:00+00:00",
+    }
+
+
+def test_map_inspection_maps_project_id_from_argument():
+    """The project_canonical_id argument threads directly onto
+    rex.inspections.project_id (the NOT NULL FK). This is the
+    canonical rex.projects.id — NOT the Procore project_source_id
+    (bigint-as-string). The orchestrator resolves the canonical id via
+    rex.connector_mappings before calling the mapper."""
+    m = map_inspection(_inspection_payload(), PROJECT_CANONICAL_ID)
+    assert m["project_id"] == PROJECT_CANONICAL_ID
+
+
+def test_map_inspection_does_not_emit_source_id():
+    """source_id is NOT a rex.inspections column. Orchestrator reads
+    the procore id directly from the raw payload (item["id"]) for the
+    source_links writer — same convention as map_change_event /
+    map_daily_log / map_submittal."""
+    m = map_inspection(_inspection_payload(), PROJECT_CANONICAL_ID)
+    assert "source_id" not in m
+
+
+def test_map_inspection_maps_inspection_number():
+    """Procore's ``inspection_number`` is the user-visible inspection
+    identifier. It maps directly to rex.inspections.inspection_number —
+    the natural key (with project_id) for the writer's ON CONFLICT
+    upsert that migration 034 backs with a UNIQUE constraint."""
+    m = map_inspection(_inspection_payload(), PROJECT_CANONICAL_ID)
+    assert m["inspection_number"] == "INS-042"
+
+
+def test_map_inspection_missing_number_falls_back_to_id():
+    """If Procore's response omits ``inspection_number``, fall back to
+    the stringified Procore id so the (project_id, inspection_number)
+    upsert key stays deterministic. UNIQUE indexes treat NULLs as
+    distinct, so a NULL inspection_number would defeat idempotency."""
+    raw = _inspection_payload()
+    raw["inspection_number"] = None
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["inspection_number"] == "5001"
+
+
+def test_map_inspection_normalizes_type_with_inspection_suffix():
+    """Procore often returns inspection_type strings with a trailing
+    " Inspection" suffix (e.g. "Safety Inspection", "Quality
+    Inspection"). rex CHECK enum is lowercase-underscore without the
+    suffix. The mapper strips it."""
+    raw = _inspection_payload()
+    raw["inspection_type"] = "Safety Inspection"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["inspection_type"] == "safety"
+
+
+def test_map_inspection_normalizes_type_lowercase_passthrough():
+    """Already-canonical lowercase values pass through unchanged."""
+    raw = _inspection_payload()
+    raw["inspection_type"] = "municipal"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["inspection_type"] == "municipal"
+
+
+def test_map_inspection_unknown_type_falls_back_to_other():
+    """rex.inspections.inspection_type is NOT NULL CHECK IN
+    (municipal|quality|safety|pre_concrete|framing|mep_rough|
+    mep_final|other). Unknown/missing Procore values fall back to
+    'other' (the catch-all) rather than crashing the sync."""
+    raw = _inspection_payload()
+    raw["inspection_type"] = "Weird Unknown Thing"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["inspection_type"] == "other"
+
+
+def test_map_inspection_normalizes_status_title_case():
+    """Procore returns title-cased status strings (``Scheduled``,
+    ``In Progress``). rex CHECK enum is lowercase-underscore
+    (``scheduled``, ``in_progress``, ``passed``, ``failed``,
+    ``partial``, ``cancelled``)."""
+    raw = _inspection_payload()
+    raw["status"] = "In Progress"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "in_progress"
+
+
+def test_map_inspection_missing_status_defaults_to_scheduled():
+    """rex.inspections.status is NOT NULL DEFAULT 'scheduled'. The
+    mapper always emits a concrete value (defaults don't fire on
+    explicit inclusion), so None / empty / unknown falls back to
+    'scheduled'."""
+    raw = _inspection_payload()
+    raw["status"] = None
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "scheduled"
+
+
+def test_map_inspection_canceled_us_spelling_normalizes_to_cancelled():
+    """Procore may use US-spelling ``Canceled``; rex CHECK enum uses
+    the British ``cancelled``. Both map to the same canonical value."""
+    raw = _inspection_payload()
+    raw["status"] = "Canceled"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["status"] == "cancelled"
+
+
+def test_map_inspection_parses_scheduled_date_iso_string():
+    """scheduled_date is NOT NULL on rex.inspections. The mapper parses
+    an ISO date string into a Python date so asyncpg binds it natively
+    to the date column."""
+    from datetime import date
+    raw = _inspection_payload()
+    raw["scheduled_date"] = "2026-05-01"
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["scheduled_date"] == date(2026, 5, 1)
+
+
+def test_map_inspection_parses_completed_date_none_passthrough():
+    """completed_date is nullable on rex.inspections. None passes
+    through unchanged."""
+    raw = _inspection_payload()
+    raw["completed_date"] = None
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["completed_date"] is None
+
+
+def test_map_inspection_missing_scheduled_date_falls_back_to_today():
+    """rex.inspections.scheduled_date is NOT NULL. Be defensive: if
+    Procore's payload omits it, fall back to today's date rather than
+    crashing the INSERT. Admin can re-classify post-sync."""
+    from datetime import date
+    raw = _inspection_payload()
+    raw["scheduled_date"] = None
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["scheduled_date"] == date.today()
+
+
+def test_map_inspection_title_falls_back_when_missing():
+    """rex.inspections.title is NOT NULL. Procore is expected to always
+    carry a name/title in practice, but be defensive: fall back to a
+    placeholder rather than crashing the sync with a NULL violation."""
+    raw = _inspection_payload()
+    raw["title"] = None
+    m = map_inspection(raw, PROJECT_CANONICAL_ID)
+    assert m["title"] == "(untitled inspection)"
+
+
+def test_map_inspection_fks_are_none():
+    """inspecting_company_id / responsible_person_id / activity_id /
+    created_by are uuid FKs the mapper leaves as None pending follow-up
+    enrichment passes. There is no resolver for these on the Procore
+    inspections response today."""
+    m = map_inspection(_inspection_payload(), PROJECT_CANONICAL_ID)
+    assert m["inspecting_company_id"] is None
+    assert m["responsible_person_id"] is None
+    assert m["activity_id"] is None
+    assert m["created_by"] is None
+
+
+def test_map_inspection_emits_only_expected_keys():
+    """Every key the mapper emits is a real rex.inspections column.
+    No sidecars — inspections has a direct (project_id, inspection_number)
+    natural key and doesn't need a parent-bootstrap like
+    schedule_activities does for rex.schedules.
+
+    Excluded:
+    - id, created_at, updated_at (DB-managed)
+    - source_id (orchestrator reads it from the raw payload directly)
+    """
+    m = map_inspection(_inspection_payload(), PROJECT_CANONICAL_ID)
+    expected = {
+        "project_id",
+        "inspection_number",
+        "title",
+        "inspection_type",
+        "status",
+        "scheduled_date",
+        "completed_date",
+        "inspector_name",
+        "location",
+        "comments",
+        "inspecting_company_id",
+        "responsible_person_id",
+        "activity_id",
+        "created_by",
+    }
+    assert set(m.keys()) == expected, (
+        f"inspection mapper keys differ from expected set.\n"
         f"  missing: {expected - set(m.keys())}\n"
         f"  extra:   {set(m.keys()) - expected}"
     )

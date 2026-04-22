@@ -134,6 +134,13 @@ MIGRATION_ORDER: list[str] = [
     #       ``create_change_event`` LLM tool, which uses the same natural
     #       key for ON CONFLICT DO UPDATE.
     "033_rex_change_events_project_number_unique.sql",
+    # 034 = unique (project_id, inspection_number) on rex.inspections so
+    #       the inspections resource orchestrator's ON CONFLICT upsert has
+    #       a matching constraint (Task 7 of Phase 4 Wave 2 — the fifth
+    #       and final end-to-end resource). The canonical DDL does not
+    #       declare this natural-key UNIQUE, so a supplementary migration
+    #       is required.
+    "034_rex_inspections_project_number_unique.sql",
 ]
 
 # ── Optional demo data (Phase 41) ─────────────────────────────────────────

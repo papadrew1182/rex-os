@@ -409,9 +409,76 @@ def build_change_event_payload(
     }
 
 
+def build_inspection_payload(
+    project_external_id: str, raw: dict[str, Any]
+) -> dict[str, Any]:
+    """Procore API inspection row -> staging payload.
+
+    Consumes a dict returned directly by Procore's REST API via
+    ``ProcoreClient.list_inspections`` (the
+    ``/rest/v1.0/projects/{id}/inspection_lists`` endpoint). Mirrors
+    ``build_change_event_payload`` / ``build_schedule_activity_payload`` —
+    the project scope comes from the adapter's ``project_external_id``
+    argument rather than the row itself, because Procore's endpoint
+    already scopes by path.
+
+    Shape is deliberately parallel to the other Wave 2 direct-Procore
+    builders: ``id`` and ``project_source_id`` are top-level string keys
+    (what staging's ``upsert_raw`` reads), ``updated_at`` is the
+    ISO-stringified watermark. Every other payload key mirrors the
+    Procore API field name so ``mapper.map_inspection`` can read them
+    via ``raw.get(...)`` without translation.
+
+    Procore's inspection_lists endpoint carries at least:
+      * ``id``                — inspection id (canonical natural key
+        flows through ``inspection_number`` below).
+      * ``inspection_number`` — user-visible inspection number (mapped
+        to rex.inspections.inspection_number — the natural key with
+        project_id for ON CONFLICT upserts).
+      * ``name`` / ``title``  — NOT NULL on the canonical side
+        (rex.inspections.title). Procore APIs variously expose this
+        as ``name`` or ``title`` depending on the endpoint flavor.
+      * ``inspection_type``   — type classifier; the mapper normalizes
+        to rex's CHECK enum (municipal|quality|safety|pre_concrete|
+        framing|mep_rough|mep_final|other).
+      * ``status``            — Procore status string (Scheduled,
+        In Progress, Passed, Failed, Partial, Cancelled); the mapper
+        normalizes to rex's CHECK enum.
+      * ``scheduled_date``    — NOT NULL on the canonical side.
+      * ``completed_date``    — nullable date.
+      * ``inspector_name``    — free-text name (NOT resolved to a
+        people FK today; the mapper passes through).
+      * ``location``          — free-text location.
+      * ``comments``          — free-text comments.
+      * ``updated_at``        — watermark for cursor advancement.
+
+    FKs (inspecting_company_id, responsible_person_id, activity_id,
+    created_by) are NOT carried on the Procore inspections row in a form
+    that resolves to canonical rex UUIDs; the mapper emits None for them.
+    A follow-up enrichment pass can populate them by joining on other
+    sync_service state.
+    """
+    return {
+        "id":                 str(raw["id"]),
+        "project_source_id":  str(project_external_id),
+        "inspection_number":  raw.get("inspection_number") or raw.get("number"),
+        "title":              raw.get("title") or raw.get("name"),
+        "inspection_type":    raw.get("inspection_type") or raw.get("type"),
+        "status":             raw.get("status"),
+        "scheduled_date":     _iso(raw.get("scheduled_date") or raw.get("start_date")),
+        "completed_date":     _iso(raw.get("completed_date") or raw.get("end_date")),
+        "inspector_name":     raw.get("inspector_name") or raw.get("inspector"),
+        "location":           raw.get("location"),
+        "comments":           raw.get("comments") or raw.get("description"),
+        "created_at":         _iso(raw.get("created_at")),
+        "updated_at":         _iso(raw.get("updated_at")),
+    }
+
+
 __all__ = [
     "build_change_event_payload",
     "build_daily_log_payload",
+    "build_inspection_payload",
     "build_rfi_payload",
     "build_project_payload",
     "build_schedule_activity_payload",
