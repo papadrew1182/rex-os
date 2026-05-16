@@ -1,0 +1,3 @@
+rex_tables=112
+rex_views=25
+rex_user_accounts=4
