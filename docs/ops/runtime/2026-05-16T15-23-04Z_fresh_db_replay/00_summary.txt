@@ -1,0 +1,4 @@
+fresh_db_replay: PASS
+timestamp_utc: 2026-05-16T15:23:14Z
+database_url: postgresql://rex:rex@127.0.0.1:5432/rex_os_fresh
+artifact_dir: /home/deploy/rex-os/docs/ops/runtime/2026-05-16T15-23-04Z_fresh_db_replay
