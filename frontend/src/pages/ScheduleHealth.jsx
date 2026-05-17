@@ -96,15 +96,16 @@ function exportCriticalCsv(activities, project) {
   downloadCsv(`critical-path-${project?.project_number || "project"}-${new Date().toISOString().slice(0, 10)}.csv`, rows, headers);
 }
 
+function weekKey(dateStr) {
+  const d = new Date(dateStr + "T00:00:00");
+  const day = d.getDay();
+  const monday = new Date(d.getTime() - ((day + 6) % 7) * 86400000);
+  return monday.toISOString().slice(0, 10);
+}
+
 function renderPrintTable(activities, tab) {
   if (tab === "lookahead") {
     // Group by week
-    function weekKey(dateStr) {
-      const d = new Date(dateStr + "T00:00:00");
-      const day = d.getDay();
-      const monday = new Date(d.getTime() - ((day + 6) % 7) * 86400000);
-      return monday.toISOString().slice(0, 10);
-    }
     const grouped = {};
     activities.forEach(a => {
       const k = weekKey(a.start_date);
