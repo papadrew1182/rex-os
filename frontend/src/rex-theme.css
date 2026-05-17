@@ -84,6 +84,24 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
   font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px;
   color: rgba(255,255,255,0.35); padding: 16px 20px 6px;
 }
+.rex-sidebar-group-btn {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  text-align: left;
+}
+.rex-chevron {
+  font-size: 12px;
+  line-height: 1;
+  transition: transform 0.15s ease;
+}
+.rex-chevron.collapsed {
+  transform: rotate(-90deg);
+}
 .rex-sidebar-item {
   padding: 9px 20px; font-size: 13px; font-weight: 500; color: var(--rex-sidebar-muted);
   cursor: pointer; display: flex; align-items: center; gap: 8px;
@@ -126,6 +144,30 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
      contained, causing phantom horizontal page scroll on iOS Safari. */
   overflow-x: hidden;
   min-width: 0;
+}
+.rex-content-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.rex-page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.rex-role-chip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid var(--rex-accent-border);
+  background: var(--rex-accent-lighter);
+  color: var(--rex-accent-dark);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 /* ── Cards ── */
@@ -1274,5 +1316,112 @@ select.rex-input { padding-right: 24px; }
 @media (max-width: 1200px) {
   .rex-assistant-rail {
     display: none;
+  }
+}
+
+.rex-ai-fab {
+  position: fixed;
+  right: 24px;
+  bottom: 24px;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: var(--rex-accent);
+  color: #fff;
+  font-weight: 800;
+  box-shadow: var(--rex-shadow-md);
+  z-index: 30;
+  cursor: pointer;
+}
+.rex-ai-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.35);
+  z-index: 31;
+}
+.rex-ai-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: min(420px, 100vw);
+  height: 100vh;
+  background: var(--rex-bg-card);
+  border-left: 1px solid var(--rex-border);
+  padding: 18px;
+  z-index: 32;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.rex-ai-panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.rex-ai-action-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.rex-ai-action-pill {
+  border: 1px solid var(--rex-accent-border);
+  background: var(--rex-accent-lighter);
+  color: var(--rex-accent);
+  border-radius: 14px;
+  padding: 4px 10px;
+  font-size: 11px;
+  cursor: pointer;
+}
+.rex-ai-input {
+  width: 100%;
+  resize: vertical;
+}
+.rex-ai-stream {
+  border: 1px solid var(--rex-border);
+  border-radius: 8px;
+  background: var(--rex-bg-stripe);
+  padding: 10px;
+  min-height: 160px;
+  white-space: pre-wrap;
+  font-size: 12px;
+  overflow: auto;
+}
+.rex-mobile-nav {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .rex-content {
+    padding: 14px 12px 76px;
+  }
+  .rex-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .rex-ai-fab {
+    display: none;
+  }
+  .rex-mobile-nav {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 56px;
+    background: var(--rex-bg-card);
+    border-top: 1px solid var(--rex-border);
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    z-index: 33;
+  }
+  .rex-mobile-nav-btn {
+    border: 0;
+    background: transparent;
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--rex-text-muted);
+  }
+  .rex-mobile-nav-btn.active {
+    color: var(--rex-accent);
   }
 }

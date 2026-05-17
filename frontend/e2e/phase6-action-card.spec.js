@@ -19,8 +19,8 @@ import { test, expect } from "@playwright/test";
 test.skip("create_task auto-commits inline and can be undone within 60s", async ({ page }) => {
   // 1. Log in
   await page.goto("/login");
-  await page.getByLabel(/email/i).fill("aroberts@exxircapital.com");
-  await page.getByLabel(/password/i).fill("rex2026!");
+  await page.getByPlaceholder("aroberts@exxircapital.com").fill("aroberts@exxircapital.com");
+  await page.getByPlaceholder("rex2026!").fill("rex2026!");
   await page.getByRole("button", { name: /sign in|log in/i }).click();
 
   // 2. Navigate to the assistant sidebar
