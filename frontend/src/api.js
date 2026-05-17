@@ -5,7 +5,22 @@ const TOKEN_KEY = "rex_token";
 //   - In prod (Vercel): set VITE_API_URL to the Railway backend URL,
 //     e.g. https://rex-os-backend.up.railway.app
 // Trailing slash stripped so we always join cleanly.
-export const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+const ENV_API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+
+function inferApiBaseFromHost() {
+  if (typeof window === "undefined") return "";
+  const host = window.location.hostname;
+  // Production hotfix: custom domain serves frontend only; backend lives on Railway.
+  if (host === "rex.papadrew.com" || host === "rex-os.vercel.app") {
+    return "https://rex-os-api-production.up.railway.app";
+  }
+  if (host === "rex-os-demo.vercel.app") {
+    return "https://rex-os-demo.up.railway.app";
+  }
+  return "";
+}
+
+export const API_BASE = ENV_API_BASE || inferApiBaseFromHost();
 
 export function apiUrl(path) {
   // path may start with "/api/..." or just "/..." — both work
