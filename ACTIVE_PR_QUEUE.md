@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 22:25:42Z
+Last Updated (UTC): 2026-05-17 22:42:31Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -32,8 +32,11 @@ Last Updated (UTC): 2026-05-17 22:25:42Z
       - Executed queued ScheduleHealth lint task from prior run: hoisted `weekKey` out of `renderPrintTable()` in `frontend/src/pages/ScheduleHealth.jsx` to clear `no-inner-declarations` at line 102.
       - Verification: `npx eslint src/pages/ScheduleHealth.jsx` no longer reports `no-inner-declarations`; file now reports remaining pre-existing lint backlog (`no-unused-vars` for `idSet`/`SORT_KEYS`, `no-empty` at line ~901, and one hooks warning).
       - Full lint regression after patch: `npm run lint` still FAIL due to repo backlog, improved to **34 findings** (25 errors, 9 warnings) from 35 findings (26 errors, 9 warnings).
+      - Executed queued `ScheduleHealth` no-empty remediation: replaced empty `catch {}` in `LookaheadView` constraints fetch with explicit warn-path catch in `frontend/src/pages/ScheduleHealth.jsx`.
+      - Verification: `npx eslint src/pages/ScheduleHealth.jsx` no longer reports `no-empty`; file now has only pre-existing `no-unused-vars` (`idSet`, `SORT_KEYS`) plus one hooks warning.
+      - Full validation sweep: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend build PASS, and full frontend lint still FAIL on backlog but improved to **33 findings** (24 errors, 9 warnings) from 34 findings.
 
 ## Next (Queued)
 1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)
-   - Immediate next executable: resolve `no-empty` in `frontend/src/pages/ScheduleHealth.jsx` (around line 901), then rerun `npx eslint src/pages/ScheduleHealth.jsx` and `npm run lint`.
+   - Immediate next executable: remove unused `idSet` and `SORT_KEYS` in `frontend/src/pages/ScheduleHealth.jsx`, then rerun `npx eslint src/pages/ScheduleHealth.jsx` and `npm run lint`.
 2. Phase E production-readiness progression review and continuity update

@@ -898,7 +898,9 @@ function LookaheadView({ filteredActivities, openDetail }) {
       try {
         const cs = await api(`/schedule-constraints?activity_id=${id}&limit=20`);
         cMap[id] = (cs || []).filter(c => c.status === "active");
-      } catch {}
+      } catch (error) {
+        console.warn("[ScheduleHealth] failed to load constraints", { activityId: id, error });
+      }
     })).then(() => setConstraints({ ...cMap }));
   }, [lookaheadActivities.length, lookaheadActivities.map(a => a.id).join(",")]); // eslint-disable-line react-hooks/exhaustive-deps
 
