@@ -1,9 +1,9 @@
 # ROLLBACK_REGISTRY
 
-Last Updated (UTC): 2026-05-17 19:59:15Z
+Last Updated (UTC): 2026-05-17 20:17:59Z
 
 ## Current Session (Phase C Validation Sweep)
-- Change class: validation execution + documentation/state artifacts
+- Change class: lint-baseline hardening + e2e lint blocker fix + validation execution + documentation/state artifacts
 - Runtime impact: local validation only
 - Schema impact: none
 - Rollback required: no

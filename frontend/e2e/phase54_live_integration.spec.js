@@ -106,7 +106,6 @@ async function installMocks(page, { catalogFixture }) {
   await page.route("**/api/**", async (route, request) => {
     const url = new URL(request.url());
     const path = url.pathname.replace(/^\/api/, "");
-    const method = request.method();
 
     // Legacy auth — shell gate
     if (path === "/auth/me") return json(route, ADMIN_USER);
