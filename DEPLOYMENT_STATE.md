@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-17 19:32:30Z
+Last Updated (UTC): 2026-05-17 19:54:38Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `main`
-- Local HEAD: `b08f5ef42b0a6ac8dc9f0d9459c2e3029bb3a54f`
+- Local HEAD: `505914732984e0e05aa1ef0d0df664c1435366a5`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -15,8 +15,8 @@ Last Updated (UTC): 2026-05-17 19:32:30Z
 ## Phase C Validation Snapshot (local)
 - AI/action queue/compensator pytest subset: PASS (15 passed, 2 skipped)
 - Frontend production build: PASS (`npm run build`)
-- Frontend SSE unit-test command: BLOCKED (`npm test` script not present in frontend package scripts)
-- CI queue state: latest `CI` run for `main` currently in progress for merge commit `b08f5ef`
+- Frontend SSE unit-test command: PASS (`npm run test:unit:sse` => 10 passed, 0 failed)
+- CI queue state: not re-polled this run; local validation green for touched scope
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
