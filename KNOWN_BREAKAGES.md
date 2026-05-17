@@ -1,14 +1,23 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-16 15:23:49Z
+Last Updated (UTC): 2026-05-17 16:51:03Z
 
 ## Open Breakages / Environment Gaps
-1. Railway project context is not linked in repo working copy.
+1. Railway project context is not linked in this working copy.
    - Evidence: `railway status` => "No linked project found".
-   - Impact: implicit-context Railway commands are unsafe/ambiguous.
-   - Mitigation: explicit selectors or controlled `railway link` step.
+   - Impact: implicit-context Railway deploy commands remain unsafe.
+   - Mitigation: use explicit selectors or controlled `railway link`.
+
+2. Vercel CLI unavailable in execution environment.
+   - Evidence: `vercel: command not found`.
+   - Impact: cannot directly verify Vercel runtime/parity from this host via CLI.
+   - Mitigation: use GitHub/Vercel web integrations or install CLI in a controlled step.
+
+3. Playwright phase6 action-card e2e is still environment-gated.
+   - Evidence: local run requires live backend + assistant path and currently times out on assistant composer selection.
+   - Current state: test remains `test.skip` to avoid false-negative CI breakage.
+   - Mitigation: wire deterministic assistant test fixture/mocks before unskip.
 
 ## Resolved in this phase
-- Local DB survivability gap for baseline validation is resolved via a deterministic local Postgres replay harness:
-  - `backend/scripts/fresh_db_replay.sh`
-  - Artifacts: `/home/deploy/rex-os/docs/ops/runtime/2026-05-16T15-23-04Z_fresh_db_replay`
+- Fresh-db replay gate re-verified PASS with survivability subsets.
+- Dashboard demo seed file created and idempotency validated locally.

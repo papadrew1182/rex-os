@@ -1,22 +1,22 @@
 # CURRENT_PHASE
 
-Last Updated (UTC): 2026-05-16 15:23:49Z
+Last Updated (UTC): 2026-05-17 16:51:03Z
 Project: rex-os (Rex 2.0)
 Execution Mode: HIGH AUTONOMY (with protected-operation stop gates)
 
 ## Active Phase
-- Session 2 Gate — Fresh-DB Replay Validation (local-only)
+- Phase B execution lane — UI Overhaul + dashboard seed integration (local validation complete)
 
 ## Scope Guardrails
-- Allowed: local DB replay harness, runtime survivability checks, docs/handoffs, PR prep.
+- Allowed: frontend/ui implementation, demo-seed SQL, local replay/survivability checks, docs/handoffs, PR prep.
 - Disallowed in this phase: production writes, irreversible prod migrations, prod credential/security posture changes.
 
 ## Current Git State
-- Branch: `chore/session-1b-baseline-reconciliation-2026-05-16`
-- HEAD: `0f20f7878f1c0df00b8d4885a1ee60710e674ad2`
+- Branch: `feat/ui-overhaul-dashboard`
+- Base: `origin/main @ c775f95`
 
 ## Exit Criteria for This Phase
-1. Deterministic fresh-db replay harness committed.
-2. Replay artifacts captured under `docs/ops/runtime/`.
-3. Runtime survivability checks pass on fresh DB.
-4. Ops/state docs and handoff updated.
+1. UI overhaul artifacts implemented (`Dashboard.jsx`, `AiPanel.jsx`, `App.jsx`, `rex-theme.css`).
+2. Frontend production build passes.
+3. Demo dashboard seed file created and idempotency validated locally.
+4. Continuity docs updated for phase transition and known blockers.
