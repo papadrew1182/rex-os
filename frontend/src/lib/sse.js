@@ -73,7 +73,6 @@ export function openAssistantStream(payload, handlers = {}) {
       if (closed) return;
       if (!isKnownSseEvent(event) && !unknownSeen.has(event)) {
         unknownSeen.add(event);
-        // eslint-disable-next-line no-console
         console.warn(`[integration] unknown SSE event '${event}' — reducer will skip`);
       }
       try { handlers.onEvent?.(event, data); } catch { /* host errors are not stream errors */ }

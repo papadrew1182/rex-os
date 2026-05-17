@@ -139,7 +139,6 @@ async function liveOrMock({
         error: `contract probe failed: ${probeResult.issues.join("; ")}`,
         probeIssues: probeResult.issues,
       });
-      // eslint-disable-next-line no-console
       console.warn(
         `[integration] ${surface} live response failed contract probe:`,
         probeResult.issues,
@@ -153,7 +152,6 @@ async function liveOrMock({
     return result;
   } catch (err) {
     markUnavailable(surface, { error: err });
-    // eslint-disable-next-line no-console
     console.warn(`[integration] ${surface} live fetch failed:`, err?.message || err);
     return mockPath();
   }

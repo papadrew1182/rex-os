@@ -37,7 +37,6 @@ export default class ErrorBoundary extends Component {
       /* never let telemetry break the shell */
     }
     // Always log — even without Sentry, devtools should see it.
-    // eslint-disable-next-line no-console
     console.error("[RouteErrorBoundary]", error, errorInfo);
   }
 

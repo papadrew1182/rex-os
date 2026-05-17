@@ -35,8 +35,7 @@ export function initSentry() {
     initialized = true;
   } catch (e) {
     // Sentry init should never break the app shell.
-    // eslint-disable-next-line no-console
-    console.warn("Sentry init failed:", e?.message || e);
+    console.warn("Sentry init failed", e);
   }
 }
 

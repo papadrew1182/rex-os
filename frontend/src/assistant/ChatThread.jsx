@@ -87,7 +87,6 @@ export default function ChatThread() {
     } catch (e) {
       markBusy(action.action_id, false);
       // Non-fatal — just surface via console; no UI change.
-      // eslint-disable-next-line no-console
       console.error("discard failed", e);
     }
   };
