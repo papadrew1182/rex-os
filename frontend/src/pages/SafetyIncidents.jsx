@@ -122,7 +122,8 @@ export default function SafetyIncidents() {
       if (drawerMode === "create") {
         await api("/safety-incidents/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/safety-incidents/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

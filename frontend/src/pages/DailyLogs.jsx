@@ -149,7 +149,8 @@ export default function DailyLogs() {
       if (drawerMode === "create") {
         await api("/daily-logs/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/daily-logs/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);
@@ -186,7 +187,8 @@ export default function DailyLogs() {
       if (childMode === "create") {
         await api("/manpower-entries/", { method: "POST", body: payload });
       } else {
-        const { daily_log_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.daily_log_id;
         await api(`/manpower-entries/${childEditing.id}`, { method: "PATCH", body: updateOnly });
       }
       setChildDrawerOpen(false);

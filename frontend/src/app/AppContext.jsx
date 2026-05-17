@@ -45,7 +45,7 @@ export const AppContext = createContext({
   // assistant data loaders
   loadCatalog: () => {},
   loadConversations: () => {},
-  loadConversation: (id) => {},
+  loadConversation: () => {},
 });
 
 export function AppProvider({ children }) {

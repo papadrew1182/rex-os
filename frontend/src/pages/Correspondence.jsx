@@ -117,7 +117,8 @@ export default function Correspondence() {
       if (drawerMode === "create") {
         await api("/correspondence/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/correspondence/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

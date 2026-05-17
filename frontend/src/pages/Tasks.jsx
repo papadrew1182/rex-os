@@ -121,7 +121,8 @@ export default function Tasks() {
       if (drawerMode === "create") {
         await api("/tasks/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/tasks/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);
