@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 21:49:00Z
+Last Updated (UTC): 2026-05-17 22:07:41Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -26,8 +26,11 @@ Last Updated (UTC): 2026-05-17 21:49:00Z
       - `npm run lint` now 41 errors / 10 warnings (down from 47 / 10); remaining failures are pre-existing lint backlog items.
       - Cleared stale `eslint-disable-line react-hooks/exhaustive-deps` from `frontend/src/pages/ScheduleHealth.jsx:1135` (no rule violation existed).
       - Re-ran architecture/static checks: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend build PASS, frontend lint remains FAIL but improved to 42 findings (33 errors, 9 warnings) from 43 findings.
+      - Phase D lint-hardening slice complete for notification surfaces: replaced empty catch blocks with explicit warn-path catches in `frontend/src/notifications.jsx` and `frontend/src/pages/Notifications.jsx`.
+      - Verification: `npx eslint src/notifications.jsx src/pages/Notifications.jsx` PASS.
+      - Full lint regression after patch: `npm run lint` still FAIL on pre-existing backlog, but improved from 42 findings (33 errors, 9 warnings) to 35 findings (26 errors, 9 warnings).
 
 ## Next (Queued)
 1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)
-   - Immediate next executable: remove `no-empty` lint violations in `frontend/src/notifications.jsx` and `frontend/src/pages/Notifications.jsx`, then rerun `npm run lint`.
+   - Immediate next executable: resolve `no-inner-declarations` in `frontend/src/pages/ScheduleHealth.jsx:102`, then rerun `npm run lint`.
 2. Phase E production-readiness progression review and continuity update

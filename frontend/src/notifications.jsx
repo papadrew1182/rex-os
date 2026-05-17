@@ -29,7 +29,9 @@ export function NotificationProvider({ children }) {
     try {
       const r = await api("/notifications/unread-count");
       setUnreadCount(r.unread_count || 0);
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to refresh notification unread count", error);
+    }
   }, [user]);
 
   useEffect(() => {
@@ -168,7 +170,9 @@ function NotificationDrawer({ onClose }) {
       await api(`/notifications/${id}/read`, { method: "PATCH" });
       setItems((prev) => prev.map((n) => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn(`Failed to mark notification ${id} as read`, error);
+    }
   }
 
   async function handleDismiss(id) {
@@ -176,7 +180,9 @@ function NotificationDrawer({ onClose }) {
       await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
       setItems((prev) => prev.filter((n) => n.id !== id));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn(`Failed to dismiss notification ${id}`, error);
+    }
   }
 
   async function handleReadAll() {
@@ -184,7 +190,9 @@ function NotificationDrawer({ onClose }) {
       await api(`/notifications/read-all`, { method: "PATCH" });
       setItems((prev) => prev.map((n) => ({ ...n, read_at: n.read_at || new Date().toISOString() })));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to mark all notifications as read", error);
+    }
   }
 
   return (

@@ -49,21 +49,27 @@ export default function Notifications() {
       await api(`/notifications/${id}/read`, { method: "PATCH" });
       setItems((prev) => prev.map((n) => n.id === id ? { ...n, read_at: new Date().toISOString() } : n));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn(`Failed to mark notification ${id} as read`, error);
+    }
   }
   async function handleDismiss(id) {
     try {
       await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
       setItems((prev) => prev.filter((n) => n.id !== id));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn(`Failed to dismiss notification ${id}`, error);
+    }
   }
   async function handleReadAll() {
     try {
       await api(`/notifications/read-all`, { method: "PATCH" });
       refresh();
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn("Failed to mark all notifications as read", error);
+    }
   }
 
   if (error) return <Flash type="error" message={error} />;
