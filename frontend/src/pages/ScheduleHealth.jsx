@@ -218,7 +218,6 @@ function buildTree(activities, criticalOnly) {
     if (!byParent[p]) byParent[p] = [];
     byParent[p].push(a);
   });
-  const idSet = new Set(filtered.map(a => a.id));
   const result = [];
   function walk(parentId, depth) {
     const kids = (byParent[parentId === null ? "root" : parentId] || [])
@@ -765,8 +764,6 @@ function HealthView({ data }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Activities View
 // ─────────────────────────────────────────────────────────────────────────────
-
-const SORT_KEYS = ["name", "wbs_code", "start_date", "end_date", "variance_days", "float_days", "percent_complete"];
 
 function ActivitiesView({ filteredActivities, openDetail }) {
   const [sortKey, setSortKey] = useState("start_date");
