@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
-import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { StatCard, Card, Row, PageLoader, Flash } from "../ui";
 
 const fmt = (n) => n == null ? "—" : "$" + Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 

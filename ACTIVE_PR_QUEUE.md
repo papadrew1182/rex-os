@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 22:42:31Z
+Last Updated (UTC): 2026-05-17 23:19:26Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -35,6 +35,8 @@ Last Updated (UTC): 2026-05-17 22:42:31Z
       - Executed queued `ScheduleHealth` no-empty remediation: replaced empty `catch {}` in `LookaheadView` constraints fetch with explicit warn-path catch in `frontend/src/pages/ScheduleHealth.jsx`.
       - Verification: `npx eslint src/pages/ScheduleHealth.jsx` no longer reports `no-empty`; file now has only pre-existing `no-unused-vars` (`idSet`, `SORT_KEYS`) plus one hooks warning.
       - Full validation sweep: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend build PASS, and full frontend lint still FAIL on backlog but improved to **33 findings** (24 errors, 9 warnings) from 34 findings.
+      - Executed highest-priority lint burn-down slice this run (user-visible pages): removed unused `Badge` imports in `BudgetOverview.jsx`, `Drawings.jsx`, `Photos.jsx`, and `Specifications.jsx`; removed unused `TextArea` import in `SubmittalManagement.jsx`.
+      - Verification: `npm run lint` remains FAIL on backlog but improved to **26 findings** (17 errors, 9 warnings) from 31 findings (22 errors, 9 warnings) at run start.
 
 ## Next (Queued)
 1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)

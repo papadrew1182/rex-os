@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { api } from "../api";
 import { useProject } from "../project";
-import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
+import { StatCard, Card, Row, PageLoader, Flash } from "../ui";
 import {
   FormDrawer, useFormState, Field, NumberField, DateField, TextArea, Select, Checkbox,
   WriteButton, cleanPayload,

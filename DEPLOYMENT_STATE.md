@@ -1,6 +1,6 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-17 22:42:31Z
+Last Updated (UTC): 2026-05-17 23:19:26Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
@@ -16,8 +16,8 @@ Last Updated (UTC): 2026-05-17 22:42:31Z
 - AI/action queue/compensator pytest subset: PASS (`pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => 15 passed, 2 skipped)
 - Frontend production build: PASS (`npm run build`)
 - Frontend SSE unit-test command: PASS (`npm run test:unit:sse` => 10 passed, 0 failed)
-- Frontend lint hardening pass: PARTIAL PASS (ScheduleHealth `no-empty` catch remediated with explicit warn-path handling)
-- Frontend lint command: FAIL (`npm run lint`; backlog now **33 findings**: 24 errors + 9 warnings; backend+SSE+build parity remained green this run)
+- Frontend lint hardening pass: PARTIAL PASS (removed unused imports across user-visible pages: BudgetOverview, Drawings, Photos, Specifications, SubmittalManagement)
+- Frontend lint command: FAIL (`npm run lint`; backlog now **26 findings**: 17 errors + 9 warnings; backend+SSE+build parity remained green this run)
 - CI queue state: not re-polled this run; local validation green for touched scope except known lint backlog
 
 ## Safety Posture

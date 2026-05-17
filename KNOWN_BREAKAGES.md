@@ -1,6 +1,6 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-17 21:30:59Z
+Last Updated (UTC): 2026-05-17 23:19:26Z
 
 ## Open Breakages / Environment Gaps
 1. Railway project context is not linked in this working copy.
@@ -19,10 +19,10 @@ Last Updated (UTC): 2026-05-17 21:30:59Z
    - Mitigation: wire deterministic assistant test fixture/mocks before unskip.
 
 4. Frontend lint parity is not baseline-clean.
-   - Evidence: `npm run lint` still fails on baseline backlog (currently 34 errors + 9 warnings).
+   - Evidence: `npm run lint` still fails on baseline backlog (currently 17 errors + 9 warnings).
    - Impact: lint cannot yet serve as a strict CI gate for this branch without scoping/normalization.
    - Mitigation: add explicit ESLint baseline config and ignore generated artifacts; then burn down violations incrementally by domain.
-   - Progress this run: reduced total findings from 51 → 43 by fixing control-plane + assistant unescaped entities and one unstable hook dependency.
+   - Progress this run: reduced findings from 31 (22 errors + 9 warnings) → 26 (17 errors + 9 warnings) by removing unused imports in user-visible pages.
 
 5. Local DB credentials for Phase C backend validation are currently invalid.
    - Evidence: targeted pytest subset failed with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against localhost:5432.

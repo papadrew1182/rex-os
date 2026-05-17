@@ -4,7 +4,7 @@ import { useProject } from "../project";
 import { Badge, StatCard, Card, Row, PageLoader, Flash } from "../ui";
 import {
   FormDrawer, useFormState,
-  Field, NumberField, DateField, TextArea, Select, Checkbox, WriteButton, cleanPayload,
+  Field, NumberField, DateField, Select, Checkbox, WriteButton, cleanPayload,
 } from "../forms";
 import { usePermissions } from "../permissions";
 import { AlertCallout } from "../AlertCallout";
