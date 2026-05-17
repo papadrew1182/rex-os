@@ -47,7 +47,9 @@ export function AlertCallout({ notificationTypes, title = "Active alerts", empty
       await api(`/notifications/${id}/dismiss`, { method: "PATCH" });
       setItems((prev) => prev.filter((n) => n.id !== id));
       refreshUnread();
-    } catch {}
+    } catch (error) {
+      console.warn("[AlertCallout] dismiss failed", error);
+    }
   }
 
   async function handleOpen(notif) {
@@ -55,7 +57,9 @@ export function AlertCallout({ notificationTypes, title = "Active alerts", empty
       try {
         await api(`/notifications/${notif.id}/read`, { method: "PATCH" });
         refreshUnread();
-      } catch {}
+      } catch (error) {
+        console.warn("[AlertCallout] mark-read failed", error);
+      }
     }
     if (notif.action_path) {
       window.location.hash = notif.action_path.replace(/^\/?#?\/?/, "/");
