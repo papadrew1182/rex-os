@@ -94,7 +94,7 @@ export default function AiPanel({ open, onClose }) {
       const reader = res.body.getReader();
       let buffer = "";
 
-      while (true) {
+      while (!controller.signal.aborted) {
         const { value, done } = await reader.read();
         if (done) break;
 
