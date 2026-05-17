@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 21:12:29Z
+Last Updated (UTC): 2026-05-17 21:49:00Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -24,8 +24,10 @@ Last Updated (UTC): 2026-05-17 21:12:29Z
       - Removed stale `no-console` eslint-disable directives in `frontend/src/ErrorBoundary.jsx`, `frontend/src/assistant/ChatThread.jsx`, `frontend/src/lib/api.js`, `frontend/src/lib/sse.js`, and `frontend/src/sentry.js`.
       - `npx eslint src/ErrorBoundary.jsx src/assistant/ChatThread.jsx src/lib/api.js src/lib/sse.js src/sentry.js` PASS.
       - `npm run lint` now 41 errors / 10 warnings (down from 47 / 10); remaining failures are pre-existing lint backlog items.
+      - Cleared stale `eslint-disable-line react-hooks/exhaustive-deps` from `frontend/src/pages/ScheduleHealth.jsx:1135` (no rule violation existed).
+      - Re-ran architecture/static checks: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend build PASS, frontend lint remains FAIL but improved to 42 findings (33 errors, 9 warnings) from 43 findings.
 
 ## Next (Queued)
 1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)
-   - Immediate next executable: clear the remaining `Unused eslint-disable directive` in `frontend/src/pages/ScheduleHealth.jsx:1135` and continue lint backlog burn-down to restore `npm run lint` pass.
+   - Immediate next executable: remove `no-empty` lint violations in `frontend/src/notifications.jsx` and `frontend/src/pages/Notifications.jsx`, then rerun `npm run lint`.
 2. Phase E production-readiness progression review and continuity update

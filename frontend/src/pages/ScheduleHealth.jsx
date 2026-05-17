@@ -1132,7 +1132,7 @@ export default function ScheduleHealth() {
     if (s.dateFrom) setDateFrom(s.dateFrom);
     if (s.dateTo) setDateTo(s.dateTo);
     if (s.scheduleId) setScheduleId(s.scheduleId);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, []);
 
   // ── Sync filter state → URL ───────────────────────────────────────────────
   useEffect(() => {

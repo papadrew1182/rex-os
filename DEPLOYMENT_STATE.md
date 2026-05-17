@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-17 21:30:59Z
+Last Updated (UTC): 2026-05-17 21:49:00Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `main`
-- Local HEAD: `6e40bf0878734ba8b5de2b343b2998d6015fa5da`
+- Local HEAD: `51dc3619e5ff694ceadfe4021f39a7f8db9a722d`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -17,7 +17,7 @@ Last Updated (UTC): 2026-05-17 21:30:59Z
 - Frontend production build: PASS (`npm run build`)
 - Frontend SSE unit-test command: PASS (`npm run test:unit:sse` => 10 passed, 0 failed)
 - Frontend lint hardening pass: PARTIAL PASS (control-plane + assistant unescaped-entity fixes and dependency stabilization landed)
-- Frontend lint command: FAIL (`npm run lint`; backlog reduced from **51 findings** to **43 findings**: 34 errors + 9 warnings)
+- Frontend lint command: FAIL (`npm run lint`; backlog reduced from **51 findings** to **42 findings**: 33 errors + 9 warnings)
 - CI queue state: not re-polled this run; local validation green for touched scope
 
 ## Safety Posture
