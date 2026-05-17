@@ -1,6 +1,6 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-17 16:51:03Z
+Last Updated (UTC): 2026-05-17 19:32:30Z
 
 ## Open Breakages / Environment Gaps
 1. Railway project context is not linked in this working copy.
@@ -18,6 +18,12 @@ Last Updated (UTC): 2026-05-17 16:51:03Z
    - Current state: test remains `test.skip` to avoid false-negative CI breakage.
    - Mitigation: wire deterministic assistant test fixture/mocks before unskip.
 
+4. Frontend SSE parser unit test is present but not runnable via npm scripts.
+   - Evidence: `npm test -- --run frontend/src/lib/__tests__/sseParser.test.js` returns "Missing script: test".
+   - Impact: SSE parser regression checks are not wired into the frontend validation path.
+   - Mitigation: add a supported frontend unit-test runner script (e.g., Vitest) and bind `frontend/src/lib/__tests__/sseParser.test.js`.
+
 ## Resolved in this phase
 - Fresh-db replay gate re-verified PASS with survivability subsets.
 - Dashboard demo seed file created and idempotency validated locally.
+- Action queue + compensator validation subset re-run PASS (15 passed, 2 skipped).

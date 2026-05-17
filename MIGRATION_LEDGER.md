@@ -1,6 +1,6 @@
 # MIGRATION_LEDGER
 
-Last Updated (UTC): 2026-05-16 15:23:49Z
+Last Updated (UTC): 2026-05-17 19:32:30Z
 
 ## Session 2 Replay Gate (local)
 - No new migrations created.
@@ -14,3 +14,8 @@ Last Updated (UTC): 2026-05-16 15:23:49Z
 
 ## Fresh-DB Replay Rule
 - Remains mandatory before destructive migration planning/execution.
+
+## This Run
+- No new migrations created.
+- No migration files modified.
+- Migration replay not rerun because this run touched no schema/migration artifacts.

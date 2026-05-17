@@ -1,21 +1,21 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 16:51:03Z
+Last Updated (UTC): 2026-05-17 19:32:30Z
 
 ## In Flight
-1. **UI Overhaul + Dashboard Seed (current)**
-   - Branch: `feat/ui-overhaul-dashboard`
-   - Base: `main`
+1. **Phase C validation sweep (current)**
+   - Branch: `main`
+   - Base: `origin/main`
    - Scope:
-     - New role-based dashboard route/page
-     - AI quick actions panel + FAB + mobile nav
-     - Collapsible sidebar groups + content max-width
-     - Demo-only `migrations/seed_dashboard_demo.sql`
-   - Validation completed:
-     - `bash backend/scripts/fresh_db_replay.sh` PASS
+     - Action queue service/repository validation
+     - Undo compensator dispatch validation
+     - SSE parser test-path audit for current frontend toolchain
+     - Connector posture + CI parity recheck
+   - Validation completed this run:
+     - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` PASS (15 passed, 2 skipped)
      - `npm run build` PASS
-     - seed SQL idempotency verified against local replay DB
+     - `npm test -- --run frontend/src/lib/__tests__/sseParser.test.js` blocked (no `test` script in `frontend/package.json`)
 
 ## Next (Queued)
-1. Connector + AI spine stabilization checks (tool/queue/SSE/procore scheduler posture)
-2. Operational hardening pass (stale docs, CI parity edges, duplicate-key audit planning)
+1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)
+2. Phase E production-readiness progression review and continuity update

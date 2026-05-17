@@ -1,12 +1,12 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-17 16:51:03Z
+Last Updated (UTC): 2026-05-17 19:32:30Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
-- Stage: Phase B (UI overhaul implementation lane)
-- Branch: `feat/ui-overhaul-dashboard`
-- Base Head: `origin/main @ c775f95`
+- Stage: Phase C (AI/action queue/SSE/connector validation lane)
+- Branch: `main`
+- Base Head: `origin/main @ b08f5ef`
 
 ## Mandatory Gates
 1. Fresh-db replay validation before schema-risk merges.
@@ -16,10 +16,10 @@ Last Updated (UTC): 2026-05-17 16:51:03Z
 
 ## Current Gate Status
 - Fresh-db replay: PASS (`2026-05-17T16-40-05Z_fresh_db_replay`)
-- Runtime survivability subset: PASS (4 + 11 + 15)
+- Action queue/compensator pytest subset: PASS (15 passed, 2 skipped)
 - Frontend build: PASS
-- Demo seed SQL idempotency: PASS on local replay DB
+- Frontend SSE parser unit test path: BLOCKED (missing frontend `test` script)
 - Production writes: none
 
 ## Next Planned Stop
-- Open PR for UI overhaul lane, then continue into Phase C connector/AI stabilization checks.
+- Execute Phase D hardening audits (migration integrity, duplicate-key integrity, CI parity, stale docs).

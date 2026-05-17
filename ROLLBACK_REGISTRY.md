@@ -1,11 +1,11 @@
 # ROLLBACK_REGISTRY
 
-Last Updated (UTC): 2026-05-16 15:23:14Z
+Last Updated (UTC): 2026-05-17 19:32:30Z
 
-## Current Session (Fresh-DB Replay Gate)
-- Change class: local replay harness + documentation/state artifacts
+## Current Session (Phase C Validation Sweep)
+- Change class: validation execution + documentation/state artifacts
 - Runtime impact: local validation only
-- Schema impact: none in repo (replay applied existing migrations to local DB only)
+- Schema impact: none
 - Rollback required: no
 
 ## Last replay artifact
