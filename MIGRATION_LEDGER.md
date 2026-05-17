@@ -1,17 +1,16 @@
 # MIGRATION_LEDGER
 
-Last Updated (UTC): 2026-05-16 15:12:35Z
+Last Updated (UTC): 2026-05-16 15:23:49Z
 
-## Session 1B Policy
-- No migration creation/modification.
-- No schema changes.
+## Session 2 Replay Gate (local)
+- No new migrations created.
+- No schema files modified.
+- Full migration chain replayed on fresh local DB.
 
-## Observed Migration State
-- `backend/app/migrate.py::MIGRATION_ORDER` includes entries through:
-  - `034_rex_inspections_project_number_unique.sql`
-- Dry-run plan command executed successfully:
-  - `python -m app.migrate --dry-run`
+## Evidence
+- Harness: `backend/scripts/fresh_db_replay.sh`
+- Artifacts: `/home/deploy/rex-os/docs/ops/runtime/2026-05-16T15-23-04Z_fresh_db_replay`
+- Migration replay result: 36 applied, 0 missing, 0 errors.
 
 ## Fresh-DB Replay Rule
-- Mandatory before any destructive migration planning/execution.
-- Must be captured as artifact in future migration-affecting PRs.
+- Remains mandatory before destructive migration planning/execution.
