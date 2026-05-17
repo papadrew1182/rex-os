@@ -25,7 +25,7 @@ export default function AutomationRegistryPanel() {
       .catch((e) => setError(e.message || String(e)));
   }, []);
 
-  if (error) return <div className="rex-alert rex-alert-red">Couldn't load automations: {error}</div>;
+  if (error) return <div className="rex-alert rex-alert-red">Could not load automations: {error}</div>;
   if (!items) return <p className="rex-muted">Loading automation registry…</p>;
   if (items.length === 0) {
     return (

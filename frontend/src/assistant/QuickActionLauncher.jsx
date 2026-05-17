@@ -65,7 +65,10 @@ export default function QuickActionLauncher() {
   }, [catalog, me?.role_keys]);
 
   const categories = catalog?.categories || [];
-  const suggested = currentContext.assistant_defaults?.suggested_action_slugs || [];
+  const suggested = useMemo(
+    () => currentContext.assistant_defaults?.suggested_action_slugs || [],
+    [currentContext.assistant_defaults?.suggested_action_slugs]
+  );
 
   const filteredActions = useMemo(() => {
     if (selectedCategory === "ALL") return visibleActions;
@@ -87,7 +90,7 @@ export default function QuickActionLauncher() {
     return (
       <div className="rex-assistant-catalog rex-assistant-catalog--error">
         <p className="rex-muted" style={{ fontSize: 12, color: "var(--rex-red)" }}>
-          Couldn't load the catalog: {catalogError}
+          Could not load the catalog: {catalogError}
         </p>
       </div>
     );
@@ -227,9 +230,9 @@ function ActionCard({ action, expanded, onToggle, onLaunch, currentContext }) {
 }
 
 function describeBlockReason(action) {
-  if (action.readiness_state === "adapter_pending") return "the connector adapter isn't live yet.";
-  if (action.readiness_state === "writeback_pending") return "the writeback path isn't wired yet.";
+  if (action.readiness_state === "adapter_pending") return "the connector adapter is not live yet.";
+  if (action.readiness_state === "writeback_pending") return "the writeback path is not wired yet.";
   if (action.readiness_state === "blocked") return "a dependency is blocking this action.";
-  if (action.readiness_state === "disabled") return "it's disabled in the registry.";
+  if (action.readiness_state === "disabled") return "it is disabled in the registry.";
   return "not runnable for your current context.";
 }

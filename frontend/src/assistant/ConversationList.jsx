@@ -35,7 +35,7 @@ export default function ConversationList() {
     return (
       <div className="rex-assistant-list rex-assistant-list--error">
         <p className="rex-muted" style={{ fontSize: 12, color: "var(--rex-red)" }}>
-          Couldn't load history: {error}
+          Could not load history: {error}
         </p>
       </div>
     );

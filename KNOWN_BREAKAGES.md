@@ -1,6 +1,6 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-17 19:59:15Z
+Last Updated (UTC): 2026-05-17 21:30:59Z
 
 ## Open Breakages / Environment Gaps
 1. Railway project context is not linked in this working copy.
@@ -19,9 +19,15 @@ Last Updated (UTC): 2026-05-17 19:59:15Z
    - Mitigation: wire deterministic assistant test fixture/mocks before unskip.
 
 4. Frontend lint parity is not baseline-clean.
-   - Evidence: `npm run lint` currently fails with hundreds of legacy findings and generated asset noise from `playwright-report/trace/*`.
+   - Evidence: `npm run lint` still fails on baseline backlog (currently 34 errors + 9 warnings).
    - Impact: lint cannot yet serve as a strict CI gate for this branch without scoping/normalization.
    - Mitigation: add explicit ESLint baseline config and ignore generated artifacts; then burn down violations incrementally by domain.
+   - Progress this run: reduced total findings from 51 → 43 by fixing control-plane + assistant unescaped entities and one unstable hook dependency.
+
+5. Local DB credentials for Phase C backend validation are currently invalid.
+   - Evidence: targeted pytest subset failed with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against localhost:5432.
+   - Impact: cannot re-validate action queue/compensator/advisory-lock paths in this environment until DB auth is restored.
+   - Mitigation: set correct `DATABASE_URL`/`REX_DB_*` secrets for local test runner or provision matching local Postgres user/password.
 
 ## Resolved in this phase
 - Fresh-db replay gate re-verified PASS with survivability subsets.

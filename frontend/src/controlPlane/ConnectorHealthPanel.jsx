@@ -43,7 +43,7 @@ export default function ConnectorHealthPanel() {
   if (error) {
     return (
       <div className="rex-alert rex-alert-red">
-        Couldn't load connectors: {error}
+        Could not load connectors: {error}
       </div>
     );
   }
@@ -64,8 +64,8 @@ export default function ConnectorHealthPanel() {
     <>
       <p className="rex-muted" style={{ marginBottom: 12, fontSize: 12 }}>
         Connectors ingest external system data into <code>rex</code> canonical
-        tables. The "dependent actions" column shows which catalog actions
-        require each connector's adapter to be live — a blocked connector
+        tables. The &ldquo;dependent actions&rdquo; column shows which catalog actions
+        require each connector adapter to be live — a blocked connector
         cascades readiness into those actions.
       </p>
       <div className="rex-table-wrap">
