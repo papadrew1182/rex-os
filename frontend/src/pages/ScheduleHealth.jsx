@@ -582,7 +582,7 @@ function DetailPanel({ activity, onClose, peopleMap, companiesMap, costCodesMap 
       setLinks(lks || []);
       setConstraints((cs || []).filter(c => c.status === "active"));
     });
-  }, [activity?.id]);
+  }, [activity]);
 
   useEffect(() => {
     if (!activity) return;
