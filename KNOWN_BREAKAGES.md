@@ -1,6 +1,6 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-17 19:54:38Z
+Last Updated (UTC): 2026-05-17 19:59:15Z
 
 ## Open Breakages / Environment Gaps
 1. Railway project context is not linked in this working copy.
@@ -17,6 +17,11 @@ Last Updated (UTC): 2026-05-17 19:54:38Z
    - Evidence: local run requires live backend + assistant path and currently times out on assistant composer selection.
    - Current state: test remains `test.skip` to avoid false-negative CI breakage.
    - Mitigation: wire deterministic assistant test fixture/mocks before unskip.
+
+4. Frontend lint parity is not baseline-clean.
+   - Evidence: `npm run lint` currently fails with hundreds of legacy findings and generated asset noise from `playwright-report/trace/*`.
+   - Impact: lint cannot yet serve as a strict CI gate for this branch without scoping/normalization.
+   - Mitigation: add explicit ESLint baseline config and ignore generated artifacts; then burn down violations incrementally by domain.
 
 ## Resolved in this phase
 - Fresh-db replay gate re-verified PASS with survivability subsets.

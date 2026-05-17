@@ -1,12 +1,12 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-17 19:54:38Z
+Last Updated (UTC): 2026-05-17 19:59:15Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
 - Stage: Phase C (AI/action queue/SSE/connector validation lane)
 - Branch: `main`
-- Base Head: `origin/main @ 5059147`
+- Base Head: `origin/main @ 63c0d3f`
 
 ## Mandatory Gates
 1. Fresh-db replay validation before schema-risk merges.
@@ -19,7 +19,8 @@ Last Updated (UTC): 2026-05-17 19:54:38Z
 - Action queue/compensator pytest subset: PASS (15 passed, 2 skipped)
 - Frontend build: PASS
 - Frontend SSE parser unit test path: PASS (`npm run test:unit:sse`)
+- Frontend lint parity: FAIL (`npm run lint` blocked by missing repo lint baseline + generated Playwright artifacts unless ignored)
 - Production writes: none
 
 ## Next Planned Stop
-- Execute Phase D hardening audits (migration integrity, duplicate-key integrity, CI parity, stale docs).
+- Phase D hardening continuation: add scoped ESLint baseline (`src/` + `e2e/`), ignore generated artifacts, then fix first blocking lint error in `e2e/phase54_live_integration.spec.js`.
