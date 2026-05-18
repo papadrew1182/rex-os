@@ -224,16 +224,68 @@ export function Checkbox({ label, name, value, onChange }) {
 // ─────────────────────────────────────────────────────────────────────────
 
 export function FormDrawer({ open, onClose, title, subtitle, children, onSubmit, onReset, dirty, submitting, error, success, mode = "create", canDelete, onDelete, width = 520 }) {
+  const drawerRef = useRef(null);
+
   // Block close if dirty unless user confirms
   const handleClose = useCallback(() => {
     if (dirty && !window.confirm("Discard unsaved changes?")) return;
     onClose();
   }, [dirty, onClose]);
 
-  // ESC to close
+  // ESC to close + focus trap with Tab / Shift+Tab
   useEffect(() => {
     if (!open) return;
-    const onKey = (e) => { if (e.key === "Escape") handleClose(); };
+
+    const root = drawerRef.current;
+    if (!root) return;
+
+    const selector = [
+      "a[href]",
+      "button:not([disabled])",
+      "input:not([disabled])",
+      "select:not([disabled])",
+      "textarea:not([disabled])",
+      "[tabindex]:not([tabindex='-1'])",
+    ].join(",");
+
+    const getFocusable = () => Array.from(root.querySelectorAll(selector)).filter((el) => {
+      if (el.getAttribute("aria-hidden") === "true") return false;
+      if (el.tabIndex < 0) return false;
+      return true;
+    });
+
+    // focus first interactive control on open
+    const first = getFocusable()[0];
+    first?.focus();
+
+    const onKey = (e) => {
+      if (e.key === "Escape") {
+        handleClose();
+        return;
+      }
+      if (e.key !== "Tab") return;
+
+      const focusable = getFocusable();
+      if (!focusable.length) return;
+
+      const firstEl = focusable[0];
+      const lastEl = focusable[focusable.length - 1];
+      const active = document.activeElement;
+
+      if (e.shiftKey) {
+        if (active === firstEl || !root.contains(active)) {
+          e.preventDefault();
+          lastEl.focus();
+        }
+        return;
+      }
+
+      if (active === lastEl) {
+        e.preventDefault();
+        firstEl.focus();
+      }
+    };
+
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open, handleClose]);
@@ -242,13 +294,13 @@ export function FormDrawer({ open, onClose, title, subtitle, children, onSubmit,
 
   return (
     <div className="rex-drawer-overlay" onClick={handleClose}>
-      <div className="rex-drawer" onClick={(e) => e.stopPropagation()} style={{ width }}>
+      <div ref={drawerRef} className="rex-drawer" onClick={(e) => e.stopPropagation()} style={{ width }} role="dialog" aria-modal="true" aria-label={title}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 16, paddingBottom: 12, borderBottom: "1px solid var(--rex-border)" }}>
           <div>
             <div className="rex-h3">{title}</div>
             {subtitle && <div className="rex-muted" style={{ fontSize: 12, marginTop: 2 }}>{subtitle}</div>}
           </div>
-          <button className="rex-detail-panel-close" onClick={handleClose}>×</button>
+          <button className="rex-detail-panel-close" onClick={handleClose} aria-label="Close form drawer">×</button>
         </div>
 
         <Flash type="error" message={error} />
