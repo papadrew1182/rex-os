@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 11:10:00Z
+Last Updated (UTC): 2026-05-18 11:30:34Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `da33f4f406500800ce96b3dbd78421ece9053fb7`
+- Local HEAD: `fdfab90cfb8e108248a94df769050dca7a100497`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -108,6 +108,13 @@ Last Updated (UTC): 2026-05-18 11:10:00Z
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS; hidden sourcemaps emitted (`dist/assets/*.map` present) for Sentry symbolication readiness
   - Reliability feature delivered: enabled `build.sourcemap = 'hidden'` in `frontend/vite.config.js` so production assets avoid sourcemap references while maps are generated for `npm run sentry:upload-sourcemaps`.
+- 2026-05-18 11:30Z verification rerun + continuity evidence refresh (same branch lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - `npm run test:unit:api-base` => PASS (3 passed, 0 failed)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (split chunks stable; largest emitted JS chunk remains `vendor-react` 141.83 kB)
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
