@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 05:34:46Z
+Last Updated (UTC): 2026-05-18 05:52:46Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -70,6 +70,9 @@ Last Updated (UTC): 2026-05-18 05:34:46Z
       - Canonical architecture/static rerun (2026-05-18 05:35Z): backend AI/action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS; frontend build PASS.
       - Executed highest-priority unblocked reliability closure task (`Next` item #3): reran `pytest -q backend/tests/test_session2_migration_sanity.py` and reproduced blocker unchanged — 1 passed, 6 errors, all failing at DB setup with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`.
       - Safety/rollback state unchanged: validation-only commands, no migrations applied, no production mutations, no rollback required.
+      - 2026-05-18 05:52Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
+      - Executed highest-priority unblocked reliability step in this run (`Next` item #3): reran `pytest -q backend/tests/test_session2_migration_sanity.py`; blocker remains reproducible and unchanged (1 passed, 6 errors) with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against `localhost:5432/rex_os`.
+      - No protected operations crossed: no production writes, no credential mutations, no rollback required.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
