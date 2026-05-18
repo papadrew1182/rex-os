@@ -11,6 +11,7 @@ import {
   discardAction,
   fetchControlPlaneQueue,
   fetchPendingActions,
+  undoAction,
 } from "../lib/api";
 
 export default function QueueReviewPanel() {
@@ -18,6 +19,8 @@ export default function QueueReviewPanel() {
   const [pending, setPending] = useState(null);
   const [error, setError] = useState("");
   const [busyId, setBusyId] = useState("");
+  const [flash, setFlash] = useState(null);
+  const [undoBusy, setUndoBusy] = useState(false);
 
   async function loadPending() {
     try {
@@ -40,13 +43,50 @@ export default function QueueReviewPanel() {
   async function runAction(kind, actionId) {
     setBusyId(actionId);
     try {
-      if (kind === "approve") await approveAction(actionId);
-      if (kind === "discard") await discardAction(actionId);
+      const row = pending?.find((item) => item.id === actionId);
+      const response = kind === "approve"
+        ? await approveAction(actionId)
+        : await discardAction(actionId);
+      const nextStatus = response?.status || (kind === "approve" ? "committed" : "dismissed");
+
+      setFlash({
+        kind,
+        actionId,
+        toolSlug: row?.tool_slug || "action",
+        status: nextStatus,
+        canUndo: kind === "approve" && nextStatus === "committed",
+      });
+      setError("");
       await loadPending();
     } catch (err) {
       setError(err?.message || `Failed to ${kind} action.`);
     } finally {
       setBusyId("");
+    }
+  }
+
+  async function runUndo() {
+    if (!flash?.actionId) return;
+    setUndoBusy(true);
+    try {
+      const response = await undoAction(flash.actionId);
+      setFlash((prev) => ({
+        ...(prev || {}),
+        canUndo: false,
+        status: response?.status || "undone",
+        undoResult: response?.status === "undone"
+          ? "Undo succeeded."
+          : response?.error_excerpt || "Undo unavailable for this action state.",
+      }));
+      setError("");
+      await loadPending();
+    } catch (err) {
+      setFlash((prev) => ({
+        ...(prev || {}),
+        undoResult: err?.message || "Undo failed.",
+      }));
+    } finally {
+      setUndoBusy(false);
     }
   }
 
@@ -82,6 +122,35 @@ export default function QueueReviewPanel() {
       {error ? (
         <div className="rex-alert rex-alert-red" style={{ marginBottom: 16 }}>
           {error}
+        </div>
+      ) : null}
+
+      {flash ? (
+        <div className="rex-alert rex-alert-green" style={{ marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+            <span style={{ flex: 1 }}>
+              {flash.kind === "approve" ? "Approved" : "Discarded"} <b>{flash.toolSlug}</b>
+              {" "}(status: {flash.status}).
+              {flash.undoResult ? ` ${flash.undoResult}` : ""}
+            </span>
+            {flash.canUndo ? (
+              <button
+                type="button"
+                className="rex-btn secondary"
+                onClick={runUndo}
+                disabled={undoBusy}
+              >
+                {undoBusy ? "Undoing…" : "Undo"}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className="rex-btn secondary"
+              onClick={() => setFlash(null)}
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       ) : null}
 

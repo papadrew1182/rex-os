@@ -339,6 +339,10 @@ export async function discardAction(actionId) {
   return jsonFetch(`/actions/${actionId}/discard`, { method: "POST" });
 }
 
+export async function undoAction(actionId) {
+  return jsonFetch(`/actions/${actionId}/undo`, { method: "POST" });
+}
+
 // ── My Day ────────────────────────────────────────────────────────────
 
 export async function fetchMyDay(opts = {}) {
