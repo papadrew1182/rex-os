@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 05:16:38Z
+Last Updated (UTC): 2026-05-18 05:34:46Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -65,7 +65,11 @@ Last Updated (UTC): 2026-05-18 05:16:38Z
       - Executed highest-priority unblocked reliability hardening step this run (Phase D→E continuity lane): re-ran architecture/static gates and captured a reproducible local migration-sanity blocker path so handoff evidence reflects current execution risk.
       - Architecture/static rerun results (2026-05-18 05:16Z): backend AI/action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS; frontend build PASS.
       - Additional migration integrity probe: `pytest -q backend/tests/test_session2_migration_sanity.py` => partial (1 passed, 6 errors) with reproducible local DB auth failure (`asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against `localhost:5432/rex_os`).
-      - Remediation options staged for staffed follow-through: (a) provide valid local `DATABASE_URL` credentials for `deploy` user, or (b) run the same migration sanity suite inside CI/ephemeral Postgres where creds are known-good (`postgresql://rex:rex@localhost:5432/rex_ci`) to confirm schema objects without mutating production.
+      - Remediation options staged for staffed follow-through: (a) provide valid local `DATABASE_URL` credentials for `deploy` user, or (b) run the same migration sanity suite inside CI/ephemeral Postgres where creds are known-good (`postgresql://rex:***@localhost:5432/rex_ci`) to confirm schema objects without mutating production.
+      - 2026-05-18 05:34Z unattended rerun: attempted stale shorthand checks first and confirmed command drift (`pytest -q backend/tests/test_assistant_router.py ...` path missing; `npm run test` script absent). Corrected immediately to canonical lane commands.
+      - Canonical architecture/static rerun (2026-05-18 05:35Z): backend AI/action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS; frontend build PASS.
+      - Executed highest-priority unblocked reliability closure task (`Next` item #3): reran `pytest -q backend/tests/test_session2_migration_sanity.py` and reproduced blocker unchanged — 1 passed, 6 errors, all failing at DB setup with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`.
+      - Safety/rollback state unchanged: validation-only commands, no migrations applied, no production mutations, no rollback required.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
