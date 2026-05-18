@@ -417,8 +417,8 @@ and why. Each entry is labeled:
 | Demo environment for release flights | ✅ shipped phase 46–53 | Separate Railway demo env + Vercel `rex-os-demo` project; was the proving ground for the 2026-04-14 prod promotion |
 | API versioning prefix (`/api/v1`) | deferred (low priority) | No breaking response shape change planned yet |
 | S3 storage in prod | deferred (ops step) | Adapter exists and is demo-safe; prod still on `local`; flip sequence requires demo round-trip first per `DEPLOY.md §1f` |
-| Backend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Platform/Ops. Status: blocked on DSN provisioning policy. Verification commands: `curl -fsS "$REX_API_BASE/api/health"` then trigger one controlled backend error after `REX_SENTRY_DSN` is set and confirm ingestion in Sentry. |
-| Frontend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Frontend/Ops. Status: blocked on DSN + rebuild requirement. Verification commands: set `VITE_SENTRY_DSN`, redeploy frontend, then trigger one controlled frontend error on `rex-os.vercel.app` and confirm ingestion in Sentry. |
+| Backend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Platform/Ops. Status: blocked on DSN provisioning policy. Rollout runbook: `DEPLOY.md` §1c (backend env vars) + §3 (verify). Verification commands: `curl -fsS "$REX_API_BASE/api/health"` then trigger one controlled backend error after `REX_SENTRY_DSN` is set and confirm ingestion in Sentry. Evidence capture location: `docs/handoffs/` (attach timestamped deployment note with health curl output + Sentry event ID). |
+| Frontend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Frontend/Ops. Status: blocked on DSN + rebuild requirement. Rollout runbook: `DEPLOY.md` §2b-§2d (frontend env + redeploy + CORS) + §3 (verify). Verification commands: set `VITE_SENTRY_DSN`, redeploy frontend, then trigger one controlled frontend error on `rex-os.vercel.app` and confirm ingestion in Sentry. Evidence capture location: `docs/handoffs/` (attach timestamped deployment note with Vercel deploy URL + Sentry event ID). |
 | Email transport enabled | deferred (low priority) | `REX_EMAIL_TRANSPORT=noop`; SMTP wired but disabled |
 | Per-user notification preference matrix | deferred (not yet designed) | Backend has no schema for per-user opt-out |
 | Email digest job | deferred (low priority) | Blocked on email transport + preference matrix |
@@ -426,7 +426,7 @@ and why. Each entry is labeled:
 | SSO / SAML | deferred (not yet designed) | No identity provider selected |
 | Multi-tenancy beyond project scoping | deferred (not yet designed) | Current product scope is single-workspace |
 | Public API / OAuth client registration | deferred (low priority) | No external consumers |
-| Real-browser sanity pass on post-promotion prod build | pending (Phase E blocker) | Owner: QA/Release. Status: blocked on manual execution window. Verification checklist: open `rex-os.vercel.app`, log in with non-admin + admin users, validate portfolio + one write-guard denial, capture screenshots in release evidence. |
+| Real-browser sanity pass on post-promotion prod build | pending (Phase E blocker) | Owner: QA/Release. Status: blocked on manual execution window. Rollout runbook: `DEPLOY.md` §3 (verify) + known-gotchas section for login/CORS triage. Verification checklist: open `rex-os.vercel.app`, log in with non-admin + admin users, validate portfolio + one write-guard denial, capture screenshots in release evidence. Evidence capture location: `docs/handoffs/` (timestamped sanity-pass handoff with screenshots + user-role matrix). |
 
 ### Frontend polish
 
