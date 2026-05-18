@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 00:58:20Z
+Last Updated (UTC): 2026-05-18 01:17:20Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -43,9 +43,11 @@ Last Updated (UTC): 2026-05-18 00:58:20Z
       - Re-ran migration-order integrity audit this run: `MIGRATION_ORDER` now resolves 34 ordered SQL files with no missing entries; non-ordered SQLs are intentional bootstrap/seed artifacts (`rex2_business_seed.sql`, `rex2_canonical_ddl.sql`, `rex2_demo_seed.sql`, `rex2_foundation_bootstrap.sql`, `seed_dashboard_demo.sql`).
       - Re-ran Phase C/D architecture+static checks on `fix/login-api-base-routing`: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend production build PASS, and frontend lint PASS (`eslint . --max-warnings 0`).
       - Executed queued Phase E progression task: refreshed `CURRENT_PHASE.md` and staged explicit Phase E readiness blocker list (Sentry DSNs, real-browser prod sanity pass, frontend chunk-size hardening).
+      - Mirrored staged Phase E blockers into `PROGRAM_STATE.md` with explicit owner/status/verification entries for backend/frontend Sentry activation, real-browser prod sanity pass, and frontend code-splitting hardening.
+      - Re-validated architecture/static gates in same run: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend production build PASS (with chunk-size advisory), frontend lint PASS (`eslint . --max-warnings 0`).
 
 ## Next (Queued)
 1. Phase E production-readiness progression review and continuity update
-   - Immediate next executable: mirror staged Phase E blockers into `PROGRAM_STATE.md` with explicit owner/status tags and verification commands.
+   - Immediate next executable: add explicit rollout/runbook links in `PROGRAM_STATE.md` blocker rows (Sentry activation + real-browser sanity evidence location).
 2. Phase D hardening pass (stale-doc cleanup)
    - Immediate next executable: reconcile branch/base metadata in continuity docs where `main` is still referenced as active branch.

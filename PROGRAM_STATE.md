@@ -417,8 +417,8 @@ and why. Each entry is labeled:
 | Demo environment for release flights | ✅ shipped phase 46–53 | Separate Railway demo env + Vercel `rex-os-demo` project; was the proving ground for the 2026-04-14 prod promotion |
 | API versioning prefix (`/api/v1`) | deferred (low priority) | No breaking response shape change planned yet |
 | S3 storage in prod | deferred (ops step) | Adapter exists and is demo-safe; prod still on `local`; flip sequence requires demo round-trip first per `DEPLOY.md §1f` |
-| Backend Sentry activation in prod | deferred (ops step) | Code ready; needs demo DSN + one safe event + prod DSN |
-| Frontend Sentry activation in prod | deferred (ops step) | Code ready; Vite env is build-time so requires a Vercel redeploy after setting the DSN |
+| Backend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Platform/Ops. Status: blocked on DSN provisioning policy. Verification commands: `curl -fsS "$REX_API_BASE/api/health"` then trigger one controlled backend error after `REX_SENTRY_DSN` is set and confirm ingestion in Sentry. |
+| Frontend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Frontend/Ops. Status: blocked on DSN + rebuild requirement. Verification commands: set `VITE_SENTRY_DSN`, redeploy frontend, then trigger one controlled frontend error on `rex-os.vercel.app` and confirm ingestion in Sentry. |
 | Email transport enabled | deferred (low priority) | `REX_EMAIL_TRANSPORT=noop`; SMTP wired but disabled |
 | Per-user notification preference matrix | deferred (not yet designed) | Backend has no schema for per-user opt-out |
 | Email digest job | deferred (low priority) | Blocked on email transport + preference matrix |
@@ -426,7 +426,7 @@ and why. Each entry is labeled:
 | SSO / SAML | deferred (not yet designed) | No identity provider selected |
 | Multi-tenancy beyond project scoping | deferred (not yet designed) | Current product scope is single-workspace |
 | Public API / OAuth client registration | deferred (low priority) | No external consumers |
-| Real-browser sanity pass on post-promotion prod build | pending (minutes of work) | API-level smoke already green; one human click-through of `rex-os.vercel.app` still open |
+| Real-browser sanity pass on post-promotion prod build | pending (Phase E blocker) | Owner: QA/Release. Status: blocked on manual execution window. Verification checklist: open `rex-os.vercel.app`, log in with non-admin + admin users, validate portfolio + one write-guard denial, capture screenshots in release evidence. |
 
 ### Frontend polish
 
@@ -443,7 +443,7 @@ and why. Each entry is labeled:
 | ARIA labels / Lighthouse audit | deferred (low priority) | Partial ARIA labels added phase 50; Lighthouse pass not done |
 | Email-invite / signup flow for new users | deferred (not yet designed) | Existing-user management shipped phase 48; new-account creation is still DB-direct |
 | Global route-transition loading indicator | deferred (low priority) | Per-page `PageLoader` is sufficient for now |
-| Code splitting (react.lazy) | deferred (low priority) | Bundle is ~620 KB raw / ~156 KB gzip — over the 500 KB advisory but not blocking |
+| Code splitting (react.lazy) | deferred (Phase E hardening blocker) | Owner: Frontend. Status: pending chunking plan; latest build is ~734 KB raw / ~185 KB gzip for main JS chunk. Verification command: `cd frontend && npm run build` and confirm main chunk <500 KB warning threshold or approved manualChunks plan is documented. |
 | Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
 | Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
 | TypeScript migration | deferred (low priority) | Would require porting 32 pages + shared modules |
