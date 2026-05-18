@@ -1266,6 +1266,9 @@ export default function ScheduleHealth() {
     const next30End = new Date(today);
     next30End.setDate(today.getDate() + 30);
 
+    const last30Start = new Date(today);
+    last30Start.setDate(today.getDate() - 30);
+
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
@@ -1284,6 +1287,7 @@ export default function ScheduleHealth() {
     if (from === formatDate(today) && to === formatDate(next7End)) return "Next 7 days";
     if (from === formatDate(today) && to === formatDate(next14End)) return "Next 14 days";
     if (from === formatDate(today) && to === formatDate(next30End)) return "Next 30 days";
+    if (from === formatDate(last30Start) && to === formatDate(today)) return "Last 30 days";
     if (from === formatDate(monthStart) && to === formatDate(monthEnd)) return "This month";
     if (from === formatDate(lastQuarterStart) && to === formatDate(lastQuarterEnd)) return "Last quarter";
     if (from === formatDate(quarterStart) && to === formatDate(quarterEnd)) return "This quarter";
@@ -1326,6 +1330,14 @@ export default function ScheduleHealth() {
       to.setDate(to.getDate() + 30);
       setDateFrom(formatDate(today));
       setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "last30") {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 30);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(today));
       return;
     }
 
@@ -1514,6 +1526,7 @@ export default function ScheduleHealth() {
             <option value="next7">Next 7 days</option>
             <option value="next14">Next 14 days</option>
             <option value="next30">Next 30 days</option>
+            <option value="last30">Last 30 days</option>
             <option value="thisMonth">This month</option>
             <option value="lastQuarter">Last quarter</option>
             <option value="thisQuarter">This quarter</option>

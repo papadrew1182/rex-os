@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 18:13:57Z
+Last Updated (UTC): 2026-05-18 18:50:43Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -153,6 +153,8 @@ Last Updated (UTC): 2026-05-18 18:13:57Z
       - 2026-05-18 18:30Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (`ScheduleHealth` chunk 45.76 kB; largest JS chunk `vendor-react` 141.83 kB).
       - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added `Last quarter` date preset and active date-window badge detection in `frontend/src/pages/ScheduleHealth.jsx` to support retrospective quarter review workflows with one click.
       - Migration-integrity probe this run: default local env remains blocked (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors, `InvalidPasswordError` for `deploy@localhost/rex_os`), while explicit CI-style DB override path remains green (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
+      - 2026-05-18 18:50Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (`ScheduleHealth` chunk 45.99 kB; largest JS chunk `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening, lines 330–345): added `Last 30 days` date preset plus active date-window badge detection in `frontend/src/pages/ScheduleHealth.jsx`, enabling one-click retrospective schedule review.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
