@@ -325,6 +325,20 @@ export async function fetchControlPlaneQueue(opts = {}) {
   });
 }
 
+// ── Phase 6 action queue live endpoints (no mock fallback) ──────────────
+
+export async function fetchPendingActions() {
+  return jsonFetch("/actions/pending");
+}
+
+export async function approveAction(actionId) {
+  return jsonFetch(`/actions/${actionId}/approve`, { method: "POST" });
+}
+
+export async function discardAction(actionId) {
+  return jsonFetch(`/actions/${actionId}/discard`, { method: "POST" });
+}
+
 // ── My Day ────────────────────────────────────────────────────────────
 
 export async function fetchMyDay(opts = {}) {
