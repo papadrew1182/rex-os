@@ -1277,6 +1277,13 @@ export default function ScheduleHealth() {
           </div>
         )}
         <div className="rex-form-row" style={{ alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <span
+            className="rex-muted"
+            style={{ fontSize: 12, whiteSpace: "nowrap", marginRight: 4 }}
+            aria-live="polite"
+          >
+            Showing {filteredActivities.length} of {activities?.length ?? 0} activities{activeFilterCount ? ` • ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : ""}
+          </span>
           <input
             className="rex-input"
             placeholder="Search name, number, WBS, or location…"
@@ -1307,6 +1314,30 @@ export default function ScheduleHealth() {
             <option value="">All cost codes</option>
             {costCodes.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
           </select>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--rex-text-muted)", whiteSpace: "nowrap" }}>
+            From
+            <input
+              type="date"
+              className="rex-input"
+              aria-label="Filter start date from"
+              value={dateFrom}
+              onChange={e => setDateFrom(e.target.value)}
+              style={{ width: 150 }}
+              title="Start date from"
+            />
+          </label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--rex-text-muted)", whiteSpace: "nowrap" }}>
+            To
+            <input
+              type="date"
+              className="rex-input"
+              aria-label="Filter end date to"
+              value={dateTo}
+              onChange={e => setDateTo(e.target.value)}
+              style={{ width: 150 }}
+              title="End date to"
+            />
+          </label>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--rex-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
             <input type="checkbox" checked={criticalOnly} onChange={e => setCriticalOnly(e.target.checked)} style={{ cursor: "pointer" }} />
             Critical only
