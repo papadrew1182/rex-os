@@ -8,6 +8,7 @@ import BuildVersionChip from "./BuildVersionChip";
 import { AppProvider } from "./app/AppContext";
 import AssistantSidebar from "./assistant/AssistantSidebar";
 import AiPanel, { AiFab } from "./AiPanel";
+import { PageLoader } from "./ui";
 
 const MyDayHome = lazy(() => import("./myday/MyDayHome"));
 const ControlPlaneHome = lazy(() => import("./controlPlane/ControlPlaneHome"));
@@ -115,7 +116,7 @@ function Shell() {
 
   if (!user) {
     return (
-      <Suspense fallback={<div className="rex-empty">Loading…</div>}>
+      <Suspense fallback={<PageLoader text="Loading login…" />}>
         <LoginPage />
       </Suspense>
     );
@@ -219,7 +220,7 @@ function Shell() {
               <div className="rex-content">
                 <div className="rex-content-inner">
                   <ErrorBoundary routeKey={location.pathname}>
-                    <Suspense fallback={<div className="rex-empty">Loading page…</div>}>
+                    <Suspense fallback={<PageLoader text="Loading page…" />}>
                       <Routes>
                         <Route path="/" element={<Dashboard />} />
                         <Route path="/portfolio" element={<Portfolio />} />
