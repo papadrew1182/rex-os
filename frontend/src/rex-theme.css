@@ -1354,6 +1354,11 @@ select.rex-input { padding-right: 24px; }
   flex-direction: column;
   gap: 12px;
 }
+.rex-ai-panel--expanded {
+  left: 0;
+  width: 100vw;
+  border-left: 0;
+}
 .rex-ai-panel-header {
   display: flex;
   justify-content: space-between;

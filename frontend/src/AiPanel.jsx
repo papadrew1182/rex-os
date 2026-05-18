@@ -29,7 +29,12 @@ export default function AiPanel({ open, onClose }) {
   const [streamText, setStreamText] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [sending, setSending] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const streamRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) setExpanded(false);
+  }, [open]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,10 +134,15 @@ export default function AiPanel({ open, onClose }) {
   return (
     <>
       <div className="rex-ai-overlay" onClick={onClose} aria-hidden="true" />
-      <aside className="rex-ai-panel" aria-label="AI quick actions panel">
+      <aside className={`rex-ai-panel${expanded ? " rex-ai-panel--expanded" : ""}`} aria-label="AI quick actions panel">
         <div className="rex-ai-panel-header">
           <h3 className="rex-h3">AI Quick Actions</h3>
-          <button type="button" className="rex-btn rex-btn-outline" onClick={onClose}>Close</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="rex-btn rex-btn-outline" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+            <button type="button" className="rex-btn rex-btn-outline" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <p className="rex-muted" style={{ marginTop: 6 }}>
