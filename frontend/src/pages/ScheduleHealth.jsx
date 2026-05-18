@@ -1269,6 +1269,9 @@ export default function ScheduleHealth() {
     const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
     const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+    const lastQuarterStartMonth = quarterStartMonth - 3;
+    const lastQuarterStart = new Date(today.getFullYear(), lastQuarterStartMonth, 1);
+    const lastQuarterEnd = new Date(today.getFullYear(), lastQuarterStartMonth + 3, 0);
     const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
     const quarterEnd = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
     const nextQuarterStartMonth = quarterStartMonth + 3;
@@ -1282,6 +1285,7 @@ export default function ScheduleHealth() {
     if (from === formatDate(today) && to === formatDate(next14End)) return "Next 14 days";
     if (from === formatDate(today) && to === formatDate(next30End)) return "Next 30 days";
     if (from === formatDate(monthStart) && to === formatDate(monthEnd)) return "This month";
+    if (from === formatDate(lastQuarterStart) && to === formatDate(lastQuarterEnd)) return "Last quarter";
     if (from === formatDate(quarterStart) && to === formatDate(quarterEnd)) return "This quarter";
     if (from === formatDate(nextQuarterStart) && to === formatDate(nextQuarterEnd)) return "Next quarter";
     return "Custom";
@@ -1328,6 +1332,16 @@ export default function ScheduleHealth() {
     if (preset === "thisMonth") {
       const from = new Date(today.getFullYear(), today.getMonth(), 1);
       const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "lastQuarter") {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const lastQuarterStartMonth = quarterStartMonth - 3;
+      const from = new Date(today.getFullYear(), lastQuarterStartMonth, 1);
+      const to = new Date(today.getFullYear(), lastQuarterStartMonth + 3, 0);
       setDateFrom(formatDate(from));
       setDateTo(formatDate(to));
       return;
@@ -1501,6 +1515,7 @@ export default function ScheduleHealth() {
             <option value="next14">Next 14 days</option>
             <option value="next30">Next 30 days</option>
             <option value="thisMonth">This month</option>
+            <option value="lastQuarter">Last quarter</option>
             <option value="thisQuarter">This quarter</option>
             <option value="nextQuarter">Next quarter</option>
             <option value="clear">Clear dates</option>
