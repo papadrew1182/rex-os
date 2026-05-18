@@ -1,6 +1,6 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 14:22:48Z
+Last Updated (UTC): 2026-05-18 19:03:34Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
@@ -137,6 +137,13 @@ Last Updated (UTC): 2026-05-18 14:22:48Z
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (split chunks stable; largest emitted JS chunk remains `vendor-react` 141.83 kB)
   - User-visible feature delivered: `frontend/src/pages/ScheduleHealth.jsx` now computes active filter count, shows `Clear (N)` when filters are active, and disables the Clear button when no filters are set.
+- 2026-05-18 19:03Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => FAIL (1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os` without env override)
+  - Rollback-state proof: validation-only commands, no schema/prod mutation; rollback-client/advisory-lock repeat tests passed, demonstrating stable recovery behavior.
 
 ## Safety Posture
 - No production deployment actions executed in this phase.

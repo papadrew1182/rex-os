@@ -1,6 +1,6 @@
 # CURRENT_PHASE
 
-Last Updated (UTC): 2026-05-18 10:52:14Z
+Last Updated (UTC): 2026-05-18 19:03:34Z
 Project: rex-os (Rex 2.0)
 Execution Mode: HIGH AUTONOMY (with protected-operation stop gates)
 
@@ -24,4 +24,5 @@ Execution Mode: HIGH AUTONOMY (with protected-operation stop gates)
 ## Phase E Readiness Blockers (staged)
 - ⚠️ Production Sentry DSNs remain unset for both backend and frontend environments (see `PROGRAM_STATE.md` open blockers).
 - ⚠️ Real-browser post-promotion production sanity pass is still open.
+- ⚠️ Default local migration-sanity path is still credential-blocked (`deploy@localhost/rex_os` `InvalidPasswordError`) when `DATABASE_URL` override is absent; CI-style override path is green.
 - ✅ Frontend chunking hardening lane complete locally: route-level splitting is active and current `npm run build` produces a split bundle with no >500 kB chunk warning; continue monitoring post-merge production artifacts for regressions.
