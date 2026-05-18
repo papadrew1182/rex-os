@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 02:31:52Z
+Last Updated (UTC): 2026-05-18 03:08:50Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -47,9 +47,11 @@ Last Updated (UTC): 2026-05-18 02:31:52Z
       - Re-validated architecture/static gates in same run: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend production build PASS (with chunk-size advisory), frontend lint PASS (`eslint . --max-warnings 0`).
       - Reconciled continuity metadata drift by correcting this queue's active validation branch from stale `main` to `fix/login-api-base-routing` (base remains `origin/main`), aligning Phase D docs with live git state.
       - Re-ran architecture/static checks in same run after doc reconciliation: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
+      - Executed queued Phase D stale-doc cleanup: normalized stale branch references in `RELEASE_TRAIN.md` and `DEPLOYMENT_STATE.md` from historical `main` to active `fix/login-api-base-routing`, and refreshed stage/gate text to match current validation lane.
+      - Re-ran Phase C/D architecture+static checks in same run after doc updates: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
 
 ## Next (Queued)
-1. Phase D hardening pass (stale-doc cleanup)
-   - Immediate next executable: audit remaining continuity docs for stale active-branch references and normalize to `fix/login-api-base-routing` (or explicit historical `main` where intentional).
-2. Phase E production-readiness progression review and continuity update
+1. Phase E production-readiness progression review and continuity update
    - Immediate next executable: draft a single handoff template in `docs/handoffs/` for Sentry activation and real-browser sanity evidence capture to reduce operator variance.
+2. Phase D hardening follow-through (continuity sweep)
+   - Immediate next executable: audit remaining continuity artifacts for stale `origin/main @ 63c0d3f` references and either update to live base (`origin/main @ b08f5ef`) or mark as intentional historical snapshot.

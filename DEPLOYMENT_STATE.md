@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-17 23:19:26Z
+Last Updated (UTC): 2026-05-18 03:08:50Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
-- Local Branch: `main`
-- Local HEAD: `b2c1ae1cf2841e1fdd68d5649a0c75570fc4711a`
+- Local Branch: `fix/login-api-base-routing`
+- Local HEAD: `cb9e659204c0aa6666d50480094f19b555d3a7c4`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -16,9 +16,9 @@ Last Updated (UTC): 2026-05-17 23:19:26Z
 - AI/action queue/compensator pytest subset: PASS (`pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => 15 passed, 2 skipped)
 - Frontend production build: PASS (`npm run build`)
 - Frontend SSE unit-test command: PASS (`npm run test:unit:sse` => 10 passed, 0 failed)
-- Frontend lint hardening pass: PARTIAL PASS (removed unused imports across user-visible pages: BudgetOverview, Drawings, Photos, Specifications, SubmittalManagement)
-- Frontend lint command: FAIL (`npm run lint`; backlog now **26 findings**: 17 errors + 9 warnings; backend+SSE+build parity remained green this run)
-- CI queue state: not re-polled this run; local validation green for touched scope except known lint backlog
+- Frontend lint hardening pass: PASS (prior backlog cleared in workspace)
+- Frontend lint command: PASS (`npm run lint`)
+- CI queue state: local validation rerun this session; backend pytest subset + frontend SSE tests + frontend lint + frontend build all green
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
