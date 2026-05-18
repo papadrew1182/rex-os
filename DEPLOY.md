@@ -192,6 +192,30 @@ or two preview URLs. **Copy the production URL.**
    `https://rex-os.vercel.app,https://rex-os-git-master-papadrew1182.vercel.app`
 3. Railway will redeploy automatically (~30s)
 
+### 2e. Upload frontend sourcemaps for Sentry (Phase E hardening)
+
+Frontend Sentry events are already code-wired but stack traces are only useful
+after sourcemaps are uploaded for the exact release.
+
+From `frontend/`:
+
+```bash
+npm run build
+SENTRY_AUTH_TOKEN=*** \
+SENTRY_ORG=<org-slug> \
+SENTRY_PROJECT=<project-slug> \
+REX_RELEASE=<git-sha> \
+npm run sentry:upload-sourcemaps
+```
+
+Notes:
+- The upload script derives the release string as `rex-os-frontend@<sha>` to
+  match `frontend/src/sentry.js`.
+- `REX_RELEASE` is optional when `VERCEL_GIT_COMMIT_SHA`/`GITHUB_SHA` is
+  present, but supplying it explicitly avoids mismatch during manual runs.
+- This is a build artifact operation only; it does not mutate runtime app
+  behavior and is safe for demo-first validation.
+
 ---
 
 ## 3. Verify
