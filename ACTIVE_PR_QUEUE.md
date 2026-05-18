@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 17:54:58Z
+Last Updated (UTC): 2026-05-18 18:13:57Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -148,6 +148,9 @@ Last Updated (UTC): 2026-05-18 17:54:58Z
       - Executed highest-priority incomplete **user-visible** hardening slice this unattended run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added one-click `Overdue open (N)` affordance + inline overdue telemetry to Schedule Workbench in `frontend/src/pages/ScheduleHealth.jsx`, enabling faster pivot into actionable late work without manually enabling filters.
       - 2026-05-18 17:54Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (`ScheduleHealth` chunk 45.10 kB; largest JS chunk remains `vendor-react` 141.83 kB).
       - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): expanded Schedule Workbench date presets in `frontend/src/pages/ScheduleHealth.jsx` with a new `This quarter` preset plus active-date-window label detection, reducing manual multi-month date entry for quarterly planning views.
+      - 2026-05-18 18:13Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (`ScheduleHealth` chunk 45.43 kB; largest JS chunk `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added `Next quarter` date preset and matching active date-window badge detection in `frontend/src/pages/ScheduleHealth.jsx` to reduce manual quarter-ahead planning setup.
+      - Migration-integrity probe this run: `pytest -q backend/tests/test_session2_migration_sanity.py` remains reproducibly blocked in default local env (1 passed, 6 errors) with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

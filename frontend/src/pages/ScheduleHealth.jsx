@@ -1271,6 +1271,9 @@ export default function ScheduleHealth() {
     const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
     const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
     const quarterEnd = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+    const nextQuarterStartMonth = quarterStartMonth + 3;
+    const nextQuarterStart = new Date(today.getFullYear(), nextQuarterStartMonth, 1);
+    const nextQuarterEnd = new Date(today.getFullYear(), nextQuarterStartMonth + 3, 0);
 
     const from = dateFrom;
     const to = dateTo;
@@ -1280,6 +1283,7 @@ export default function ScheduleHealth() {
     if (from === formatDate(today) && to === formatDate(next30End)) return "Next 30 days";
     if (from === formatDate(monthStart) && to === formatDate(monthEnd)) return "This month";
     if (from === formatDate(quarterStart) && to === formatDate(quarterEnd)) return "This quarter";
+    if (from === formatDate(nextQuarterStart) && to === formatDate(nextQuarterEnd)) return "Next quarter";
     return "Custom";
   }, [dateFrom, dateTo]);
 
@@ -1333,6 +1337,16 @@ export default function ScheduleHealth() {
       const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
       const from = new Date(today.getFullYear(), quarterStartMonth, 1);
       const to = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "nextQuarter") {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const nextQuarterStartMonth = quarterStartMonth + 3;
+      const from = new Date(today.getFullYear(), nextQuarterStartMonth, 1);
+      const to = new Date(today.getFullYear(), nextQuarterStartMonth + 3, 0);
       setDateFrom(formatDate(from));
       setDateTo(formatDate(to));
       return;
@@ -1488,6 +1502,7 @@ export default function ScheduleHealth() {
             <option value="next30">Next 30 days</option>
             <option value="thisMonth">This month</option>
             <option value="thisQuarter">This quarter</option>
+            <option value="nextQuarter">Next quarter</option>
             <option value="clear">Clear dates</option>
           </select>
           {activeDatePresetLabel && (
