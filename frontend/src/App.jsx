@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { HashRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { ProjectProvider, useProject } from "./project";
@@ -7,43 +7,45 @@ import ErrorBoundary from "./ErrorBoundary";
 import BuildVersionChip from "./BuildVersionChip";
 import { AppProvider } from "./app/AppContext";
 import AssistantSidebar from "./assistant/AssistantSidebar";
-import MyDayHome from "./myday/MyDayHome";
-import ControlPlaneHome from "./controlPlane/ControlPlaneHome";
-import ProjectDashboard from "./app/ProjectDashboard";
-import LoginPage from "./pages/Login";
-import Portfolio from "./pages/Portfolio";
-import Dashboard from "./pages/Dashboard";
-import Companies from "./pages/Companies";
-import People from "./pages/People";
-import ProjectReadiness from "./pages/ProjectReadiness";
-import Checklists from "./pages/Checklists";
-import Milestones from "./pages/Milestones";
-import Attachments from "./pages/Attachments";
-import ScheduleHealth from "./pages/ScheduleHealth";
-import ExecutionHealth from "./pages/ExecutionHealth";
-import BudgetOverview from "./pages/BudgetOverview";
-import PayApplications from "./pages/PayApplications";
-import Commitments from "./pages/Commitments";
-import ChangeOrders from "./pages/ChangeOrders";
-import RfiManagement from "./pages/RfiManagement";
-import PunchList from "./pages/PunchList";
-import SubmittalManagement from "./pages/SubmittalManagement";
-import DailyLogs from "./pages/DailyLogs";
-import Inspections from "./pages/Inspections";
-import Tasks from "./pages/Tasks";
-import Drawings from "./pages/Drawings";
-import Specifications from "./pages/Specifications";
-import Correspondence from "./pages/Correspondence";
-import Photos from "./pages/Photos";
-import Meetings from "./pages/Meetings";
-import Observations from "./pages/Observations";
-import SafetyIncidents from "./pages/SafetyIncidents";
-import Warranties from "./pages/Warranties";
-import OmManuals from "./pages/OmManuals";
-import InsuranceCertificates from "./pages/InsuranceCertificates";
-import Notifications from "./pages/Notifications";
-import AdminJobs from "./pages/AdminJobs";
 import AiPanel, { AiFab } from "./AiPanel";
+import { PageLoader } from "./ui";
+
+const MyDayHome = lazy(() => import("./myday/MyDayHome"));
+const ControlPlaneHome = lazy(() => import("./controlPlane/ControlPlaneHome"));
+const ProjectDashboard = lazy(() => import("./app/ProjectDashboard"));
+const LoginPage = lazy(() => import("./pages/Login"));
+const Portfolio = lazy(() => import("./pages/Portfolio"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Companies = lazy(() => import("./pages/Companies"));
+const People = lazy(() => import("./pages/People"));
+const ProjectReadiness = lazy(() => import("./pages/ProjectReadiness"));
+const Checklists = lazy(() => import("./pages/Checklists"));
+const Milestones = lazy(() => import("./pages/Milestones"));
+const Attachments = lazy(() => import("./pages/Attachments"));
+const ScheduleHealth = lazy(() => import("./pages/ScheduleHealth"));
+const ExecutionHealth = lazy(() => import("./pages/ExecutionHealth"));
+const BudgetOverview = lazy(() => import("./pages/BudgetOverview"));
+const PayApplications = lazy(() => import("./pages/PayApplications"));
+const Commitments = lazy(() => import("./pages/Commitments"));
+const ChangeOrders = lazy(() => import("./pages/ChangeOrders"));
+const RfiManagement = lazy(() => import("./pages/RfiManagement"));
+const PunchList = lazy(() => import("./pages/PunchList"));
+const SubmittalManagement = lazy(() => import("./pages/SubmittalManagement"));
+const DailyLogs = lazy(() => import("./pages/DailyLogs"));
+const Inspections = lazy(() => import("./pages/Inspections"));
+const Tasks = lazy(() => import("./pages/Tasks"));
+const Drawings = lazy(() => import("./pages/Drawings"));
+const Specifications = lazy(() => import("./pages/Specifications"));
+const Correspondence = lazy(() => import("./pages/Correspondence"));
+const Photos = lazy(() => import("./pages/Photos"));
+const Meetings = lazy(() => import("./pages/Meetings"));
+const Observations = lazy(() => import("./pages/Observations"));
+const SafetyIncidents = lazy(() => import("./pages/SafetyIncidents"));
+const Warranties = lazy(() => import("./pages/Warranties"));
+const OmManuals = lazy(() => import("./pages/OmManuals"));
+const InsuranceCertificates = lazy(() => import("./pages/InsuranceCertificates"));
+const Notifications = lazy(() => import("./pages/Notifications"));
+const AdminJobs = lazy(() => import("./pages/AdminJobs"));
 
 function SidebarItem({ to, children, onClick }) {
   const loc = useLocation();
@@ -111,8 +113,22 @@ function Shell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
 
-  if (!user) return <LoginPage />;
+  useEffect(() => {
+    if (!user) return undefined;
+    setRouteLoading(true);
+    const timer = window.setTimeout(() => setRouteLoading(false), 350);
+    return () => window.clearTimeout(timer);
+  }, [user, location.pathname, location.search]);
+
+  if (!user) {
+    return (
+      <Suspense fallback={<PageLoader text="Loading login…" />}>
+        <LoginPage />
+      </Suspense>
+    );
+  }
 
   return (
     <ProjectProvider>
@@ -209,47 +225,50 @@ function Shell() {
 
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", minWidth: 0 }}>
               <Topbar onMenuToggle={() => setSidebarOpen((v) => !v)} />
+              <div className={`rex-route-loader${routeLoading ? " active" : ""}`} aria-hidden="true" />
               <div className="rex-content">
                 <div className="rex-content-inner">
                   <ErrorBoundary routeKey={location.pathname}>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/portfolio" element={<Portfolio />} />
-                      <Route path="/project/:projectId" element={<ProjectReadiness />} />
-                      <Route path="/schedule" element={<ScheduleHealth />} />
-                      <Route path="/execution" element={<ExecutionHealth />} />
-                      <Route path="/checklists" element={<Checklists />} />
-                      <Route path="/milestones" element={<Milestones />} />
-                      <Route path="/attachments" element={<Attachments />} />
-                      <Route path="/budget" element={<BudgetOverview />} />
-                      <Route path="/pay-apps" element={<PayApplications />} />
-                      <Route path="/commitments" element={<Commitments />} />
-                      <Route path="/change-orders" element={<ChangeOrders />} />
-                      <Route path="/rfis" element={<RfiManagement />} />
-                      <Route path="/punch-list" element={<PunchList />} />
-                      <Route path="/submittals" element={<SubmittalManagement />} />
-                      <Route path="/daily-logs" element={<DailyLogs />} />
-                      <Route path="/inspections" element={<Inspections />} />
-                      <Route path="/tasks" element={<Tasks />} />
-                      <Route path="/drawings" element={<Drawings />} />
-                      <Route path="/specifications" element={<Specifications />} />
-                      <Route path="/correspondence" element={<Correspondence />} />
-                      <Route path="/photos" element={<Photos />} />
-                      <Route path="/meetings" element={<Meetings />} />
-                      <Route path="/observations" element={<Observations />} />
-                      <Route path="/safety" element={<SafetyIncidents />} />
-                      <Route path="/warranties" element={<Warranties />} />
-                      <Route path="/om-manuals" element={<OmManuals />} />
-                      <Route path="/insurance" element={<InsuranceCertificates />} />
-                      <Route path="/notifications" element={<Notifications />} />
-                      <Route path="/admin/jobs" element={<AdminJobs />} />
-                      <Route path="/companies" element={<Companies />} />
-                      <Route path="/people" element={<People />} />
-                      <Route path="/my-day" element={<MyDayHome />} />
-                      <Route path="/control-plane" element={<ControlPlaneHome />} />
-                      <Route path="/projects/:projectSlug" element={<ProjectDashboard />} />
-                      <Route path="/login" element={<Navigate to="/" />} />
-                    </Routes>
+                    <Suspense fallback={<PageLoader text="Loading page…" />}>
+                      <Routes>
+                        <Route path="/" element={<Dashboard />} />
+                        <Route path="/portfolio" element={<Portfolio />} />
+                        <Route path="/project/:projectId" element={<ProjectReadiness />} />
+                        <Route path="/schedule" element={<ScheduleHealth />} />
+                        <Route path="/execution" element={<ExecutionHealth />} />
+                        <Route path="/checklists" element={<Checklists />} />
+                        <Route path="/milestones" element={<Milestones />} />
+                        <Route path="/attachments" element={<Attachments />} />
+                        <Route path="/budget" element={<BudgetOverview />} />
+                        <Route path="/pay-apps" element={<PayApplications />} />
+                        <Route path="/commitments" element={<Commitments />} />
+                        <Route path="/change-orders" element={<ChangeOrders />} />
+                        <Route path="/rfis" element={<RfiManagement />} />
+                        <Route path="/punch-list" element={<PunchList />} />
+                        <Route path="/submittals" element={<SubmittalManagement />} />
+                        <Route path="/daily-logs" element={<DailyLogs />} />
+                        <Route path="/inspections" element={<Inspections />} />
+                        <Route path="/tasks" element={<Tasks />} />
+                        <Route path="/drawings" element={<Drawings />} />
+                        <Route path="/specifications" element={<Specifications />} />
+                        <Route path="/correspondence" element={<Correspondence />} />
+                        <Route path="/photos" element={<Photos />} />
+                        <Route path="/meetings" element={<Meetings />} />
+                        <Route path="/observations" element={<Observations />} />
+                        <Route path="/safety" element={<SafetyIncidents />} />
+                        <Route path="/warranties" element={<Warranties />} />
+                        <Route path="/om-manuals" element={<OmManuals />} />
+                        <Route path="/insurance" element={<InsuranceCertificates />} />
+                        <Route path="/notifications" element={<Notifications />} />
+                        <Route path="/admin/jobs" element={<AdminJobs />} />
+                        <Route path="/companies" element={<Companies />} />
+                        <Route path="/people" element={<People />} />
+                        <Route path="/my-day" element={<MyDayHome />} />
+                        <Route path="/control-plane" element={<ControlPlaneHome />} />
+                        <Route path="/projects/:projectSlug" element={<ProjectDashboard />} />
+                        <Route path="/login" element={<Navigate to="/" />} />
+                      </Routes>
+                    </Suspense>
                   </ErrorBoundary>
                 </div>
               </div>

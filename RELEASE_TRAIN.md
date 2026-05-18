@@ -1,12 +1,12 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-17 19:59:15Z
+Last Updated (UTC): 2026-05-18 20:49:23Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
-- Stage: Phase C (AI/action queue/SSE/connector validation lane)
-- Branch: `main`
-- Base Head: `origin/main @ 63c0d3f`
+- Stage: Phase D (hardening + continuity lane, with Phase E readiness staging)
+- Branch: `fix/login-api-base-routing`
+- Base Head: `origin/main @ b08f5ef`
 
 ## Mandatory Gates
 1. Fresh-db replay validation before schema-risk merges.
@@ -19,8 +19,14 @@ Last Updated (UTC): 2026-05-17 19:59:15Z
 - Action queue/compensator pytest subset: PASS (15 passed, 2 skipped)
 - Frontend build: PASS
 - Frontend SSE parser unit test path: PASS (`npm run test:unit:sse`)
-- Frontend lint parity: FAIL (`npm run lint` blocked by missing repo lint baseline + generated Playwright artifacts unless ignored)
+- Frontend API-base host inference unit test path: PASS (`npm run test:unit:api-base`)
+- Frontend lint parity: PASS (`npm run lint`)
+- Migration-sanity reliability check: PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed)
+- Auth/session production-like verification: PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => 9 passed)
+- Rollback/advisory-lock recovery verification: PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => 8 passed; focused `...::test_ph40_advisory_lock_stable_across_repeat_runs` => 1 passed)
+- Default local migration-sanity path (no DB override): FAIL (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`)
 - Production writes: none
+- Latest unattended rerun (2026-05-18 20:49Z): blocker-first hardening evidence revalidated green for auth/session + rollback lane (`test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1); migration-sanity parity unchanged (default local path FAIL due to `deploy@localhost/rex_os` auth drift; CI-style `DATABASE_URL` override PASS 7/7).
 
 ## Next Planned Stop
-- Phase D hardening continuation: add scoped ESLint baseline (`src/` + `e2e/`), ignore generated artifacts, then fix first blocking lint error in `e2e/phase54_live_integration.spec.js`.
+- Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.

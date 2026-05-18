@@ -163,7 +163,8 @@ export default function Meetings() {
       if (drawerMode === "create") {
         await api("/meetings/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/meetings/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);
@@ -200,7 +201,8 @@ export default function Meetings() {
       if (childMode === "create") {
         await api("/meeting-action-items/", { method: "POST", body: payload });
       } else {
-        const { meeting_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.meeting_id;
         await api(`/meeting-action-items/${childEditing.id}`, { method: "PATCH", body: updateOnly });
       }
       setChildDrawerOpen(false);

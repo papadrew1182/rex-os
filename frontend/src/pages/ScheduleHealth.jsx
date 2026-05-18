@@ -582,7 +582,7 @@ function DetailPanel({ activity, onClose, peopleMap, companiesMap, costCodesMap 
       setLinks(lks || []);
       setConstraints((cs || []).filter(c => c.status === "active"));
     });
-  }, [activity?.id]);
+  }, [activity]);
 
   useEffect(() => {
     if (!activity) return;
@@ -1117,6 +1117,7 @@ export default function ScheduleHealth() {
   const [location, setLocation] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   // ── Read URL state on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -1131,13 +1132,14 @@ export default function ScheduleHealth() {
     if (s.location) setLocation(s.location);
     if (s.dateFrom) setDateFrom(s.dateFrom);
     if (s.dateTo) setDateTo(s.dateTo);
+    if (s.overdueOnly === "true") setOverdueOnly(true);
     if (s.scheduleId) setScheduleId(s.scheduleId);
   }, []);
 
   // ── Sync filter state → URL ───────────────────────────────────────────────
   useEffect(() => {
-    writeUrlState({ tab: activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, scheduleId });
-  }, [activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, scheduleId]);
+    writeUrlState({ tab: activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, overdueOnly, scheduleId });
+  }, [activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, overdueOnly, scheduleId]);
 
   // ── Fetch health summary ──────────────────────────────────────────────────
   useEffect(() => {
@@ -1188,6 +1190,8 @@ export default function ScheduleHealth() {
   }, [activities]);
 
   // ── Filtered activities (shared across all tabs) ──────────────────────────
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const filteredActivities = useMemo(() => {
     if (!activities) return [];
     const q = search.toLowerCase();
@@ -1202,12 +1206,186 @@ export default function ScheduleHealth() {
       if (criticalOnly && !a.is_critical) return false;
       if (dateFrom && a.start_date && a.start_date < dateFrom) return false;
       if (dateTo && a.end_date && a.end_date > dateTo) return false;
+      if (overdueOnly) {
+        if (!a.end_date) return false;
+        const isOverdue = a.end_date < todayStr;
+        const isComplete = (a.percent_complete || 0) >= 100 || Boolean(a.actual_finish_date);
+        if (!isOverdue || isComplete) return false;
+      }
       return true;
     });
-  }, [activities, scheduleId, search, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, criticalOnly, dateFrom, dateTo]);
+  }, [activities, scheduleId, search, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, criticalOnly, dateFrom, dateTo, overdueOnly, todayStr]);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (search) count += 1;
+    if (location) count += 1;
+    if (wbsRoot) count += 1;
+    if (assignedCompany) count += 1;
+    if (assignedPerson) count += 1;
+    if (costCodeId) count += 1;
+    if (criticalOnly) count += 1;
+    if (overdueOnly) count += 1;
+    if (dateFrom) count += 1;
+    if (dateTo) count += 1;
+    if (scheduleId) count += 1;
+    return count;
+  }, [search, location, wbsRoot, assignedCompany, assignedPerson, costCodeId, criticalOnly, overdueOnly, dateFrom, dateTo, scheduleId]);
+
+  const overdueOpenCount = useMemo(() => {
+    const list = overdueOnly
+      ? filteredActivities
+      : filteredActivities.filter((a) => {
+          if (!a?.end_date) return false;
+          const isOverdue = a.end_date < todayStr;
+          const isComplete = (a.percent_complete || 0) >= 100 || Boolean(a.actual_finish_date);
+          return isOverdue && !isComplete;
+        });
+    return list.length;
+  }, [filteredActivities, overdueOnly, todayStr]);
+
+  const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const hasDateFilters = Boolean(dateFrom || dateTo);
+
+  const activeDatePresetLabel = useMemo(() => {
+    if (!dateFrom || !dateTo) return "";
+    const today = new Date();
+    const formatDate = (d) => d.toISOString().slice(0, 10);
+
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const next7End = new Date(today);
+    next7End.setDate(today.getDate() + 7);
+
+    const next14End = new Date(today);
+    next14End.setDate(today.getDate() + 14);
+
+    const next30End = new Date(today);
+    next30End.setDate(today.getDate() + 30);
+
+    const last30Start = new Date(today);
+    last30Start.setDate(today.getDate() - 30);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+    const lastQuarterStartMonth = quarterStartMonth - 3;
+    const lastQuarterStart = new Date(today.getFullYear(), lastQuarterStartMonth, 1);
+    const lastQuarterEnd = new Date(today.getFullYear(), lastQuarterStartMonth + 3, 0);
+    const quarterStart = new Date(today.getFullYear(), quarterStartMonth, 1);
+    const quarterEnd = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+    const nextQuarterStartMonth = quarterStartMonth + 3;
+    const nextQuarterStart = new Date(today.getFullYear(), nextQuarterStartMonth, 1);
+    const nextQuarterEnd = new Date(today.getFullYear(), nextQuarterStartMonth + 3, 0);
+
+    const from = dateFrom;
+    const to = dateTo;
+    if (from === formatDate(weekStart) && to === formatDate(weekEnd)) return "This week";
+    if (from === formatDate(today) && to === formatDate(next7End)) return "Next 7 days";
+    if (from === formatDate(today) && to === formatDate(next14End)) return "Next 14 days";
+    if (from === formatDate(today) && to === formatDate(next30End)) return "Next 30 days";
+    if (from === formatDate(last30Start) && to === formatDate(today)) return "Last 30 days";
+    if (from === formatDate(monthStart) && to === formatDate(monthEnd)) return "This month";
+    if (from === formatDate(lastQuarterStart) && to === formatDate(lastQuarterEnd)) return "Last quarter";
+    if (from === formatDate(quarterStart) && to === formatDate(quarterEnd)) return "This quarter";
+    if (from === formatDate(nextQuarterStart) && to === formatDate(nextQuarterEnd)) return "Next quarter";
+    return "Custom";
+  }, [dateFrom, dateTo]);
+
+  function applyDatePreset(preset) {
+    const today = new Date();
+    const formatDate = (d) => d.toISOString().slice(0, 10);
+
+    if (preset === "thisWeek") {
+      const from = new Date(today);
+      from.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const to = new Date(from);
+      to.setDate(from.getDate() + 6);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "next7") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 7);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "next14") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 14);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "next30") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 30);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "last30") {
+      const from = new Date(today);
+      from.setDate(from.getDate() - 30);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(today));
+      return;
+    }
+
+    if (preset === "thisMonth") {
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "lastQuarter") {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const lastQuarterStartMonth = quarterStartMonth - 3;
+      const from = new Date(today.getFullYear(), lastQuarterStartMonth, 1);
+      const to = new Date(today.getFullYear(), lastQuarterStartMonth + 3, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "thisQuarter") {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const from = new Date(today.getFullYear(), quarterStartMonth, 1);
+      const to = new Date(today.getFullYear(), quarterStartMonth + 3, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "nextQuarter") {
+      const quarterStartMonth = Math.floor(today.getMonth() / 3) * 3;
+      const nextQuarterStartMonth = quarterStartMonth + 3;
+      const from = new Date(today.getFullYear(), nextQuarterStartMonth, 1);
+      const to = new Date(today.getFullYear(), nextQuarterStartMonth + 3, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "clear") {
+      setDateFrom("");
+      setDateTo("");
+    }
+  }
 
   function resetFilters() {
-    setSearch(""); setCriticalOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
+    setSearch(""); setCriticalOnly(false); setOverdueOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
   }
 
   const openDetail = useCallback((a) => setSelectedActivity(a), []);
@@ -1217,7 +1395,9 @@ export default function ScheduleHealth() {
   const filterSummary = useMemo(() => {
     const parts = [];
     if (search) parts.push(`search="${search}"`);
+    if (location) parts.push(`location="${location}"`);
     if (criticalOnly) parts.push("critical only");
+    if (overdueOnly) parts.push("overdue only");
     if (wbsRoot) parts.push(`WBS root=${wbsRoot}`);
     if (assignedCompany) parts.push(`company=${companiesMap[assignedCompany]?.name || assignedCompany}`);
     if (assignedPerson) { const p = peopleMap[assignedPerson]; parts.push(`person=${p ? `${p.first_name} ${p.last_name}` : assignedPerson}`); }
@@ -1225,7 +1405,7 @@ export default function ScheduleHealth() {
     if (dateFrom) parts.push(`from=${dateFrom}`);
     if (dateTo) parts.push(`to=${dateTo}`);
     return parts.join("; ");
-  }, [search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
+  }, [search, location, criticalOnly, overdueOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
 
   // ── Export handlers ───────────────────────────────────────────────────────
   function handleExportCsv() {
@@ -1261,12 +1441,26 @@ export default function ScheduleHealth() {
           </div>
         )}
         <div className="rex-form-row" style={{ alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+          <span
+            className="rex-muted"
+            style={{ fontSize: 12, whiteSpace: "nowrap", marginRight: 4 }}
+            aria-live="polite"
+          >
+            Showing {filteredActivities.length} of {activities?.length ?? 0} activities{activeFilterCount ? ` • ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : ""}{!overdueOnly && overdueOpenCount ? ` • ${overdueOpenCount} overdue open` : ""}
+          </span>
           <input
             className="rex-input"
             placeholder="Search name, number, WBS, or location…"
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 220 }}
+          />
+          <input
+            className="rex-input"
+            placeholder="Filter location…"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            style={{ width: 170 }}
           />
           <select className="rex-input" value={wbsRoot} onChange={e => setWbsRoot(e.target.value)} style={{ width: 130 }}>
             <option value="">All WBS</option>
@@ -1284,11 +1478,103 @@ export default function ScheduleHealth() {
             <option value="">All cost codes</option>
             {costCodes.map(c => <option key={c.id} value={c.id}>{c.code}</option>)}
           </select>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--rex-text-muted)", whiteSpace: "nowrap" }}>
+            From
+            <input
+              type="date"
+              className="rex-input"
+              aria-label="Filter start date from"
+              value={dateFrom}
+              max={dateTo || undefined}
+              onChange={e => setDateFrom(e.target.value)}
+              style={{ width: 150 }}
+              title="Start date from"
+            />
+          </label>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--rex-text-muted)", whiteSpace: "nowrap" }}>
+            To
+            <input
+              type="date"
+              className="rex-input"
+              aria-label="Filter end date to"
+              value={dateTo}
+              min={dateFrom || undefined}
+              onChange={e => setDateTo(e.target.value)}
+              style={{ width: 150 }}
+              title="End date to"
+            />
+          </label>
+          {hasInvalidDateRange && (
+            <span className="rex-muted" style={{ fontSize: 12, color: "var(--rex-danger)", whiteSpace: "nowrap" }} role="status" aria-live="polite">
+              Date range invalid: “From” is after “To”.
+            </span>
+          )}
+          <select
+            className="rex-input"
+            aria-label="Apply date filter preset"
+            defaultValue=""
+            onChange={e => {
+              if (!e.target.value) return;
+              applyDatePreset(e.target.value);
+              e.target.value = "";
+            }}
+            style={{ width: 170 }}
+            title="Apply a date range preset"
+          >
+            <option value="">Date preset…</option>
+            <option value="thisWeek">This week</option>
+            <option value="next7">Next 7 days</option>
+            <option value="next14">Next 14 days</option>
+            <option value="next30">Next 30 days</option>
+            <option value="last30">Last 30 days</option>
+            <option value="thisMonth">This month</option>
+            <option value="lastQuarter">Last quarter</option>
+            <option value="thisQuarter">This quarter</option>
+            <option value="nextQuarter">Next quarter</option>
+            <option value="clear">Clear dates</option>
+          </select>
+          {activeDatePresetLabel && (
+            <span className="rex-badge rex-badge-gray" title="Active date window" style={{ whiteSpace: "nowrap" }}>
+              Date window: {activeDatePresetLabel}
+            </span>
+          )}
+          <button
+            className="rex-btn rex-btn-outline"
+            onClick={() => { setDateFrom(""); setDateTo(""); }}
+            title={hasDateFilters ? "Clear date range filters" : "No date filters to clear"}
+            style={{ whiteSpace: "nowrap" }}
+            disabled={!hasDateFilters}
+          >
+            Clear dates
+          </button>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--rex-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
             <input type="checkbox" checked={criticalOnly} onChange={e => setCriticalOnly(e.target.checked)} style={{ cursor: "pointer" }} />
             Critical only
           </label>
-          <button className="rex-btn rex-btn-outline" onClick={resetFilters} title="Clear all filters" style={{ whiteSpace: "nowrap" }}>Clear</button>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--rex-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} style={{ cursor: "pointer" }} />
+            Overdue only
+          </label>
+          {!overdueOnly && (
+            <button
+              className="rex-btn rex-btn-outline"
+              onClick={() => setOverdueOnly(true)}
+              title={overdueOpenCount ? `Show ${overdueOpenCount} overdue open activit${overdueOpenCount === 1 ? "y" : "ies"}` : "No overdue open activities in current filter scope"}
+              style={{ whiteSpace: "nowrap" }}
+              disabled={!overdueOpenCount}
+            >
+              Overdue open{overdueOpenCount ? ` (${overdueOpenCount})` : ""}
+            </button>
+          )}
+          <button
+            className="rex-btn rex-btn-outline"
+            onClick={resetFilters}
+            title={activeFilterCount ? `Clear ${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}` : "No active filters to clear"}
+            style={{ whiteSpace: "nowrap" }}
+            disabled={activeFilterCount === 0}
+          >
+            Clear{activeFilterCount ? ` (${activeFilterCount})` : ""}
+          </button>
           {activeTab !== "health" && activeTab !== "gantt" && (
             <>
               <button className="rex-btn rex-btn-outline" onClick={handleExportCsv} title="Export CSV" style={{ whiteSpace: "nowrap" }}>CSV</button>

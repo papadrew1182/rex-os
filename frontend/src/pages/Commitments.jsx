@@ -86,16 +86,6 @@ export default function Commitments() {
     remaining: items.reduce((s, r) => s + ((r.revised_value ?? 0) - (r.invoiced_amount ?? 0)), 0),
   }), [items]);
 
-  // Refresh detail panel for selected commitment
-  const refreshDetail = useCallback((id) => {
-    if (!id) return;
-    setDetailLoading(true);
-    api(`/commitments/${id}/summary`)
-      .then(setDetail)
-      .catch(() => setDetail(null))
-      .finally(() => setDetailLoading(false));
-  }, []);
-
   // Also refresh line items in detail — detail may embed them or we fetch separately
   const refreshLineItems = useCallback((id) => {
     if (!id) return;

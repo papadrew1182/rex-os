@@ -85,9 +85,11 @@ export default function Tasks() {
   const statuses = useMemo(() => [...new Set(items.map((r) => r.status).filter(Boolean))], [items]);
   const priorities = useMemo(() => [...new Set(items.map((r) => r.priority).filter(Boolean))], [items]);
   const categories = useMemo(() => [...new Set(items.map((r) => r.category).filter(Boolean))], [items]);
-
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
+  const today = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
 
   const summary = useMemo(() => {
     const openItems = items.filter((r) => r.status === "open" || r.status === "in_progress");
@@ -95,7 +97,7 @@ export default function Tasks() {
     const completed = items.filter((r) => r.status === "complete").length;
     const highPriority = items.filter((r) => r.priority === "high" && r.status !== "complete" && r.status !== "void").length;
     return { total: items.length, open: openItems.length, overdue, completed, highPriority };
-  }, [items]);
+  }, [items, today]);
 
   function openCreate() {
     setDrawerMode("create");
@@ -121,7 +123,8 @@ export default function Tasks() {
       if (drawerMode === "create") {
         await api("/tasks/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/tasks/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

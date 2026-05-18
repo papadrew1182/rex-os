@@ -87,7 +87,8 @@ export default function Specifications() {
       if (drawerMode === "create") {
         await api("/specifications/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/specifications/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

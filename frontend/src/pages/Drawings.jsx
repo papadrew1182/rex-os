@@ -136,7 +136,8 @@ export default function Drawings() {
       if (drawerMode === "create") {
         await api("/drawings/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/drawings/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

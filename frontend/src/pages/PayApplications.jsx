@@ -113,7 +113,10 @@ export default function PayApplications() {
       if (drawerMode === "create") {
         await api("/payment-applications/", { method: "POST", body: payload });
       } else {
-        const { commitment_id, billing_period_id, pay_app_number, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.commitment_id;
+        delete updateOnly.billing_period_id;
+        delete updateOnly.pay_app_number;
         await api(`/payment-applications/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);

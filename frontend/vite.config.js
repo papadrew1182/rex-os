@@ -32,5 +32,18 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Generate sourcemaps for Sentry symbolication without exposing map
+    // references in browser-loaded assets.
+    sourcemap: 'hidden',
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('@sentry/')) return 'vendor-sentry'
+          if (id.includes('react-router')) return 'vendor-router'
+          if (id.includes('react')) return 'vendor-react'
+        },
+      },
+    },
   },
 })

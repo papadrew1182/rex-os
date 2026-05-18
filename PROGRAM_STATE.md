@@ -9,6 +9,13 @@
 > Source of truth: **`main` branch** (currently `d119663`) + production Railway
 > + Vercel deployments.
 > The prior integration branch `master` is deprecated — see `DEPLOY.md §4c`.
+>
+> **Branch-state disclaimer (2026-05-18 continuity sweep):** references to
+> `main @ d119663` in this document are intentionally preserved as a
+> **historical reconciliation snapshot baseline** from the 2026-04-14 production
+> verification pass. Active implementation/validation work is currently happening
+> on branch `fix/login-api-base-routing`; use `ACTIVE_PR_QUEUE.md` +
+> `CURRENT_PHASE.md` for live branch/SHA execution context.
 
 ---
 
@@ -35,7 +42,7 @@ with no UI) say so. AI features have their own copy of this ladder in
 
 ## 1) Current program state summary
 
-**Rex OS is live in production** at:
+**Rex OS is live in production** at *(historical 2026-04-14 reconciliation snapshot)*:
 - Frontend: https://rex-os.vercel.app (Vercel, Vite + React, bundle `index-gT1ItBVr.js`, ~620 KB raw / ~156 KB gzip)
 - Backend: https://rex-os-api-production.up.railway.app (Railway, FastAPI + Postgres)
 - Running on **`main @ d119663`** as of 2026-04-14 (phase 41–53 promotion commit `3148f0c` + one CI-only fix on top, no runtime change)
@@ -386,7 +393,7 @@ This is the standard. Sprints that don't meet it should be marked "partial" in t
 | Playwright test count (**14**) | **High** — smoke.spec.js (8) + phase46_50.spec.js (6) |
 | Phases 1-44 are all shipped | **High** — verified by the reconciliation table |
 | Phases 45–53 are all shipped | **High** — verified by the new rows in the reconciliation table; prod promotion completed 2026-04-14 |
-| Production deploy is healthy at `d119663` | **High** — verified by `/api/health` returning 200, `/api/version.commit=d119663`, `environment=production`, login + projects list working, bundle `index-gT1ItBVr.js` contains phase 46–50 strings. The phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI workflow fix on top with no runtime change. |
+| Production deploy is healthy at `d119663` *(historical snapshot baseline)* | **High** — verified by `/api/health` returning 200, `/api/version.commit=d119663`, `environment=production`, login + projects list working, bundle `index-gT1ItBVr.js` contains phase 46–50 strings. The phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI workflow fix on top with no runtime change. Live branch/SHA execution context is tracked in `ACTIVE_PR_QUEUE.md`/`CURRENT_PHASE.md`. |
 | `REX_DEMO_SEED` is off on prod | **High** — verified by `/api/companies/` returning only foundation companies (Rex Construction + Exxir Capital), no Apex Concrete / Steel Frame / etc. |
 | All P1 parity items closed | **High** — verified by `FIELD_PARITY_BACKLOG.md` and migration 002/003 contents |
 | All practical P2 parity items closed | **High** — verified by migration 005 contents |
@@ -417,8 +424,8 @@ and why. Each entry is labeled:
 | Demo environment for release flights | ✅ shipped phase 46–53 | Separate Railway demo env + Vercel `rex-os-demo` project; was the proving ground for the 2026-04-14 prod promotion |
 | API versioning prefix (`/api/v1`) | deferred (low priority) | No breaking response shape change planned yet |
 | S3 storage in prod | deferred (ops step) | Adapter exists and is demo-safe; prod still on `local`; flip sequence requires demo round-trip first per `DEPLOY.md §1f` |
-| Backend Sentry activation in prod | deferred (ops step) | Code ready; needs demo DSN + one safe event + prod DSN |
-| Frontend Sentry activation in prod | deferred (ops step) | Code ready; Vite env is build-time so requires a Vercel redeploy after setting the DSN |
+| Backend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Platform/Ops. Status: blocked on DSN provisioning policy. Rollout runbook: `DEPLOY.md` §1c (backend env vars) + §3 (verify). Verification commands: `curl -fsS "$REX_API_BASE/api/health"` then trigger one controlled backend error after `REX_SENTRY_DSN` is set and confirm ingestion in Sentry. Evidence capture location: `docs/handoffs/` (attach timestamped deployment note with health curl output + Sentry event ID). |
+| Frontend Sentry activation in prod | deferred (ops step, Phase E blocker) | Owner: Frontend/Ops. Status: blocked on DSN + rebuild requirement. Rollout runbook: `DEPLOY.md` §2b-§2d (frontend env + redeploy + CORS) + §3 (verify). Verification commands: set `VITE_SENTRY_DSN`, redeploy frontend, then trigger one controlled frontend error on `rex-os.vercel.app` and confirm ingestion in Sentry. Evidence capture location: `docs/handoffs/` (attach timestamped deployment note with Vercel deploy URL + Sentry event ID). |
 | Email transport enabled | deferred (low priority) | `REX_EMAIL_TRANSPORT=noop`; SMTP wired but disabled |
 | Per-user notification preference matrix | deferred (not yet designed) | Backend has no schema for per-user opt-out |
 | Email digest job | deferred (low priority) | Blocked on email transport + preference matrix |
@@ -426,7 +433,7 @@ and why. Each entry is labeled:
 | SSO / SAML | deferred (not yet designed) | No identity provider selected |
 | Multi-tenancy beyond project scoping | deferred (not yet designed) | Current product scope is single-workspace |
 | Public API / OAuth client registration | deferred (low priority) | No external consumers |
-| Real-browser sanity pass on post-promotion prod build | pending (minutes of work) | API-level smoke already green; one human click-through of `rex-os.vercel.app` still open |
+| Real-browser sanity pass on post-promotion prod build | pending (Phase E blocker) | Owner: QA/Release. Status: blocked on manual execution window. Rollout runbook: `DEPLOY.md` §3 (verify) + known-gotchas section for login/CORS triage. Verification checklist: open `rex-os.vercel.app`, log in with non-admin + admin users, validate portfolio + one write-guard denial, capture screenshots in release evidence. Evidence capture location: `docs/handoffs/` (timestamped sanity-pass handoff with screenshots + user-role matrix). |
 
 ### Frontend polish
 
@@ -443,11 +450,11 @@ and why. Each entry is labeled:
 | ARIA labels / Lighthouse audit | deferred (low priority) | Partial ARIA labels added phase 50; Lighthouse pass not done |
 | Email-invite / signup flow for new users | deferred (not yet designed) | Existing-user management shipped phase 48; new-account creation is still DB-direct |
 | Global route-transition loading indicator | deferred (low priority) | Per-page `PageLoader` is sufficient for now |
-| Code splitting (react.lazy) | deferred (low priority) | Bundle is ~620 KB raw / ~156 KB gzip — over the 500 KB advisory but not blocking |
+| Code splitting (react.lazy) | ✅ shipped (Phase E hardening) | Owner: Frontend. Status: completed on `fix/login-api-base-routing`; app routes are lazy-loaded and current build output is split (`vendor-react` ~142 KB, `index` ~109 KB, `ScheduleHealth` ~40 KB, no >500 KB Vite warning). Verification command: `cd frontend && npm run build` and confirm split chunk output remains under warning thresholds. |
 | Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
 | Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
 | TypeScript migration | deferred (low priority) | Would require porting 32 pages + shared modules |
-| Frontend source map upload for Sentry | deferred (blocking prod Sentry flip) | Required before frontend Sentry stack traces will be meaningful |
+| Frontend source map upload for Sentry | in progress (code-ready; operator execution pending) | Hidden sourcemap emission is now enabled in Vite (`build.sourcemap='hidden'`) and upload script exists (`npm run sentry:upload-sourcemaps`); staffed run with Sentry org/project/token is still required before prod Sentry flip. |
 
 ### Advanced schedule / document features
 

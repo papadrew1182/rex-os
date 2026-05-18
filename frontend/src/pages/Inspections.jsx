@@ -143,7 +143,8 @@ export default function Inspections() {
       if (drawerMode === "create") {
         await api("/inspections/", { method: "POST", body: { ...payload, project_id: selectedId } });
       } else {
-        const { project_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.project_id;
         await api(`/inspections/${editing.id}`, { method: "PATCH", body: updateOnly });
       }
       setDrawerOpen(false);
@@ -180,7 +181,8 @@ export default function Inspections() {
       if (childMode === "create") {
         await api("/inspection-items/", { method: "POST", body: payload });
       } else {
-        const { inspection_id, ...updateOnly } = payload;
+        const updateOnly = { ...payload };
+        delete updateOnly.inspection_id;
         await api(`/inspection-items/${childEditing.id}`, { method: "PATCH", body: updateOnly });
       }
       setChildDrawerOpen(false);

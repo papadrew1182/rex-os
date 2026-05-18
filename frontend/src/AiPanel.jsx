@@ -29,7 +29,33 @@ export default function AiPanel({ open, onClose }) {
   const [streamText, setStreamText] = useState("");
   const [loadingCatalog, setLoadingCatalog] = useState(false);
   const [sending, setSending] = useState(false);
+  const [expanded, setExpanded] = useState(false);
   const streamRef = useRef(null);
+  const panelRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) setExpanded(false);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        if (expanded) {
+          setExpanded(false);
+          return;
+        }
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [expanded, onClose, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -129,10 +155,20 @@ export default function AiPanel({ open, onClose }) {
   return (
     <>
       <div className="rex-ai-overlay" onClick={onClose} aria-hidden="true" />
-      <aside className="rex-ai-panel" aria-label="AI quick actions panel">
+      <aside
+        className={`rex-ai-panel${expanded ? " rex-ai-panel--expanded" : ""}`}
+        aria-label="AI quick actions panel"
+        ref={panelRef}
+        tabIndex={-1}
+      >
         <div className="rex-ai-panel-header">
           <h3 className="rex-h3">AI Quick Actions</h3>
-          <button type="button" className="rex-btn rex-btn-outline" onClick={onClose}>Close</button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button type="button" className="rex-btn rex-btn-outline" onClick={() => setExpanded((value) => !value)}>
+              {expanded ? "Collapse" : "Expand"}
+            </button>
+            <button type="button" className="rex-btn rex-btn-outline" onClick={onClose}>Close</button>
+          </div>
         </div>
 
         <p className="rex-muted" style={{ marginTop: 6 }}>
@@ -152,25 +188,34 @@ export default function AiPanel({ open, onClose }) {
           ))}
         </div>
 
-        <textarea
-          className="rex-input rex-ai-input"
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Type request for assistant..."
-          rows={5}
-        />
+        <div className={`rex-ai-workspace${expanded ? " rex-ai-workspace--expanded" : ""}`}>
+          <div className="rex-ai-composer">
+            <textarea
+              className="rex-input rex-ai-input"
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Type request for assistant..."
+              rows={expanded ? 10 : 5}
+              onKeyDown={(event) => {
+                if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+                  event.preventDefault();
+                  send();
+                }
+              }}
+            />
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="rex-btn rex-btn-outline" onClick={() => setPrompt("")}>
+                Clear
+              </button>
+              <button type="button" className="rex-btn rex-btn-primary" onClick={send} disabled={sending || !prompt.trim()}>
+                {sending ? "Streaming..." : "Send"}
+              </button>
+            </div>
+          </div>
 
-        <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-          <button type="button" className="rex-btn rex-btn-outline" onClick={() => setPrompt("")}>
-            Clear
-          </button>
-          <button type="button" className="rex-btn rex-btn-primary" onClick={send} disabled={sending || !prompt.trim()}>
-            {sending ? "Streaming..." : "Send"}
-          </button>
-        </div>
-
-        <div className="rex-ai-stream" role="status">
-          {streamText || "Assistant response will stream here..."}
+          <div className="rex-ai-stream" role="status">
+            {streamText || "Assistant response will stream here..."}
+          </div>
         </div>
       </aside>
     </>

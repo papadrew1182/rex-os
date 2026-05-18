@@ -40,14 +40,14 @@ export default function MyDayHome() {
   const { me } = useMe();
   const currentContext = useCurrentContext();
   const { assistant, launchAction, selectConversation, setTab, setCollapsed } = useAssistantClient();
+  const catalogActions = useMemo(() => assistant.catalog.data?.actions || [], [assistant.catalog.data?.actions]);
 
-  const suggestedSlugs = currentContext.assistant_defaults?.suggested_action_slugs || [];
-  const catalogActions = assistant.catalog.data?.actions || [];
   const suggestedActions = useMemo(() => {
+    const suggestedSlugs = currentContext.assistant_defaults?.suggested_action_slugs || [];
     return suggestedSlugs
       .map((slug) => catalogActions.find((a) => a.slug === slug))
       .filter(Boolean);
-  }, [suggestedSlugs, catalogActions]);
+  }, [currentContext.assistant_defaults?.suggested_action_slugs, catalogActions]);
 
   // Recent conversations — pulled directly from the reducer's
   // `conversations` bucket. Capped at 4 for the home surface; full

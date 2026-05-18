@@ -1,11 +1,14 @@
 const TOKEN_KEY = "rex_token";
+import { inferApiBaseFromWindow } from "./lib/apiBase.js";
 
 // API base URL.
 //   - In dev: empty string → uses Vite proxy at /api → http://localhost:9000
 //   - In prod (Vercel): set VITE_API_URL to the Railway backend URL,
 //     e.g. https://rex-os-backend.up.railway.app
 // Trailing slash stripped so we always join cleanly.
-export const API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+const ENV_API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
+
+export const API_BASE = ENV_API_BASE || inferApiBaseFromWindow();
 
 export function apiUrl(path) {
   // path may start with "/api/..." or just "/..." — both work
