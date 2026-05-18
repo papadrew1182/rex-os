@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-17 23:19:26Z
+Last Updated (UTC): 2026-05-18 00:40:00Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -37,8 +37,12 @@ Last Updated (UTC): 2026-05-17 23:19:26Z
       - Full validation sweep: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend build PASS, and full frontend lint still FAIL on backlog but improved to **33 findings** (24 errors, 9 warnings) from 34 findings.
       - Executed highest-priority lint burn-down slice this run (user-visible pages): removed unused `Badge` imports in `BudgetOverview.jsx`, `Drawings.jsx`, `Photos.jsx`, and `Specifications.jsx`; removed unused `TextArea` import in `SubmittalManagement.jsx`.
       - Verification: `npm run lint` remains FAIL on backlog but improved to **26 findings** (17 errors, 9 warnings) from 31 findings (22 errors, 9 warnings) at run start.
+      - Re-ran Phase C/D architecture+static checks on branch `fix/login-api-base-routing`: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), and frontend production build PASS.
+      - Executed full frontend lint gate: `npm run lint` now PASS clean (`eslint . --max-warnings 0`), indicating the prior lint backlog is fully cleared in current workspace state.
+      - Ran migration-order integrity audit (`backend/app/migrate.py::MIGRATION_ORDER` vs `migrations/*.sql`): no missing ordered files; 3 intentional data-seed SQL files remain outside ordered schema migrations (`023_bishop_modern_dashboard_seed.sql`, `seed_dashboard_demo.sql`, `rex2_demo_seed.sql`).
 
 ## Next (Queued)
 1. Phase D hardening pass (migration integrity + CI parity edge checks + stale-doc cleanup)
-   - Immediate next executable: remove unused `idSet` and `SORT_KEYS` in `frontend/src/pages/ScheduleHealth.jsx`, then rerun `npx eslint src/pages/ScheduleHealth.jsx` and `npm run lint`.
+   - Immediate next executable: run targeted migration-order integrity audit (`backend/app/migrate.py::MIGRATION_ORDER` vs `migrations/*.sql`) and document any drift in continuity docs.
 2. Phase E production-readiness progression review and continuity update
+   - Immediate next executable: refresh `CURRENT_PHASE.md` exit-criteria status now that lint/static gates are green, then stage Phase E blocker list.
