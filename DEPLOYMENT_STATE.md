@@ -1,6 +1,6 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 08:19:42Z
+Last Updated (UTC): 2026-05-18 09:00:56Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
@@ -54,7 +54,13 @@ Last Updated (UTC): 2026-05-18 08:19:42Z
   - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; split build stable)
-  - `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+- 2026-05-18 09:00Z verification rerun + routing hardening patch (same branch lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB)
+  - User-visible reliability hardening applied: `frontend/src/api.js` host inference now covers `www.rex.papadrew.com` plus Vercel preview host patterns (`rex-os-git-*`, `rex-os-demo-git-*`) to prevent login/API fallthrough to broken same-origin `/api` on frontend-only hosts.
 
 ## Safety Posture
 - No production deployment actions executed in this phase.

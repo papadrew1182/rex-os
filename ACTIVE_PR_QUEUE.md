@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 08:19:42Z
+Last Updated (UTC): 2026-05-18 09:00:56Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -101,6 +101,9 @@ Last Updated (UTC): 2026-05-18 08:19:42Z
       - Executed highest-priority incomplete roadmap/reliability task this run (`docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 migration integrity hardening): reran canonical migration-sanity suite using explicit CI-style local DB override and confirmed PASS — `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed.
       - Continuity evidence updated in same run: refreshed `DEPLOYMENT_STATE.md` timestamp/HEAD and replaced prior open local-auth blocker text with resolved status + reproducible passing command.
       - Safety/rollback posture unchanged this run: validation-only execution, no production mutations, no credential/security changes, no rollback required.
+      - 2026-05-18 09:00Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
+      - Executed highest-priority incomplete user-visible reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 "Hardening", esp. retries/backoff + production-infra behavior, lines 330-345): hardened frontend API host inference in `frontend/src/api.js` to route login/auth API calls correctly for `www.rex.papadrew.com` and Vercel preview host patterns (`rex-os-git-*`, `rex-os-demo-git-*`) so frontend-only hosts do not fall through to broken same-origin `/api` login requests.
+      - Verification for routing hardening: full static/architecture suite above remained green after patch; no new lint/build/test regressions.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
