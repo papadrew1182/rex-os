@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 15:22:39Z
+Last Updated (UTC): 2026-05-18 15:59:26Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -134,6 +134,10 @@ Last Updated (UTC): 2026-05-18 15:22:39Z
       - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): surfaced existing `dateFrom`/`dateTo` filtering state as visible toolbar controls in `frontend/src/pages/ScheduleHealth.jsx` (from/to date pickers), enabling date-range filtering directly from the Schedule Workbench UI.
       - 2026-05-18 15:22Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed), frontend lint PASS (`npm run lint -- --max-warnings 0`), frontend build PASS.
       - Executed highest-priority incomplete **user-visible** hardening slice this unattended run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): refined Schedule Workbench date filters in `frontend/src/pages/ScheduleHealth.jsx` with explicit inline labels (`From`, `To`) so date-range controls are scannable without relying on browser date-input chrome.
+      - 2026-05-18 15:41Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): hardened Schedule Workbench date-range UX in `frontend/src/pages/ScheduleHealth.jsx` by adding cross-bound `min`/`max` constraints on `From`/`To` date inputs and an inline invalid-range warning (`From` after `To`) so filter errors are prevented/visible at entry time.
+      - 2026-05-18 15:59Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added a dedicated `Clear dates` toolbar action in `frontend/src/pages/ScheduleHealth.jsx` that resets only `From`/`To` filters and is disabled when no date filters are active.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

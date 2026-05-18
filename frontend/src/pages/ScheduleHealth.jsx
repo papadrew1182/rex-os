@@ -1208,8 +1208,8 @@ export default function ScheduleHealth() {
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (search) count += 1;
-    if (location) count += 1;
+    if (search.trim()) count += 1;
+    if (location.trim()) count += 1;
     if (wbsRoot) count += 1;
     if (assignedCompany) count += 1;
     if (assignedPerson) count += 1;
@@ -1220,6 +1220,9 @@ export default function ScheduleHealth() {
     if (scheduleId) count += 1;
     return count;
   }, [search, location, wbsRoot, assignedCompany, assignedPerson, costCodeId, criticalOnly, dateFrom, dateTo, scheduleId]);
+
+  const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
+  const hasDateFilters = Boolean(dateFrom || dateTo);
 
   function resetFilters() {
     setSearch(""); setCriticalOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
@@ -1321,6 +1324,7 @@ export default function ScheduleHealth() {
               className="rex-input"
               aria-label="Filter start date from"
               value={dateFrom}
+              max={dateTo || undefined}
               onChange={e => setDateFrom(e.target.value)}
               style={{ width: 150 }}
               title="Start date from"
@@ -1333,11 +1337,26 @@ export default function ScheduleHealth() {
               className="rex-input"
               aria-label="Filter end date to"
               value={dateTo}
+              min={dateFrom || undefined}
               onChange={e => setDateTo(e.target.value)}
               style={{ width: 150 }}
               title="End date to"
             />
           </label>
+          {hasInvalidDateRange && (
+            <span className="rex-muted" style={{ fontSize: 12, color: "var(--rex-danger)", whiteSpace: "nowrap" }} role="status" aria-live="polite">
+              Date range invalid: “From” is after “To”.
+            </span>
+          )}
+          <button
+            className="rex-btn rex-btn-outline"
+            onClick={() => { setDateFrom(""); setDateTo(""); }}
+            title={hasDateFilters ? "Clear date range filters" : "No date filters to clear"}
+            style={{ whiteSpace: "nowrap" }}
+            disabled={!hasDateFilters}
+          >
+            Clear dates
+          </button>
           <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--rex-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
             <input type="checkbox" checked={criticalOnly} onChange={e => setCriticalOnly(e.target.checked)} style={{ cursor: "pointer" }} />
             Critical only
