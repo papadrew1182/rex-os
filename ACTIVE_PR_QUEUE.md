@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 19:38:19Z
+Last Updated (UTC): 2026-05-18 20:15:01Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -160,6 +160,8 @@ Last Updated (UTC): 2026-05-18 19:38:19Z
       - 2026-05-18 19:03Z migration-sanity parity evidence: default local path still FAIL (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors, `InvalidPasswordError` for `deploy@localhost/rex_os`), while canonical CI-style override remains PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
       - 2026-05-18 19:38Z blocker-first rerun (auth/session + rollback hardening): `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed); `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed); focused advisory-lock replay `...::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed).
       - 2026-05-18 19:38Z migration-sanity parity rerun: default local path remains FAIL (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`), CI-style override remains PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
+      - 2026-05-18 20:15Z blocker-first rerun (auth/session + rollback hardening): `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed); `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed); focused advisory-lock replay `...::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed).
+      - 2026-05-18 20:15Z migration-sanity parity rerun: default local path remains FAIL (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`), CI-style override remains PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
