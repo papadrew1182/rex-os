@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 04:38:33Z
+Last Updated (UTC): 2026-05-18 04:56:12Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -60,9 +60,11 @@ Last Updated (UTC): 2026-05-18 04:38:33Z
       - Executed highest-priority queued Phase E progression step: created second timestamped operator handoff skeleton prefilled with current branch/SHA and blank evidence slots at `docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`.
       - Re-ran Phase C/D architecture+static checks this run: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
       - Executed highest-priority unblocked queued task from this lane (`ACTIVE_PR_QUEUE.md` "Next" item #2): completed Phase D continuity sweep in `PROGRAM_STATE.md` by adding explicit branch-state disclaimers that `main @ d119663` references are historical reconciliation snapshots and pointing live execution context to `ACTIVE_PR_QUEUE.md` / `CURRENT_PHASE.md`.
+      - Re-ran required Phase C/D architecture+static gates this run on `fix/login-api-base-routing`: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS, frontend build PASS.
+      - Executed highest-priority incomplete roadmap task for this unattended run (Phase E readiness progression, docs/evidence lane): refreshed continuity artifacts (`DEPLOYMENT_STATE.md` timestamp + HEAD + fresh validation evidence block) to keep the operator execution packet chain current without performing protected production mutations.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
    - Immediate next executable: execute `docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md` in a staffed window and attach backend/frontend Sentry probe evidence plus browser-sanity screenshots.
-2. Phase D hardening follow-through (continuity sweep)
-   - Immediate next executable: sweep `PROGRAM_STATE.md` for branch-state disclaimers and annotate historical `main @ d119663` sections as reconciliation snapshots to avoid confusion with active validation branch context.
+2. Phase E hardening follow-through (artifact capture discipline)
+   - Immediate next executable: after staffed execution, append concrete evidence links + rollback state into `DEPLOYMENT_STATE.md`, `CONNECTOR_STATUS.md`, and `RELEASE_TRAIN.md` in the same commit.

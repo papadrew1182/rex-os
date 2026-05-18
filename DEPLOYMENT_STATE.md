@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 03:08:50Z
+Last Updated (UTC): 2026-05-18 04:56:12Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `cb9e659204c0aa6666d50480094f19b555d3a7c4`
+- Local HEAD: `093b31d14b816c322bcdc7aa0a1e974b7d71c775`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -19,6 +19,11 @@ Last Updated (UTC): 2026-05-18 03:08:50Z
 - Frontend lint hardening pass: PASS (prior backlog cleared in workspace)
 - Frontend lint command: PASS (`npm run lint`)
 - CI queue state: local validation rerun this session; backend pytest subset + frontend SSE tests + frontend lint + frontend build all green
+- 2026-05-18 04:56Z verification rerun (same branch/SHA lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint` => PASS
+  - `npm run build` => PASS (chunked output, largest chunk 141.83 kB vendor-react)
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
