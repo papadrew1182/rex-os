@@ -1,4 +1,5 @@
 const TOKEN_KEY = "rex_token";
+import { inferApiBaseFromWindow } from "./lib/apiBase.js";
 
 // API base URL.
 //   - In dev: empty string → uses Vite proxy at /api → http://localhost:9000
@@ -7,30 +8,7 @@ const TOKEN_KEY = "rex_token";
 // Trailing slash stripped so we always join cleanly.
 const ENV_API_BASE = (import.meta.env?.VITE_API_URL || "").replace(/\/$/, "");
 
-function inferApiBaseFromHost() {
-  if (typeof window === "undefined") return "";
-  const host = window.location.hostname;
-
-  // Production hotfix: custom/frontend-only domains need explicit backend routing.
-  // Include common aliases so login never falls back to frontend /api on those hosts.
-  const isProdFrontendHost =
-    host === "rex.papadrew.com" ||
-    host === "www.rex.papadrew.com" ||
-    host === "rex-os.vercel.app" ||
-    /^rex-os-git-.*\.vercel\.app$/i.test(host);
-
-  if (isProdFrontendHost) {
-    return "https://rex-os-api-production.up.railway.app";
-  }
-
-  if (host === "rex-os-demo.vercel.app" || /^rex-os-demo-git-.*\.vercel\.app$/i.test(host)) {
-    return "https://rex-os-demo.up.railway.app";
-  }
-
-  return "";
-}
-
-export const API_BASE = ENV_API_BASE || inferApiBaseFromHost();
+export const API_BASE = ENV_API_BASE || inferApiBaseFromWindow();
 
 export function apiUrl(path) {
   // path may start with "/api/..." or just "/..." — both work

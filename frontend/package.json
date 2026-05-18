@@ -11,6 +11,7 @@
     "preview": "vite preview",
     "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "test:unit:sse": "node src/lib/__tests__/sseParser.test.js",
+    "test:unit:api-base": "node src/lib/__tests__/apiBase.test.js",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui"
   },

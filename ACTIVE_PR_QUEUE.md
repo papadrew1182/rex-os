@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 09:19:26Z
+Last Updated (UTC): 2026-05-18 09:38:46Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -107,6 +107,9 @@ Last Updated (UTC): 2026-05-18 09:19:26Z
       - 2026-05-18 09:19Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
       - Executed highest-priority incomplete reliability task this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6, Phase 11 DoD migration integrity and idempotency checks): reran `pytest -q backend/tests/test_session2_migration_sanity.py` with explicit CI-style local DB override and confirmed PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci` => 7 passed).
       - Blocker state: local migration-sanity path remains green with explicit credentialed override; no open reproducible migration-integrity failures in current lane.
+      - 2026-05-18 09:38Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS; frontend build PASS (split chunks stable, largest JS chunk `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6, Phase 11 retries/backoff + migration-idempotency verification): extracted frontend API host-inference into tested helper (`frontend/src/lib/apiBase.js`) and added dedicated unit coverage (`frontend/src/lib/__tests__/apiBase.test.js`) to lock production/demo/preview host routing behavior.
+      - Additional hardening verification in same run: `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed).
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
