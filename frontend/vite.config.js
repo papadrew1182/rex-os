@@ -32,5 +32,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return
+          if (id.includes('@sentry/')) return 'vendor-sentry'
+          if (id.includes('react-router')) return 'vendor-router'
+          if (id.includes('react')) return 'vendor-react'
+        },
+      },
+    },
   },
 })
