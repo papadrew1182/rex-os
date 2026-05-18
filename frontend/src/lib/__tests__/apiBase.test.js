@@ -17,7 +17,15 @@ function test(name, fn) {
 
 test("maps rex production hosts to Railway production API", () => {
   assert.strictEqual(
+    inferApiBaseFromHost("rex.papadrew.com"),
+    "https://rex-os-api-production.up.railway.app",
+  );
+  assert.strictEqual(
     inferApiBaseFromHost("www.rex.papadrew.com"),
+    "https://rex-os-api-production.up.railway.app",
+  );
+  assert.strictEqual(
+    inferApiBaseFromHost("ops.rex.papadrew.com"),
     "https://rex-os-api-production.up.railway.app",
   );
   assert.strictEqual(

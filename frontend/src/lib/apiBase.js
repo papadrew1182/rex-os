@@ -1,9 +1,12 @@
 export function inferApiBaseFromHost(hostname) {
   const host = (hostname || "").toLowerCase();
 
-  const isProdFrontendHost =
+  const isRexPapadrewHost =
     host === "rex.papadrew.com" ||
-    host === "www.rex.papadrew.com" ||
+    host.endsWith(".rex.papadrew.com");
+
+  const isProdFrontendHost =
+    isRexPapadrewHost ||
     host === "rex-os.vercel.app" ||
     /^rex-os-git-.*\.vercel\.app$/i.test(host);
 
