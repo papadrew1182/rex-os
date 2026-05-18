@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 04:02:25Z
+Last Updated (UTC): 2026-05-18 04:19:39Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -56,9 +56,11 @@ Last Updated (UTC): 2026-05-18 04:02:25Z
       - Executed highest-priority queued Phase E progression task from prior run: promoted the dry-run handoff artifact into an operator-ready execution packet by adding demo-first then production command snippets, evidence placeholders, manual browser sanity script, and explicit rollback command scaffolds in `docs/handoffs/2026-05-18_phase_e_handoff_template_dry_run.md`.
       - Re-ran Phase C/D architecture+static checks in same run after handoff packet update: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
       - Executed continuity follow-through scan for stale branch/base metadata in current continuity docs (`CURRENT_PHASE.md`, `DEPLOYMENT_STATE.md`, `RELEASE_TRAIN.md`, `ACTIVE_PR_QUEUE.md`): no stale `main` branch metadata found requiring correction in this run.
+      - Re-ran Phase C/D architecture+static checks this run on `fix/login-api-base-routing`: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
+      - Executed highest-priority queued Phase E progression step: created second timestamped operator handoff skeleton prefilled with current branch/SHA and blank evidence slots at `docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`.
 
 ## Next (Queued)
-1. Phase E production-readiness progression review
-   - Immediate next executable: prepare a second timestamped handoff skeleton copied from `phase_e_sentry_browser_sanity_handoff_template.md` for live operator execution window, prefilled with current branch/SHA and blank evidence slots.
+1. Phase E blocker progression (operator execution)
+   - Immediate next executable: execute `docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md` in a staffed window and attach backend/frontend Sentry probe evidence plus browser-sanity screenshots.
 2. Phase D hardening follow-through (continuity sweep)
    - Immediate next executable: sweep `PROGRAM_STATE.md` for branch-state disclaimers and annotate historical `main @ d119663` sections as reconciliation snapshots to avoid confusion with active validation branch context.
