@@ -450,7 +450,7 @@ and why. Each entry is labeled:
 | ARIA labels / Lighthouse audit | deferred (low priority) | Partial ARIA labels added phase 50; Lighthouse pass not done |
 | Email-invite / signup flow for new users | deferred (not yet designed) | Existing-user management shipped phase 48; new-account creation is still DB-direct |
 | Global route-transition loading indicator | deferred (low priority) | Per-page `PageLoader` is sufficient for now |
-| Code splitting (react.lazy) | deferred (Phase E hardening blocker) | Owner: Frontend. Status: pending chunking plan; latest build is ~734 KB raw / ~185 KB gzip for main JS chunk. Verification command: `cd frontend && npm run build` and confirm main chunk <500 KB warning threshold or approved manualChunks plan is documented. |
+| Code splitting (react.lazy) | ✅ shipped (Phase E hardening) | Owner: Frontend. Status: completed on `fix/login-api-base-routing`; app routes are lazy-loaded and current build output is split (`vendor-react` ~142 KB, `index` ~109 KB, `ScheduleHealth` ~40 KB, no >500 KB Vite warning). Verification command: `cd frontend && npm run build` and confirm split chunk output remains under warning thresholds. |
 | Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
 | Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
 | TypeScript migration | deferred (low priority) | Would require porting 32 pages + shared modules |
