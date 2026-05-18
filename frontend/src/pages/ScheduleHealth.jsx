@@ -1117,6 +1117,7 @@ export default function ScheduleHealth() {
   const [location, setLocation] = useState("");
   const [dateFrom, setDateFrom] = useState("");
   const [dateTo, setDateTo] = useState("");
+  const [overdueOnly, setOverdueOnly] = useState(false);
 
   // ── Read URL state on mount ───────────────────────────────────────────────
   useEffect(() => {
@@ -1131,13 +1132,14 @@ export default function ScheduleHealth() {
     if (s.location) setLocation(s.location);
     if (s.dateFrom) setDateFrom(s.dateFrom);
     if (s.dateTo) setDateTo(s.dateTo);
+    if (s.overdueOnly === "true") setOverdueOnly(true);
     if (s.scheduleId) setScheduleId(s.scheduleId);
   }, []);
 
   // ── Sync filter state → URL ───────────────────────────────────────────────
   useEffect(() => {
-    writeUrlState({ tab: activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, scheduleId });
-  }, [activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, scheduleId]);
+    writeUrlState({ tab: activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, overdueOnly, scheduleId });
+  }, [activeTab, search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, dateFrom, dateTo, overdueOnly, scheduleId]);
 
   // ── Fetch health summary ──────────────────────────────────────────────────
   useEffect(() => {
@@ -1188,6 +1190,8 @@ export default function ScheduleHealth() {
   }, [activities]);
 
   // ── Filtered activities (shared across all tabs) ──────────────────────────
+  const todayStr = new Date().toISOString().slice(0, 10);
+
   const filteredActivities = useMemo(() => {
     if (!activities) return [];
     const q = search.toLowerCase();
@@ -1202,24 +1206,43 @@ export default function ScheduleHealth() {
       if (criticalOnly && !a.is_critical) return false;
       if (dateFrom && a.start_date && a.start_date < dateFrom) return false;
       if (dateTo && a.end_date && a.end_date > dateTo) return false;
+      if (overdueOnly) {
+        if (!a.end_date) return false;
+        const isOverdue = a.end_date < todayStr;
+        const isComplete = (a.percent_complete || 0) >= 100 || Boolean(a.actual_finish_date);
+        if (!isOverdue || isComplete) return false;
+      }
       return true;
     });
-  }, [activities, scheduleId, search, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, criticalOnly, dateFrom, dateTo]);
+  }, [activities, scheduleId, search, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, criticalOnly, dateFrom, dateTo, overdueOnly, todayStr]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (search.trim()) count += 1;
-    if (location.trim()) count += 1;
+    if (search) count += 1;
+    if (location) count += 1;
     if (wbsRoot) count += 1;
     if (assignedCompany) count += 1;
     if (assignedPerson) count += 1;
     if (costCodeId) count += 1;
     if (criticalOnly) count += 1;
+    if (overdueOnly) count += 1;
     if (dateFrom) count += 1;
     if (dateTo) count += 1;
     if (scheduleId) count += 1;
     return count;
-  }, [search, location, wbsRoot, assignedCompany, assignedPerson, costCodeId, criticalOnly, dateFrom, dateTo, scheduleId]);
+  }, [search, location, wbsRoot, assignedCompany, assignedPerson, costCodeId, criticalOnly, overdueOnly, dateFrom, dateTo, scheduleId]);
+
+  const overdueOpenCount = useMemo(() => {
+    const list = overdueOnly
+      ? filteredActivities
+      : filteredActivities.filter((a) => {
+          if (!a?.end_date) return false;
+          const isOverdue = a.end_date < todayStr;
+          const isComplete = (a.percent_complete || 0) >= 100 || Boolean(a.actual_finish_date);
+          return isOverdue && !isComplete;
+        });
+    return list.length;
+  }, [filteredActivities, overdueOnly, todayStr]);
 
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const hasDateFilters = Boolean(dateFrom || dateTo);
@@ -1309,7 +1332,7 @@ export default function ScheduleHealth() {
   }
 
   function resetFilters() {
-    setSearch(""); setCriticalOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
+    setSearch(""); setCriticalOnly(false); setOverdueOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
   }
 
   const openDetail = useCallback((a) => setSelectedActivity(a), []);
@@ -1321,6 +1344,7 @@ export default function ScheduleHealth() {
     if (search) parts.push(`search="${search}"`);
     if (location) parts.push(`location="${location}"`);
     if (criticalOnly) parts.push("critical only");
+    if (overdueOnly) parts.push("overdue only");
     if (wbsRoot) parts.push(`WBS root=${wbsRoot}`);
     if (assignedCompany) parts.push(`company=${companiesMap[assignedCompany]?.name || assignedCompany}`);
     if (assignedPerson) { const p = peopleMap[assignedPerson]; parts.push(`person=${p ? `${p.first_name} ${p.last_name}` : assignedPerson}`); }
@@ -1328,7 +1352,7 @@ export default function ScheduleHealth() {
     if (dateFrom) parts.push(`from=${dateFrom}`);
     if (dateTo) parts.push(`to=${dateTo}`);
     return parts.join("; ");
-  }, [search, location, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
+  }, [search, location, criticalOnly, overdueOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
 
   // ── Export handlers ───────────────────────────────────────────────────────
   function handleExportCsv() {
@@ -1369,7 +1393,7 @@ export default function ScheduleHealth() {
             style={{ fontSize: 12, whiteSpace: "nowrap", marginRight: 4 }}
             aria-live="polite"
           >
-            Showing {filteredActivities.length} of {activities?.length ?? 0} activities{activeFilterCount ? ` • ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : ""}
+            Showing {filteredActivities.length} of {activities?.length ?? 0} activities{activeFilterCount ? ` • ${activeFilterCount} filter${activeFilterCount === 1 ? "" : "s"} active` : ""}{!overdueOnly && overdueOpenCount ? ` • ${overdueOpenCount} overdue open` : ""}
           </span>
           <input
             className="rex-input"
@@ -1470,6 +1494,21 @@ export default function ScheduleHealth() {
             <input type="checkbox" checked={criticalOnly} onChange={e => setCriticalOnly(e.target.checked)} style={{ cursor: "pointer" }} />
             Critical only
           </label>
+          <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: "var(--rex-text)", cursor: "pointer", whiteSpace: "nowrap" }}>
+            <input type="checkbox" checked={overdueOnly} onChange={e => setOverdueOnly(e.target.checked)} style={{ cursor: "pointer" }} />
+            Overdue only
+          </label>
+          {!overdueOnly && (
+            <button
+              className="rex-btn rex-btn-outline"
+              onClick={() => setOverdueOnly(true)}
+              title={overdueOpenCount ? `Show ${overdueOpenCount} overdue open activit${overdueOpenCount === 1 ? "y" : "ies"}` : "No overdue open activities in current filter scope"}
+              style={{ whiteSpace: "nowrap" }}
+              disabled={!overdueOpenCount}
+            >
+              Overdue open{overdueOpenCount ? ` (${overdueOpenCount})` : ""}
+            </button>
+          )}
           <button
             className="rex-btn rex-btn-outline"
             onClick={resetFilters}
