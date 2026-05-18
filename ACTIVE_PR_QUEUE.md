@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 07:24:53Z
+Last Updated (UTC): 2026-05-18 07:43:21Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -89,6 +89,10 @@ Last Updated (UTC): 2026-05-18 07:24:53Z
       - 2026-05-18 07:24Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (split chunks stable; largest JS chunk `vendor-react` 141.83 kB).
       - Executed highest-priority incomplete roadmap/reliability task this run (`Next` item #3): reran `pytest -q backend/tests/test_session2_migration_sanity.py`; blocker remains reproducible and unchanged (1 passed, 6 errors), with all setup failures at local DB auth (`asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`).
       - Safety/rollback posture unchanged: validation-only execution, no migration writes, no production mutations, no rollback required.
+      - 2026-05-18 07:43Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest JS chunk remains `vendor-react` 141.83 kB, no >500 kB warning).
+      - Executed highest-priority incomplete roadmap/reliability task this run (`Next` item #3; roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §Phase 11, line 341 migration idempotency): reran `pytest -q backend/tests/test_session2_migration_sanity.py`; blocker remains reproducible and unchanged (1 passed, 6 errors), with all setup failures rooted at local DB auth (`asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`).
+      - Hard-blocker remediation options unchanged and ready for staffed execution: (a) provide valid passworded local `DATABASE_URL` credentials for user `deploy` and rerun migration sanity; or (b) run the same suite against CI/ephemeral Postgres with managed credentials and capture artifact outputs.
+      - Safety/rollback posture unchanged in this run: no schema writes applied, no production operations, no credential mutations, no rollback required.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
