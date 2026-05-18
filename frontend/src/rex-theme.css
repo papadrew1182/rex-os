@@ -1382,6 +1382,25 @@ select.rex-input { padding-right: 24px; }
   width: 100%;
   resize: vertical;
 }
+.rex-ai-workspace {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
+  flex: 1;
+}
+.rex-ai-workspace--expanded {
+  flex-direction: row;
+  align-items: stretch;
+}
+.rex-ai-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rex-ai-workspace--expanded .rex-ai-composer {
+  width: min(460px, 42vw);
+}
 .rex-ai-stream {
   border: 1px solid var(--rex-border);
   border-radius: 8px;
@@ -1391,6 +1410,10 @@ select.rex-input { padding-right: 24px; }
   white-space: pre-wrap;
   font-size: 12px;
   overflow: auto;
+}
+.rex-ai-workspace--expanded .rex-ai-stream {
+  flex: 1;
+  min-height: 0;
 }
 .rex-mobile-nav {
   display: none;
