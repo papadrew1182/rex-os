@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 07:24:53Z
+Last Updated (UTC): 2026-05-18 08:19:42Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `8543b1050f50337b886821fc4080267686be7b1d`
+- Local HEAD: `47bd7a6b0e0aee3585579b69b71afb5ef5e17cec`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -49,16 +49,19 @@ Last Updated (UTC): 2026-05-18 07:24:53Z
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; split build stable)
   - `pytest -q backend/tests/test_session2_migration_sanity.py` => PARTIAL (1 passed, 6 errors) — blocker unchanged: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`
+- 2026-05-18 08:19Z verification rerun (same branch/SHA lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; split build stable)
+  - `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
 - No production DB writes executed in this phase.
 
-## Open Reliability Blocker (local env)
-- Blocker: migration-sanity suite requiring live Postgres credentials cannot fully run in this unattended environment because local `deploy` DB auth failed.
-- Repro: `pytest -q backend/tests/test_session2_migration_sanity.py`
-- Error signature: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"`
+## Reliability Blocker Status (local env)
+- Previous blocker (`deploy@localhost/rex_os` authentication failure) is now treated as environment-specific credential drift, not a migration integrity failure.
+- Canonical unattended validation path is green via explicit local CI-style DB override:
+  - `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
 - Rollback state: no rollback required (validation-only commands; no migrations or production mutations executed).
-- Remediation options:
-  1) provide valid `DATABASE_URL` credentials for local `deploy` user/database, then rerun the suite;
-  2) execute suite in CI Postgres service (`rex/rex/rex_ci`) and attach artifact output to handoff evidence.

@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 08:02:40Z
+Last Updated (UTC): 2026-05-18 08:19:42Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -97,6 +97,10 @@ Last Updated (UTC): 2026-05-18 08:02:40Z
       - Executed highest-priority incomplete roadmap/reliability task this run (`Next` item #3; roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 DoD migration integrity): replaced prior local-auth blocker by provisioning an ephemeral local validation DB (`rex_ci`) and running canonical migration replay (`python -m app.migrate`) under `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci`; then reran `pytest -q backend/tests/test_session2_migration_sanity.py` against the same DB and achieved PASS (7 passed).
       - Blocker state changed this run: previous `InvalidPasswordError` on `deploy@localhost/rex_os` is now resolved/reframed as environment-specific credential drift; canonical migration-sanity path is reproducible and green via explicit `DATABASE_URL` override to managed local CI-style creds.
       - Safety/rollback posture this run: local-only validation DB creation/migration (`rex_ci`) with no production writes, no prod credential/security mutations, and no irreversible operations.
+      - 2026-05-18 08:19Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest JS chunk unchanged at `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete roadmap/reliability task this run (`docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 migration integrity hardening): reran canonical migration-sanity suite using explicit CI-style local DB override and confirmed PASS — `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed.
+      - Continuity evidence updated in same run: refreshed `DEPLOYMENT_STATE.md` timestamp/HEAD and replaced prior open local-auth blocker text with resolved status + reproducible passing command.
+      - Safety/rollback posture unchanged this run: validation-only execution, no production mutations, no credential/security changes, no rollback required.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
