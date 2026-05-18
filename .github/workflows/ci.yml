@@ -115,3 +115,9 @@ jobs:
       - name: Build
         working-directory: frontend
         run: npm run build
+
+      - name: Enforce frontend chunk budget
+        working-directory: frontend
+        env:
+          REX_MAX_CHUNK_KB: "150"
+        run: npm run build:check-chunks

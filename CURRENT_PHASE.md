@@ -1,6 +1,6 @@
 # CURRENT_PHASE
 
-Last Updated (UTC): 2026-05-18 02:31:52Z
+Last Updated (UTC): 2026-05-18 02:51:21Z
 Project: rex-os (Rex 2.0)
 Execution Mode: HIGH AUTONOMY (with protected-operation stop gates)
 
@@ -24,4 +24,4 @@ Execution Mode: HIGH AUTONOMY (with protected-operation stop gates)
 ## Phase E Readiness Blockers (staged)
 - ⚠️ Production Sentry DSNs remain unset for both backend and frontend environments (see `PROGRAM_STATE.md` open blockers).
 - ⚠️ Real-browser post-promotion production sanity pass is still open.
-- ⚠️ Frontend bundle remains monolithic (>500 kB chunk warning in production build), requiring planned code-splitting hardening before scale traffic.
+- ✅ Frontend chunking hardening lane in progress: route-level splitting plus CI chunk-budget guard (`REX_MAX_CHUNK_KB=150`) are now enforced; continue monitoring post-merge production artifacts for regressions.
