@@ -1206,6 +1206,21 @@ export default function ScheduleHealth() {
     });
   }, [activities, scheduleId, search, wbsRoot, assignedCompany, assignedPerson, costCodeId, location, criticalOnly, dateFrom, dateTo]);
 
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (search) count += 1;
+    if (location) count += 1;
+    if (wbsRoot) count += 1;
+    if (assignedCompany) count += 1;
+    if (assignedPerson) count += 1;
+    if (costCodeId) count += 1;
+    if (criticalOnly) count += 1;
+    if (dateFrom) count += 1;
+    if (dateTo) count += 1;
+    if (scheduleId) count += 1;
+    return count;
+  }, [search, location, wbsRoot, assignedCompany, assignedPerson, costCodeId, criticalOnly, dateFrom, dateTo, scheduleId]);
+
   function resetFilters() {
     setSearch(""); setCriticalOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
   }
@@ -1296,7 +1311,15 @@ export default function ScheduleHealth() {
             <input type="checkbox" checked={criticalOnly} onChange={e => setCriticalOnly(e.target.checked)} style={{ cursor: "pointer" }} />
             Critical only
           </label>
-          <button className="rex-btn rex-btn-outline" onClick={resetFilters} title="Clear all filters" style={{ whiteSpace: "nowrap" }}>Clear</button>
+          <button
+            className="rex-btn rex-btn-outline"
+            onClick={resetFilters}
+            title={activeFilterCount ? `Clear ${activeFilterCount} active filter${activeFilterCount === 1 ? "" : "s"}` : "No active filters to clear"}
+            style={{ whiteSpace: "nowrap" }}
+            disabled={activeFilterCount === 0}
+          >
+            Clear{activeFilterCount ? ` (${activeFilterCount})` : ""}
+          </button>
           {activeTab !== "health" && activeTab !== "gantt" && (
             <>
               <button className="rex-btn rex-btn-outline" onClick={handleExportCsv} title="Export CSV" style={{ whiteSpace: "nowrap" }}>CSV</button>
