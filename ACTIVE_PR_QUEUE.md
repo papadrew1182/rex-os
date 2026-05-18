@@ -1,10 +1,10 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 01:17:20Z
+Last Updated (UTC): 2026-05-18 02:31:52Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
-   - Branch: `main`
+   - Branch: `fix/login-api-base-routing`
    - Base: `origin/main`
    - Scope:
      - Action queue service/repository validation
@@ -45,9 +45,11 @@ Last Updated (UTC): 2026-05-18 01:17:20Z
       - Executed queued Phase E progression task: refreshed `CURRENT_PHASE.md` and staged explicit Phase E readiness blocker list (Sentry DSNs, real-browser prod sanity pass, frontend chunk-size hardening).
       - Mirrored staged Phase E blockers into `PROGRAM_STATE.md` with explicit owner/status/verification entries for backend/frontend Sentry activation, real-browser prod sanity pass, and frontend code-splitting hardening.
       - Re-validated architecture/static gates in same run: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend production build PASS (with chunk-size advisory), frontend lint PASS (`eslint . --max-warnings 0`).
+      - Reconciled continuity metadata drift by correcting this queue's active validation branch from stale `main` to `fix/login-api-base-routing` (base remains `origin/main`), aligning Phase D docs with live git state.
+      - Re-ran architecture/static checks in same run after doc reconciliation: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
 
 ## Next (Queued)
-1. Phase E production-readiness progression review and continuity update
-   - Immediate next executable: add explicit rollout/runbook links in `PROGRAM_STATE.md` blocker rows (Sentry activation + real-browser sanity evidence location).
-2. Phase D hardening pass (stale-doc cleanup)
-   - Immediate next executable: reconcile branch/base metadata in continuity docs where `main` is still referenced as active branch.
+1. Phase D hardening pass (stale-doc cleanup)
+   - Immediate next executable: audit remaining continuity docs for stale active-branch references and normalize to `fix/login-api-base-routing` (or explicit historical `main` where intentional).
+2. Phase E production-readiness progression review and continuity update
+   - Immediate next executable: draft a single handoff template in `docs/handoffs/` for Sentry activation and real-browser sanity evidence capture to reduce operator variance.
