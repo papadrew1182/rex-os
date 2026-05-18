@@ -133,6 +133,32 @@ button:disabled { opacity: 0.5; cursor: not-allowed; }
 }
 .rex-topbar-right > * { flex-shrink: 1; min-width: 0; }
 
+.rex-route-loader {
+  height: 2px;
+  width: 100%;
+  background: transparent;
+  overflow: hidden;
+}
+
+.rex-route-loader::after {
+  content: "";
+  display: block;
+  height: 100%;
+  width: 35%;
+  background: linear-gradient(90deg, #6b45a1, #8f6ac6);
+  transform: translateX(-120%);
+  transition: transform 0.2s ease;
+}
+
+.rex-route-loader.active::after {
+  animation: rex-route-loading-slide 0.9s linear infinite;
+}
+
+@keyframes rex-route-loading-slide {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}
+
 .rex-content {
   padding: 24px 28px;
   flex: 1;

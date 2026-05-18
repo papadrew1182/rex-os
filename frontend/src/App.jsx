@@ -1,4 +1,4 @@
-import { lazy, Suspense, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState } from "react";
 import { HashRouter, Routes, Route, Link, Navigate, useLocation, useNavigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import { ProjectProvider, useProject } from "./project";
@@ -113,6 +113,14 @@ function Shell() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [aiOpen, setAiOpen] = useState(false);
+  const [routeLoading, setRouteLoading] = useState(false);
+
+  useEffect(() => {
+    if (!user) return undefined;
+    setRouteLoading(true);
+    const timer = window.setTimeout(() => setRouteLoading(false), 350);
+    return () => window.clearTimeout(timer);
+  }, [user, location.pathname, location.search]);
 
   if (!user) {
     return (
@@ -217,6 +225,7 @@ function Shell() {
 
             <div style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: "100vh", minWidth: 0 }}>
               <Topbar onMenuToggle={() => setSidebarOpen((v) => !v)} />
+              <div className={`rex-route-loader${routeLoading ? " active" : ""}`} aria-hidden="true" />
               <div className="rex-content">
                 <div className="rex-content-inner">
                   <ErrorBoundary routeKey={location.pathname}>
