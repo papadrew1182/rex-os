@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 10:33:28Z
+Last Updated (UTC): 2026-05-18 10:52:14Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -114,8 +114,10 @@ Last Updated (UTC): 2026-05-18 10:33:28Z
       - Executed highest-priority incomplete unblocked reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 reliability hardening): expanded production host inference in `frontend/src/lib/apiBase.js` to include wildcard `*.rex.papadrew.com` routing to production Railway API, and lock this behavior via added unit assertions for apex + nested subdomains.
       - 2026-05-18 10:16Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk `vendor-react` 141.83 kB); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
       - Executed highest-priority incomplete unblocked user-visible reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11, retries/backoff/infrastructure hardening lane): broadened frontend Vercel-host API inference in `frontend/src/lib/apiBase.js` to map additional `rex-os-*` preview domains (excluding demo/git namespace) to production Railway API, with unit coverage added in `frontend/src/lib/__tests__/apiBase.test.js` for `rex-os-feature-preview.vercel.app`.
-      - 2026-05-18 10:33Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
+      - 2026-05-18 10:33Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
       - Executed highest-priority incomplete unblocked roadmap/reliability task for this unattended run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 migration integrity + continuity discipline): captured fresh Phase D→E evidence across continuity artifacts (`ACTIVE_PR_QUEUE.md`, `DEPLOYMENT_STATE.md`, `RELEASE_TRAIN.md`) with current branch/HEAD and reproducible green command set.
+      - 2026-05-18 10:52Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
+      - Executed highest-priority incomplete unblocked roadmap/reliability task for this unattended run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 migration integrity + continuity discipline): refreshed continuity evidence timestamps/HEAD alignment in `ACTIVE_PR_QUEUE.md`, `DEPLOYMENT_STATE.md`, and `RELEASE_TRAIN.md` while protected Phase E operator tasks remain staffed-only.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

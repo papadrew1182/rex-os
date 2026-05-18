@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 10:33:28Z
+Last Updated (UTC): 2026-05-18 10:52:14Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `9d046e75ae21b420e36b2d91ad6725058d6f0621`
+- Local HEAD: `da33f4f406500800ce96b3dbd78421ece9053fb7`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -93,7 +93,13 @@ Last Updated (UTC): 2026-05-18 10:33:28Z
   - `npm run test:unit:api-base` => PASS (3 passed, 0 failed)
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB)
-  - `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+- 2026-05-18 10:52Z verification rerun + continuity evidence refresh (same branch lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:api-base` => PASS (3 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
