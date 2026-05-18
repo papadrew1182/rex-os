@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 03:08:50Z
+Last Updated (UTC): 2026-05-18 03:30:00Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -49,9 +49,11 @@ Last Updated (UTC): 2026-05-18 03:08:50Z
       - Re-ran architecture/static checks in same run after doc reconciliation: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
       - Executed queued Phase D stale-doc cleanup: normalized stale branch references in `RELEASE_TRAIN.md` and `DEPLOYMENT_STATE.md` from historical `main` to active `fix/login-api-base-routing`, and refreshed stage/gate text to match current validation lane.
       - Re-ran Phase C/D architecture+static checks in same run after doc updates: backend AI/action queue pytest subset PASS (15 passed, 2 skipped), frontend SSE parser unit tests PASS (10 passed), frontend lint PASS (`eslint . --max-warnings 0`), frontend build PASS.
+      - Executed highest-priority queued Phase E progression task: added `docs/handoffs/phase_e_sentry_browser_sanity_handoff_template.md` as the standard evidence template for backend/frontend Sentry activation and real-browser production sanity passes.
+      - Re-ran architecture/static checks after template addition: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS, frontend build PASS.
 
 ## Next (Queued)
-1. Phase E production-readiness progression review and continuity update
-   - Immediate next executable: draft a single handoff template in `docs/handoffs/` for Sentry activation and real-browser sanity evidence capture to reduce operator variance.
-2. Phase D hardening follow-through (continuity sweep)
+1. Phase D hardening follow-through (continuity sweep)
    - Immediate next executable: audit remaining continuity artifacts for stale `origin/main @ 63c0d3f` references and either update to live base (`origin/main @ b08f5ef`) or mark as intentional historical snapshot.
+2. Phase E production-readiness progression review
+   - Immediate next executable: execute a dry-run fill of `docs/handoffs/phase_e_sentry_browser_sanity_handoff_template.md` against current known blockers from `PROGRAM_STATE.md` §9 to validate completeness before operator use.
