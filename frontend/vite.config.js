@@ -32,6 +32,9 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     emptyOutDir: true,
+    // Generate sourcemaps for Sentry symbolication without exposing map
+    // references in browser-loaded assets.
+    sourcemap: 'hidden',
     rollupOptions: {
       output: {
         manualChunks(id) {

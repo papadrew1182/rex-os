@@ -454,7 +454,7 @@ and why. Each entry is labeled:
 | Component unit tests (Vitest) | deferred (low priority) | Shared modules lack tests |
 | Visual regression tests (Chromatic/Percy) | deferred (low priority) | Not justified at current screen count |
 | TypeScript migration | deferred (low priority) | Would require porting 32 pages + shared modules |
-| Frontend source map upload for Sentry | deferred (blocking prod Sentry flip) | Required before frontend Sentry stack traces will be meaningful |
+| Frontend source map upload for Sentry | in progress (code-ready; operator execution pending) | Hidden sourcemap emission is now enabled in Vite (`build.sourcemap='hidden'`) and upload script exists (`npm run sentry:upload-sourcemaps`); staffed run with Sentry org/project/token is still required before prod Sentry flip. |
 
 ### Advanced schedule / document features
 
