@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 11:50:18Z
+Last Updated (UTC): 2026-05-18 13:00:01Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `bbfd6dde3d92ee6361fbb92a1d9b4b035da2cfb2`
+- Local HEAD: `ca786f7d4ce575b7c543684498e5807f0ccf3ec6`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -123,6 +123,13 @@ Last Updated (UTC): 2026-05-18 11:50:18Z
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (split chunks stable; largest emitted JS chunk remains `vendor-react` 141.83 kB)
   - User-visible feature delivered: `frontend/src/App.jsx` now uses shared `PageLoader` for login and route-level Suspense fallbacks, replacing plain text placeholders during navigation chunk loads.
+- 2026-05-18 12:59Z verification rerun + Schedule Workbench location-filter UX closure (same branch lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (split chunks stable; largest emitted JS chunk remains `vendor-react` 141.83 kB)
+  - User-visible feature delivered: added explicit `Filter location…` input to `frontend/src/pages/ScheduleHealth.jsx` (bound to existing `location` state) and included `location` in export print filter-summary metadata.
 
 ## Safety Posture
 - No production deployment actions executed in this phase.

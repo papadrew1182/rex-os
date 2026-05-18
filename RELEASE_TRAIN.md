@@ -1,6 +1,6 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-18 11:50:18Z
+Last Updated (UTC): 2026-05-18 13:00:01Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
@@ -23,7 +23,7 @@ Last Updated (UTC): 2026-05-18 11:50:18Z
 - Frontend lint parity: PASS (`npm run lint`)
 - Migration-sanity reliability check: PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed)
 - Production writes: none
-- Latest unattended rerun (2026-05-18 11:50Z): architecture/static gates revalidated green (backend pytest subset, frontend `test:unit:api-base`, frontend SSE unit tests, lint, build, migration-sanity override); user-visible hardening shipped by replacing plain-text Suspense fallbacks with shared `PageLoader` in `frontend/src/App.jsx` for login + route-transition loading states.
+- Latest unattended rerun (2026-05-18 12:59Z): architecture/static gates revalidated green (backend pytest subset, migration-sanity override, frontend SSE unit tests, lint, build); user-visible UX closure shipped by adding explicit `Filter location…` control to Schedule Workbench (`frontend/src/pages/ScheduleHealth.jsx`) and wiring location into export filter-summary metadata.
 
 ## Next Planned Stop
 - Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.
