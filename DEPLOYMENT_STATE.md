@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 04:56:12Z
+Last Updated (UTC): 2026-05-18 05:16:38Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `093b31d14b816c322bcdc7aa0a1e974b7d71c775`
+- Local HEAD: `775631ec24196b48224069c6a0911974fdbf28e1`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -24,7 +24,22 @@ Last Updated (UTC): 2026-05-18 04:56:12Z
   - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
   - `npm run lint` => PASS
   - `npm run build` => PASS (chunked output, largest chunk 141.83 kB vendor-react)
+- 2026-05-18 05:16Z verification rerun (same branch/SHA lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; under `REX_MAX_CHUNK_KB=150` budget)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => PARTIAL (1 passed, 6 errors) — local DB auth blocker: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
 - No production DB writes executed in this phase.
+
+## Open Reliability Blocker (local env)
+- Blocker: migration-sanity suite requiring live Postgres credentials cannot fully run in this unattended environment because local `deploy` DB auth failed.
+- Repro: `pytest -q backend/tests/test_session2_migration_sanity.py`
+- Error signature: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"`
+- Rollback state: no rollback required (validation-only commands; no migrations or production mutations executed).
+- Remediation options:
+  1) provide valid `DATABASE_URL` credentials for local `deploy` user/database, then rerun the suite;
+  2) execute suite in CI Postgres service (`rex/rex/rex_ci`) and attach artifact output to handoff evidence.

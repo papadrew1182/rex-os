@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 04:56:12Z
+Last Updated (UTC): 2026-05-18 05:16:38Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -62,9 +62,15 @@ Last Updated (UTC): 2026-05-18 04:56:12Z
       - Executed highest-priority unblocked queued task from this lane (`ACTIVE_PR_QUEUE.md` "Next" item #2): completed Phase D continuity sweep in `PROGRAM_STATE.md` by adding explicit branch-state disclaimers that `main @ d119663` references are historical reconciliation snapshots and pointing live execution context to `ACTIVE_PR_QUEUE.md` / `CURRENT_PHASE.md`.
       - Re-ran required Phase C/D architecture+static gates this run on `fix/login-api-base-routing`: backend pytest subset PASS (15 passed, 2 skipped), frontend SSE unit tests PASS (10 passed), frontend lint PASS, frontend build PASS.
       - Executed highest-priority incomplete roadmap task for this unattended run (Phase E readiness progression, docs/evidence lane): refreshed continuity artifacts (`DEPLOYMENT_STATE.md` timestamp + HEAD + fresh validation evidence block) to keep the operator execution packet chain current without performing protected production mutations.
+      - Executed highest-priority unblocked reliability hardening step this run (Phase D→E continuity lane): re-ran architecture/static gates and captured a reproducible local migration-sanity blocker path so handoff evidence reflects current execution risk.
+      - Architecture/static rerun results (2026-05-18 05:16Z): backend AI/action-queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS; frontend build PASS.
+      - Additional migration integrity probe: `pytest -q backend/tests/test_session2_migration_sanity.py` => partial (1 passed, 6 errors) with reproducible local DB auth failure (`asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against `localhost:5432/rex_os`).
+      - Remediation options staged for staffed follow-through: (a) provide valid local `DATABASE_URL` credentials for `deploy` user, or (b) run the same migration sanity suite inside CI/ephemeral Postgres where creds are known-good (`postgresql://rex:rex@localhost:5432/rex_ci`) to confirm schema objects without mutating production.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
    - Immediate next executable: execute `docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md` in a staffed window and attach backend/frontend Sentry probe evidence plus browser-sanity screenshots.
 2. Phase E hardening follow-through (artifact capture discipline)
    - Immediate next executable: after staffed execution, append concrete evidence links + rollback state into `DEPLOYMENT_STATE.md`, `CONNECTOR_STATUS.md`, and `RELEASE_TRAIN.md` in the same commit.
+3. Migration-sanity reliability closure (local env parity)
+   - Immediate next executable: export/seed valid local Postgres credentials for `deploy` (or override `DATABASE_URL`), then rerun `pytest -q backend/tests/test_session2_migration_sanity.py` and record pass/fail + traceback excerpts in continuity docs.
