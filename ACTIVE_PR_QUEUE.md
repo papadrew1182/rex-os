@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 09:57:44Z
+Last Updated (UTC): 2026-05-18 10:16:16Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -112,6 +112,8 @@ Last Updated (UTC): 2026-05-18 09:57:44Z
       - Additional hardening verification in same run: `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed).
       - 2026-05-18 09:57Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS; frontend build PASS.
       - Executed highest-priority incomplete unblocked reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 reliability hardening): expanded production host inference in `frontend/src/lib/apiBase.js` to include wildcard `*.rex.papadrew.com` routing to production Railway API, and lock this behavior via added unit assertions for apex + nested subdomains.
+      - 2026-05-18 10:16Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); frontend `test:unit:api-base` PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk `vendor-react` 141.83 kB); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed).
+      - Executed highest-priority incomplete unblocked user-visible reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11, retries/backoff/infrastructure hardening lane): broadened frontend Vercel-host API inference in `frontend/src/lib/apiBase.js` to map additional `rex-os-*` preview domains (excluding demo/git namespace) to production Railway API, with unit coverage added in `frontend/src/lib/__tests__/apiBase.test.js` for `rex-os-feature-preview.vercel.app`.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

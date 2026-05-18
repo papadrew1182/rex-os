@@ -36,6 +36,10 @@ test("maps rex production hosts to Railway production API", () => {
     inferApiBaseFromHost("rex-os-git-fix-foo-bar.vercel.app"),
     "https://rex-os-api-production.up.railway.app",
   );
+  assert.strictEqual(
+    inferApiBaseFromHost("rex-os-feature-preview.vercel.app"),
+    "https://rex-os-api-production.up.railway.app",
+  );
 });
 
 test("maps demo hosts to Railway demo API", () => {

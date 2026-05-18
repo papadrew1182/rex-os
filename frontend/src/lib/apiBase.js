@@ -5,16 +5,21 @@ export function inferApiBaseFromHost(hostname) {
     host === "rex.papadrew.com" ||
     host.endsWith(".rex.papadrew.com");
 
+  const isDemoFrontendHost =
+    host === "rex-os-demo.vercel.app" ||
+    /^rex-os-demo-git-.*\.vercel\.app$/i.test(host);
+
   const isProdFrontendHost =
     isRexPapadrewHost ||
     host === "rex-os.vercel.app" ||
-    /^rex-os-git-.*\.vercel\.app$/i.test(host);
+    /^rex-os-git-.*\.vercel\.app$/i.test(host) ||
+    /^rex-os-(?!demo(?:-|\.))(?!git-).*\.vercel\.app$/i.test(host);
 
   if (isProdFrontendHost) {
     return "https://rex-os-api-production.up.railway.app";
   }
 
-  if (host === "rex-os-demo.vercel.app" || /^rex-os-demo-git-.*\.vercel\.app$/i.test(host)) {
+  if (isDemoFrontendHost) {
     return "https://rex-os-demo.up.railway.app";
   }
 

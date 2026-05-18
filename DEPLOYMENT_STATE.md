@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 09:57:44Z
+Last Updated (UTC): 2026-05-18 10:16:16Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `2c57063bd19f6f96fac8c40e6816c08e136f80f7`
+- Local HEAD: `90f620478aaf8d60547cfa9774d1f0a0536bfd37`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -81,6 +81,13 @@ Last Updated (UTC): 2026-05-18 09:57:44Z
   - `npm run lint` => PASS
   - `npm run build` => PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB)
   - Reliability feature delivered: expanded `frontend/src/lib/apiBase.js` production-host matching from exact-host pair to `*.rex.papadrew.com` coverage (while preserving prod/demo Vercel routing), with unit tests added for apex + nested subdomain hostnames.
+- 2026-05-18 10:16Z verification rerun + Vercel preview host-inference hardening (same branch lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:api-base` => PASS (3 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - Reliability feature delivered: broadened `frontend/src/lib/apiBase.js` host matching to treat additional non-demo `rex-os-*.vercel.app` preview domains as production API callers; added lock test for `rex-os-feature-preview.vercel.app`.
 
 ## Safety Posture
 - No production deployment actions executed in this phase.
