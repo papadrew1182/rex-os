@@ -1,6 +1,6 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-18 03:08:50Z
+Last Updated (UTC): 2026-05-18 10:33:28Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
@@ -19,8 +19,10 @@ Last Updated (UTC): 2026-05-18 03:08:50Z
 - Action queue/compensator pytest subset: PASS (15 passed, 2 skipped)
 - Frontend build: PASS
 - Frontend SSE parser unit test path: PASS (`npm run test:unit:sse`)
+- Frontend API-base host inference unit test path: PASS (`npm run test:unit:api-base`)
 - Frontend lint parity: PASS (`npm run lint`)
+- Migration-sanity reliability check: PASS (`DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed)
 - Production writes: none
 
 ## Next Planned Stop
-- Phase D hardening continuation: stale-doc cleanup + continuity metadata normalization to active branch, then Phase E handoff-template authoring for Sentry activation + real-browser sanity evidence capture.
+- Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.
