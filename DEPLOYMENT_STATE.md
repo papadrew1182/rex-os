@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-18 05:52:46Z
+Last Updated (UTC): 2026-05-18 07:24:53Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `fix/login-api-base-routing`
-- Local HEAD: `5b5379150ff4835cef3bd2f1379adebd781a15fb`
+- Local HEAD: `8543b1050f50337b886821fc4080267686be7b1d`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -42,6 +42,12 @@ Last Updated (UTC): 2026-05-18 05:52:46Z
   - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
   - `npm run lint -- --max-warnings 0` => PASS
   - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; under chunk budget)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => PARTIAL (1 passed, 6 errors) — blocker unchanged: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`
+- 2026-05-18 07:24Z verification rerun (same branch/SHA lane):
+  - `pytest -q backend/tests/services/ai/test_action_queue_service.py backend/tests/repositories/test_action_queue_repository.py backend/tests/services/ai/test_undo_compensator_dispatch.py backend/tests/services/ai/tools/test_base_compensator.py` => PASS (15 passed, 2 skipped)
+  - `npm run test:unit:sse` => PASS (10 passed, 0 failed)
+  - `npm run lint -- --max-warnings 0` => PASS
+  - `npm run build` => PASS (largest emitted JS chunk: `vendor-react` 141.83 kB; split build stable)
   - `pytest -q backend/tests/test_session2_migration_sanity.py` => PARTIAL (1 passed, 6 errors) — blocker unchanged: `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` on `localhost:5432/rex_os`
 
 ## Safety Posture
