@@ -138,7 +138,7 @@ export default function Milestones() {
       .finally(() => setPageLoad(false));
   }, [selectedId]);
 
-  useEffect(() => { setSel(null); setEvidence(null); setGates(null); load(); }, [selectedId]);
+  useEffect(() => { setSel(null); setEvidence(null); setGates(null); load(); }, [selectedId, load]);
 
   const refresh = async () => {
     const ms = await api(`/completion-milestones/?project_id=${selectedId}&limit=50`);

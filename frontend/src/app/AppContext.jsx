@@ -94,7 +94,7 @@ export function AppProvider({ children }) {
 
   useEffect(() => {
     saveUiPrefs(assistant.ui);
-  }, [assistant.ui.collapsed, assistant.ui.activeTab, assistant.ui.workspaceMode]);
+  }, [assistant.ui]);
 
   const loadCatalog = useCallback(async () => {
     assistantDispatch({ type: ASSISTANT_ACTIONS.CATALOG_LOADING });

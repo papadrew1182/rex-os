@@ -95,7 +95,7 @@ export default function IntegrationDiagnosticsPanel() {
     return unsub;
   }, []);
 
-  const effectiveMode = useMemo(() => (shouldUseMocks() ? "mock" : "live"), [overrideValue]);
+  const effectiveMode = shouldUseMocks() ? "mock" : "live";
 
   // Roll-up: partially live = some surfaces live + some mock/unavailable
   const rollup = useMemo(() => {

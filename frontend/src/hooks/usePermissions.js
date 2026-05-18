@@ -12,12 +12,12 @@
 // The permission strings must match the backend-issued slugs exactly —
 // do not introduce frontend-only permission names.
 
-import { useContext, useCallback } from "react";
+import { useContext, useCallback, useMemo } from "react";
 import { AppContext } from "../app/AppContext";
 
 export function usePermissions() {
   const ctx = useContext(AppContext);
-  const permissions = ctx.permissions || [];
+  const permissions = useMemo(() => ctx.permissions ?? [], [ctx.permissions]);
 
   const can = useCallback(
     (permission) => permissions.includes(permission),

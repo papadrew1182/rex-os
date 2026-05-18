@@ -12,7 +12,9 @@ export function ProjectProvider({ children }) {
     api("/projects/?limit=200")
       .then((list) => {
         setProjects(list);
-        if (list.length > 0 && !selectedId) setSelectedId(list[0].id);
+        if (list.length > 0) {
+          setSelectedId((prev) => prev ?? list[0].id);
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false));
