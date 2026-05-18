@@ -9,6 +9,13 @@
 > Source of truth: **`main` branch** (currently `d119663`) + production Railway
 > + Vercel deployments.
 > The prior integration branch `master` is deprecated — see `DEPLOY.md §4c`.
+>
+> **Branch-state disclaimer (2026-05-18 continuity sweep):** references to
+> `main @ d119663` in this document are intentionally preserved as a
+> **historical reconciliation snapshot baseline** from the 2026-04-14 production
+> verification pass. Active implementation/validation work is currently happening
+> on branch `fix/login-api-base-routing`; use `ACTIVE_PR_QUEUE.md` +
+> `CURRENT_PHASE.md` for live branch/SHA execution context.
 
 ---
 
@@ -35,7 +42,7 @@ with no UI) say so. AI features have their own copy of this ladder in
 
 ## 1) Current program state summary
 
-**Rex OS is live in production** at:
+**Rex OS is live in production** at *(historical 2026-04-14 reconciliation snapshot)*:
 - Frontend: https://rex-os.vercel.app (Vercel, Vite + React, bundle `index-gT1ItBVr.js`, ~620 KB raw / ~156 KB gzip)
 - Backend: https://rex-os-api-production.up.railway.app (Railway, FastAPI + Postgres)
 - Running on **`main @ d119663`** as of 2026-04-14 (phase 41–53 promotion commit `3148f0c` + one CI-only fix on top, no runtime change)
@@ -386,7 +393,7 @@ This is the standard. Sprints that don't meet it should be marked "partial" in t
 | Playwright test count (**14**) | **High** — smoke.spec.js (8) + phase46_50.spec.js (6) |
 | Phases 1-44 are all shipped | **High** — verified by the reconciliation table |
 | Phases 45–53 are all shipped | **High** — verified by the new rows in the reconciliation table; prod promotion completed 2026-04-14 |
-| Production deploy is healthy at `d119663` | **High** — verified by `/api/health` returning 200, `/api/version.commit=d119663`, `environment=production`, login + projects list working, bundle `index-gT1ItBVr.js` contains phase 46–50 strings. The phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI workflow fix on top with no runtime change. |
+| Production deploy is healthy at `d119663` *(historical snapshot baseline)* | **High** — verified by `/api/health` returning 200, `/api/version.commit=d119663`, `environment=production`, login + projects list working, bundle `index-gT1ItBVr.js` contains phase 46–50 strings. The phase 41–53 promotion commit was `3148f0c`; `d119663` is a CI workflow fix on top with no runtime change. Live branch/SHA execution context is tracked in `ACTIVE_PR_QUEUE.md`/`CURRENT_PHASE.md`. |
 | `REX_DEMO_SEED` is off on prod | **High** — verified by `/api/companies/` returning only foundation companies (Rex Construction + Exxir Capital), no Apex Concrete / Steel Frame / etc. |
 | All P1 parity items closed | **High** — verified by `FIELD_PARITY_BACKLOG.md` and migration 002/003 contents |
 | All practical P2 parity items closed | **High** — verified by migration 005 contents |
