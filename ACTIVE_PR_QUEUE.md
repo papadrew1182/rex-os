@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 11:50:18Z
+Last Updated (UTC): 2026-05-18 12:59:04Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -124,6 +124,8 @@ Last Updated (UTC): 2026-05-18 11:50:18Z
       - Executed highest-priority incomplete unblocked roadmap task for this unattended run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening + continuity discipline): refreshed continuity evidence chain with a new timestamped validation pass across `ACTIVE_PR_QUEUE.md`, `DEPLOYMENT_STATE.md`, and `RELEASE_TRAIN.md` while staffed-only Phase E operator steps remain pending.
       - 2026-05-18 11:50Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend `test:unit:api-base` PASS (3 passed), frontend SSE unit tests PASS (10 passed), frontend lint PASS, frontend build PASS.
       - Executed highest-priority incomplete **user-visible** roadmap task this run (roadmap ref: `PROGRAM_STATE.md` §5 Frontend UX/polish gap "No global loading indicator between route transitions"): upgraded `frontend/src/App.jsx` Suspense fallbacks from plain text placeholders to shared `PageLoader` for both login and route-level lazy transitions, giving users a consistent spinner/status indicator during navigation chunk loads.
+      - 2026-05-18 12:59Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:rex@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
+      - Executed highest-priority incomplete **user-visible** roadmap task this unattended run (roadmap ref: `PROGRAM_STATE.md` §5 Frontend UX/polish gap "No location filter input on Schedule"): added a dedicated `Filter location…` control to `frontend/src/pages/ScheduleHealth.jsx` bound to existing `location` state and included `location` in printable filter-summary metadata.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

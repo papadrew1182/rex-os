@@ -1217,6 +1217,7 @@ export default function ScheduleHealth() {
   const filterSummary = useMemo(() => {
     const parts = [];
     if (search) parts.push(`search="${search}"`);
+    if (location) parts.push(`location="${location}"`);
     if (criticalOnly) parts.push("critical only");
     if (wbsRoot) parts.push(`WBS root=${wbsRoot}`);
     if (assignedCompany) parts.push(`company=${companiesMap[assignedCompany]?.name || assignedCompany}`);
@@ -1225,7 +1226,7 @@ export default function ScheduleHealth() {
     if (dateFrom) parts.push(`from=${dateFrom}`);
     if (dateTo) parts.push(`to=${dateTo}`);
     return parts.join("; ");
-  }, [search, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
+  }, [search, location, criticalOnly, wbsRoot, assignedCompany, assignedPerson, costCodeId, dateFrom, dateTo, companiesMap, peopleMap, costCodesMap]);
 
   // ── Export handlers ───────────────────────────────────────────────────────
   function handleExportCsv() {
@@ -1267,6 +1268,13 @@ export default function ScheduleHealth() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             style={{ flex: 1, minWidth: 220 }}
+          />
+          <input
+            className="rex-input"
+            placeholder="Filter location…"
+            value={location}
+            onChange={e => setLocation(e.target.value)}
+            style={{ width: 170 }}
           />
           <select className="rex-input" value={wbsRoot} onChange={e => setWbsRoot(e.target.value)} style={{ width: 130 }}>
             <option value="">All WBS</option>
