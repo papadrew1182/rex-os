@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 16:17:57Z
+Last Updated (UTC): 2026-05-18 16:37:20Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -140,6 +140,8 @@ Last Updated (UTC): 2026-05-18 16:17:57Z
       - Executed highest-priority incomplete **user-visible** hardening slice this run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added a dedicated `Clear dates` toolbar action in `frontend/src/pages/ScheduleHealth.jsx` that resets only `From`/`To` filters and is disabled when no date filters are active.
       - 2026-05-18 16:17Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB).
       - Executed highest-priority incomplete **user-visible** hardening slice this unattended run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): added Schedule Workbench date-range quick presets in `frontend/src/pages/ScheduleHealth.jsx` (`Next 14 days`, `Next 30 days`, `This month`, `Clear dates`) to reduce manual date-entry overhead while preserving existing explicit `From`/`To` controls.
+      - 2026-05-18 16:37Z architecture/static rerun (same branch lane): backend action-queue pytest subset PASS (15 passed, 2 skipped); migration integrity suite PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed); frontend SSE unit tests PASS (10 passed); frontend API-base unit tests PASS (3 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS (largest emitted JS chunk remains `vendor-react` 141.83 kB).
+      - Executed highest-priority incomplete **user-visible** hardening slice this unattended run (roadmap ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 hardening): expanded Schedule Workbench date presets with `This week` + `Next 7 days` and added an active "Date window" badge in `frontend/src/pages/ScheduleHealth.jsx` to make current range context visible at a glance.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)

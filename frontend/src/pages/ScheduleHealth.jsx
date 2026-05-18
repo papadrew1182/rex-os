@@ -1224,9 +1224,59 @@ export default function ScheduleHealth() {
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const hasDateFilters = Boolean(dateFrom || dateTo);
 
+  const activeDatePresetLabel = useMemo(() => {
+    if (!dateFrom || !dateTo) return "";
+    const today = new Date();
+    const formatDate = (d) => d.toISOString().slice(0, 10);
+
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+
+    const next7End = new Date(today);
+    next7End.setDate(today.getDate() + 7);
+
+    const next14End = new Date(today);
+    next14End.setDate(today.getDate() + 14);
+
+    const next30End = new Date(today);
+    next30End.setDate(today.getDate() + 30);
+
+    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    const monthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+
+    const from = dateFrom;
+    const to = dateTo;
+    if (from === formatDate(weekStart) && to === formatDate(weekEnd)) return "This week";
+    if (from === formatDate(today) && to === formatDate(next7End)) return "Next 7 days";
+    if (from === formatDate(today) && to === formatDate(next14End)) return "Next 14 days";
+    if (from === formatDate(today) && to === formatDate(next30End)) return "Next 30 days";
+    if (from === formatDate(monthStart) && to === formatDate(monthEnd)) return "This month";
+    return "Custom";
+  }, [dateFrom, dateTo]);
+
   function applyDatePreset(preset) {
     const today = new Date();
     const formatDate = (d) => d.toISOString().slice(0, 10);
+
+    if (preset === "thisWeek") {
+      const from = new Date(today);
+      from.setDate(today.getDate() - ((today.getDay() + 6) % 7));
+      const to = new Date(from);
+      to.setDate(from.getDate() + 6);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "next7") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 7);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
 
     if (preset === "next14") {
       const to = new Date(today);
@@ -1395,11 +1445,18 @@ export default function ScheduleHealth() {
             title="Apply a date range preset"
           >
             <option value="">Date preset…</option>
+            <option value="thisWeek">This week</option>
+            <option value="next7">Next 7 days</option>
             <option value="next14">Next 14 days</option>
             <option value="next30">Next 30 days</option>
             <option value="thisMonth">This month</option>
             <option value="clear">Clear dates</option>
           </select>
+          {activeDatePresetLabel && (
+            <span className="rex-badge rex-badge-gray" title="Active date window" style={{ whiteSpace: "nowrap" }}>
+              Date window: {activeDatePresetLabel}
+            </span>
+          )}
           <button
             className="rex-btn rex-btn-outline"
             onClick={() => { setDateFrom(""); setDateTo(""); }}
