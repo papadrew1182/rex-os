@@ -1,6 +1,6 @@
 # ACTIVE_PR_QUEUE
 
-Last Updated (UTC): 2026-05-18 09:00:56Z
+Last Updated (UTC): 2026-05-18 09:19:26Z
 
 ## In Flight
 1. **Phase C validation sweep (current)**
@@ -104,6 +104,9 @@ Last Updated (UTC): 2026-05-18 09:00:56Z
       - 2026-05-18 09:00Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
       - Executed highest-priority incomplete user-visible reliability feature this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6 Phase 11 "Hardening", esp. retries/backoff + production-infra behavior, lines 330-345): hardened frontend API host inference in `frontend/src/api.js` to route login/auth API calls correctly for `www.rex.papadrew.com` and Vercel preview host patterns (`rex-os-git-*`, `rex-os-demo-git-*`) so frontend-only hosts do not fall through to broken same-origin `/api` login requests.
       - Verification for routing hardening: full static/architecture suite above remained green after patch; no new lint/build/test regressions.
+      - 2026-05-18 09:19Z architecture/static rerun (same branch lane): backend AI/action queue pytest subset PASS (15 passed, 2 skipped); frontend SSE unit tests PASS (10 passed); frontend lint PASS (`npm run lint -- --max-warnings 0`); frontend build PASS.
+      - Executed highest-priority incomplete reliability task this run (roadmap hardening ref: `docs/roadmaps/rex_os_full_roadmap.md` §6, Phase 11 DoD migration integrity and idempotency checks): reran `pytest -q backend/tests/test_session2_migration_sanity.py` with explicit CI-style local DB override and confirmed PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci` => 7 passed).
+      - Blocker state: local migration-sanity path remains green with explicit credentialed override; no open reproducible migration-integrity failures in current lane.
 
 ## Next (Queued)
 1. Phase E blocker progression (operator execution)
