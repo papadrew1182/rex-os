@@ -1224,6 +1224,40 @@ export default function ScheduleHealth() {
   const hasInvalidDateRange = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const hasDateFilters = Boolean(dateFrom || dateTo);
 
+  function applyDatePreset(preset) {
+    const today = new Date();
+    const formatDate = (d) => d.toISOString().slice(0, 10);
+
+    if (preset === "next14") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 14);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "next30") {
+      const to = new Date(today);
+      to.setDate(to.getDate() + 30);
+      setDateFrom(formatDate(today));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "thisMonth") {
+      const from = new Date(today.getFullYear(), today.getMonth(), 1);
+      const to = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+      setDateFrom(formatDate(from));
+      setDateTo(formatDate(to));
+      return;
+    }
+
+    if (preset === "clear") {
+      setDateFrom("");
+      setDateTo("");
+    }
+  }
+
   function resetFilters() {
     setSearch(""); setCriticalOnly(false); setWbsRoot(""); setAssignedCompany(""); setAssignedPerson(""); setCostCodeId(""); setLocation(""); setDateFrom(""); setDateTo(""); setScheduleId("");
   }
@@ -1348,6 +1382,24 @@ export default function ScheduleHealth() {
               Date range invalid: “From” is after “To”.
             </span>
           )}
+          <select
+            className="rex-input"
+            aria-label="Apply date filter preset"
+            defaultValue=""
+            onChange={e => {
+              if (!e.target.value) return;
+              applyDatePreset(e.target.value);
+              e.target.value = "";
+            }}
+            style={{ width: 170 }}
+            title="Apply a date range preset"
+          >
+            <option value="">Date preset…</option>
+            <option value="next14">Next 14 days</option>
+            <option value="next30">Next 30 days</option>
+            <option value="thisMonth">This month</option>
+            <option value="clear">Clear dates</option>
+          </select>
           <button
             className="rex-btn rex-btn-outline"
             onClick={() => { setDateFrom(""); setDateTo(""); }}

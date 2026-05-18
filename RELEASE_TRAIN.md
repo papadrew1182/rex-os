@@ -1,6 +1,6 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 2026-05-18 15:59:26Z
+Last Updated (UTC): 2026-05-18 16:17:57Z
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
@@ -23,7 +23,7 @@ Last Updated (UTC): 2026-05-18 15:59:26Z
 - Frontend lint parity: PASS (`npm run lint`)
 - Migration-sanity reliability check: PASS (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => 7 passed)
 - Production writes: none
-- Latest unattended rerun (2026-05-18 15:59Z): architecture/static gates revalidated green (backend pytest subset + migration-sanity, frontend SSE + API-base unit tests, lint, build); user-visible Schedule Workbench UX hardening advanced with a dedicated `Clear dates` control (disabled/no-op when empty) in `frontend/src/pages/ScheduleHealth.jsx`, complementing prior date-range guardrails.
+- Latest unattended rerun (2026-05-18 16:17Z): architecture/static gates revalidated green (backend pytest subset + migration-sanity, frontend SSE + API-base unit tests, lint, build); user-visible Schedule Workbench UX hardening advanced with date-range quick presets (`Next 14 days`, `Next 30 days`, `This month`, `Clear dates`) in `frontend/src/pages/ScheduleHealth.jsx` for faster filtering workflows.
 
 ## Next Planned Stop
 - Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.
