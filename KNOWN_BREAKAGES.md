@@ -1,6 +1,6 @@
 # KNOWN_BREAKAGES
 
-Last Updated (UTC): 2026-05-18 03:44:00Z
+Last Updated (UTC): 19/05/2026 17:08:39 UTC
 
 ## Open Breakages / Environment Gaps
 1. Railway project context is not linked in this working copy.
@@ -23,10 +23,11 @@ Last Updated (UTC): 2026-05-18 03:44:00Z
    - Impact: lint can now be used as a strict gate for this branch's frontend surface.
    - Follow-up: preserve this as a no-regression invariant during Phase D/E progression.
 
-5. Local DB credentials for Phase C backend validation are currently invalid.
-   - Evidence: targeted pytest subset failed with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against localhost:5432.
-   - Impact: cannot re-validate action queue/compensator/advisory-lock paths in this environment until DB auth is restored.
-   - Mitigation: set correct `DATABASE_URL`/`REX_DB_*` secrets for local test runner or provision matching local Postgres user/password.
+5. Default local DB credential path remains invalid when `DATABASE_URL` is not overridden.
+   - Evidence (19/05/2026 17:07:51 UTC): control-path auth/session probe failed (`pytest -q backend/tests/test_verification_flows.py` => 8 failed, 1 passed) with `asyncpg.exceptions.InvalidPasswordError: password authentication failed for user "deploy"` against localhost:5432/rex_os.
+   - Evidence (19/05/2026 17:07:51 UTC): control-path migration sanity failed (`pytest -q backend/tests/test_session2_migration_sanity.py` => 1 passed, 6 errors) with same `InvalidPasswordError`.
+   - Impact: default local env remains non-parity for blocker verification.
+   - Mitigation: continue canonical production-like evidence path via explicit override (`DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci`), and separately remediate local `deploy@localhost/rex_os` credentials for true default-path parity.
 
 ## Resolved in this phase
 - Fresh-db replay gate re-verified PASS with survivability subsets.
