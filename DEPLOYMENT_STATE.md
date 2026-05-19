@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 19/05/2026 15:59:37 UTC
+Last Updated (UTC): 19/05/2026 16:34:10 UTC
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `audit/gpt55-reconciliation-2026-05-18`
-- Local HEAD: `dd7012257eca1409269c53b7126be4f8b766ef09`
+- Local HEAD: `724aab3ab9efd2504f95a7a31f9fcbce1ddd6e81`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -416,6 +416,15 @@ Last Updated (UTC): 19/05/2026 15:59:37 UTC
   - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
 
 - 2026-05-19 15:59Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
+  - Control-path check (no DB override): `pytest -q backend/tests/test_verification_flows.py` => FAIL (8 failed, 1 passed; `InvalidPasswordError` for `deploy@localhost/rex_os`)
+  - Canonical production-like path: `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -q` => PASS (1 passed)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => FAIL (1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os` without env override)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
+
+- 2026-05-19 16:34Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
   - Control-path check (no DB override): `pytest -q backend/tests/test_verification_flows.py` => FAIL (8 failed, 1 passed; `InvalidPasswordError` for `deploy@localhost/rex_os`)
   - Canonical production-like path: `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
