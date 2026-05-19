@@ -1,6 +1,6 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 19/05/2026 05:51:57 UTC
+Last Updated (UTC): 19/05/2026 06:33:18 UTC
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
@@ -33,6 +33,7 @@ Last Updated (UTC): 19/05/2026 05:51:57 UTC
 - Latest unattended rerun (2026-05-19 04:44Z): blocker-first hardening evidence revalidated green for auth/session + rollback lane (`test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1); migration-sanity parity unchanged (default local path FAIL due to `deploy@localhost/rex_os` auth drift; CI-style `DATABASE_URL` override PASS 7/7).
 - Latest unattended rerun (2026-05-19 05:19Z): blocker-first hardening evidence revalidated green for auth/session + rollback lane (`test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1); migration-sanity parity unchanged (default local path FAIL due to `deploy@localhost/rex_os` auth drift; CI-style `DATABASE_URL` override PASS 7/7).
 - Latest unattended rerun (2026-05-19 05:51Z): blocker-first hardening evidence revalidated green for auth/session + rollback lane (`test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1); migration-sanity parity unchanged (default local path FAIL due to `deploy@localhost/rex_os` auth drift; CI-style `DATABASE_URL` override PASS 7/7).
+- Latest unattended rerun (2026-05-19 06:33Z): blocker-first hardening evidence revalidated green for auth/session + rollback lane (`test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1); migration-sanity parity unchanged (default local path FAIL due to `deploy@localhost/rex_os` auth drift; CI-style `DATABASE_URL` override PASS 7/7).
 
 ## Next Planned Stop
 - Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.
