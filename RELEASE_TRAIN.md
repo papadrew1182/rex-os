@@ -1,6 +1,6 @@
 # RELEASE_TRAIN
 
-Last Updated (UTC): 19/05/2026 21:43:03 UTC
+Last Updated (UTC): 19/05/2026 22:17:37 UTC
 
 ## Current Train
 - Train: Rex 2.0 autonomous execution continuation
@@ -59,6 +59,7 @@ Last Updated (UTC): 19/05/2026 21:43:03 UTC
 - Latest unattended rerun (2026-05-19 20:33Z): blocker-first hardening evidence revalidated green for canonical production-like lane (`DATABASE_URL` override: `test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1, `test_session2_migration_sanity` PASS 7/7) with explicit control failure preserved on default local creds (`test_verification_flows` FAIL 8/9; `test_session2_migration_sanity` 1 passed/6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`).
 - Latest unattended rerun (2026-05-19 21:07Z): blocker-first hardening evidence revalidated green for canonical production-like lane (`DATABASE_URL` override: `test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1, `test_session2_migration_sanity` PASS 7/7) with explicit control failure preserved on default local creds (`test_verification_flows` FAIL 8/9; `test_session2_migration_sanity` 1 passed/6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`).
 - Latest unattended rerun (2026-05-19 21:42Z): blocker-first hardening evidence revalidated green for canonical production-like lane (`DATABASE_URL` override: `test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1, `test_session2_migration_sanity` PASS 7/7) with explicit control failure preserved on default local creds (`test_verification_flows` FAIL 8/9; `test_session2_migration_sanity` 1 passed/6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`).
+- Latest unattended rerun (2026-05-19 22:17Z): blocker-first hardening evidence revalidated green for canonical production-like lane (`DATABASE_URL` override: `test_verification_flows` PASS 9/9, `test_phase40_verification` PASS 8/8, focused advisory-lock repeat PASS 1/1, `test_session2_migration_sanity` PASS 7/7) with explicit control failure preserved on default local creds (`test_verification_flows` FAIL 8/9; `test_session2_migration_sanity` 1 passed/6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os`).
 
 ## Next Planned Stop
 - Execute staffed Phase E operator handoff packet (`docs/handoffs/2026-05-18_041939Z_phase_e_operator_handoff.md`) and attach Sentry/browser evidence; then mirror evidence + rollback state into continuity docs in one commit.
