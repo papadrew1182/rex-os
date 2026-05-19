@@ -1,6 +1,6 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-19 02:28:49Z
+Last Updated (UTC): 2026-05-19 03:02:40Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
@@ -229,6 +229,13 @@ Last Updated (UTC): 2026-05-19 02:28:49Z
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
   - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
 - 2026-05-19 02:28Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => FAIL (1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os` without env override)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
+- 2026-05-19 03:02Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed)
