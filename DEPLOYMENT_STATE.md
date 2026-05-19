@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 2026-05-19 03:36:57Z
+Last Updated (UTC): 2026-05-19 04:10:47Z
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `audit/gpt55-reconciliation-2026-05-18`
-- Local HEAD: `ce686edee2fdaf9b5c9450d2bc22409f52227aa5`
+- Local HEAD: `d8d8e11bdb7dfba1c6210ce04d3716b3e662fd92`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
@@ -243,6 +243,14 @@ Last Updated (UTC): 2026-05-19 03:36:57Z
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
   - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
 - 2026-05-19 03:36Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed)
+  - `pytest -q backend/tests/test_session2_migration_sanity.py` => FAIL (1 passed, 6 errors; `InvalidPasswordError` for `deploy@localhost/rex_os` without env override)
+  - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_session2_migration_sanity.py` => PASS (7 passed)
+  - Rollback-state proof: validation-only commands; no schema/prod mutation; advisory-lock repeat-run verification remains green.
+
+- 2026-05-19 04:10Z blocker-first verification rerun (auth/session + rollback hardening evidence lane):
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_verification_flows.py` => PASS (9 passed)
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py` => PASS (8 passed)
   - `DATABASE_URL=postgresql://rex:***@localhost:5432/rex_ci pytest -q backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs -vv` => PASS (1 passed)
