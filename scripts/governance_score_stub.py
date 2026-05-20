@@ -107,6 +107,27 @@ def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio:
     return "low"
 
 
+def _classify_verifier(rec: dict[str, Any]) -> str:
+    ref = str(rec.get("independent_verifier_ref") or "").lower()
+    actor = str(rec.get("actor_id") or "").lower()
+    src = str(rec.get("evidence_source_type") or "").lower()
+    reasons = " ".join([str(x).lower() for x in (rec.get("reason_codes") or [])])
+
+    if "runtime_evidence_validator" in actor or "latest_runtime_evidence_validation" in ref:
+        return "runtime_evidence_validator"
+    if "reconcil" in ref or "reconcile" in actor:
+        return "reconciliation_cron"
+    if "ci" in ref or "github" in ref or "ci" in reasons:
+        return "ci_status"
+    if "probe" in ref or "health" in ref:
+        return "deploy_runtime_probe"
+    if "rollback" in ref or "rollback" in reasons:
+        return "rollback_rehearsal"
+    if src == "manual_attestation" or "human" in actor:
+        return "human_attestation"
+    return "unknown"
+
+
 def _score_entry(
     score: float,
     evidence_basis: dict[str, Any],
@@ -208,6 +229,11 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     runtime_verifier_count = 0
     runtime_prov_complete_count = 0
     runtime_invariant_hits: set[str] = set()
+    unique_independent_refs: set[str] = set()
+    verifier_classes_seen: set[str] = set()
+    independent_verifier_record_count = 0
+    validator_self_record_count = 0
+    non_validator_independent_record_count = 0
 
     for rec in runtime_records:
         keys = set(rec.keys())
@@ -225,6 +251,14 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         self_attested = bool(rec.get("self_attested"))
         if independent_ref:
             independent_count += 1
+            independent_verifier_record_count += 1
+            unique_independent_refs.add(str(independent_ref))
+            cls = _classify_verifier(rec)
+            verifier_classes_seen.add(cls)
+            if cls == "runtime_evidence_validator":
+                validator_self_record_count += 1
+            elif cls != "unknown":
+                non_validator_independent_record_count += 1
         if self_attested:
             self_attested_count += 1
         reason_codes = set(rec.get("reason_codes", []) or [])
@@ -245,18 +279,24 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     synthetic_ratio = 0.0 if total_runtime == 0 else synthetic_count / total_runtime
 
     runtime_history_run_markers = len({str(r.get('correlation_id')) for r in runtime_records if r.get('correlation_id')})
+    correlation_id_diversity = runtime_history_run_markers
     has_runtime_operational_evidence = runtime_gate_count > 0
-    validator_ref_credit = 1 if (validator_summary_present and validation_summary_record and validation_summary_record.get('independent_verifier_ref')) else 0
-    has_independent_beyond_validator = independent_count > validator_ref_credit
-    has_multirun_history = runtime_history_run_markers > 1
+    has_multirun_history = correlation_id_diversity > 1 or any("multi_run_history" in (r.get("reason_codes") or []) for r in runtime_records)
+    unique_independent_verifier_refs = sorted(unique_independent_refs)
+    observed_classes = sorted(verifier_classes_seen)
+    unique_independent_verifier_classes = len(observed_classes)
+    valid_non_validator_class_count = len([c for c in observed_classes if c not in {"runtime_evidence_validator", "unknown"}])
+    non_validator_independent_present = non_validator_independent_record_count > 0 and valid_non_validator_class_count > 0
+    multi_run_corroboration_present = bool(has_multirun_history and non_validator_independent_present)
     hash_chain_valid = bool((validation_report or {}).get("summary", {}).get("hash_chain_valid", False))
     governance_integrity_ceiling = 60.0
     allow_above_ceiling = bool(
         validator_summary_valid
-        and has_independent_beyond_validator
+        and non_validator_independent_present
         and has_runtime_operational_evidence
         and hash_chain_valid
         and has_multirun_history
+        and not validation_degraded
     )
     high_confidence_allowed = allow_above_ceiling
 
@@ -281,6 +321,18 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     )
     if validator_self_credit_risk:
         risk_flags.append("validator_self_credit_risk")
+    independent_verifier_diversity_missing = unique_independent_verifier_classes == 0 or valid_non_validator_class_count == 0
+    verifier_self_reference_risk = validator_self_record_count > 0 and non_validator_independent_record_count == 0
+    single_source_verification_risk = len(unique_independent_verifier_refs) <= 1 and independent_verifier_record_count > 0
+    multi_run_corroboration_missing = not multi_run_corroboration_present
+    if independent_verifier_diversity_missing:
+        risk_flags.append("independent_verifier_diversity_missing")
+    if verifier_self_reference_risk:
+        risk_flags.append("verifier_self_reference_risk")
+    if single_source_verification_risk:
+        risk_flags.append("single_source_verification_risk")
+    if multi_run_corroboration_missing:
+        risk_flags.append("multi_run_corroboration_missing")
 
     missing_runtime_inputs = []
     if total_runtime == 0:
@@ -515,6 +567,18 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "confidence_cap_reason": "high_confidence_requires_independent_multirun_corroboration" if not high_confidence_allowed else "independent_multirun_corroboration_met",
             "governance_integrity_cap_reason": governance_integrity_cap_reason,
             "allow_above_ceiling": allow_above_ceiling,
+            "verifier_diversity": {
+                "unique_independent_verifier_refs": unique_independent_verifier_refs,
+                "unique_independent_verifier_classes": unique_independent_verifier_classes,
+                "independent_verifier_record_count": independent_verifier_record_count,
+                "validator_self_record_count": validator_self_record_count,
+                "non_validator_independent_record_count": non_validator_independent_record_count,
+                "correlation_id_diversity": correlation_id_diversity,
+                "multi_run_corroboration_present": multi_run_corroboration_present,
+                "observed_classes": observed_classes,
+                "functionally_self_referential": verifier_self_reference_risk or single_source_verification_risk,
+                "high_confidence_corroboration_met": allow_above_ceiling,
+            },
         },
         "coverage": {
             "artifact_structure": artifact_metrics,
@@ -527,6 +591,10 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "self_attestation_weaker_than_independent_verification": True,
             "runtime_evidence_missing": total_runtime == 0,
             "validator_self_credit_risk": validator_self_credit_risk,
+            "independent_verifier_diversity_missing": independent_verifier_diversity_missing,
+            "verifier_self_reference_risk": verifier_self_reference_risk,
+            "single_source_verification_risk": single_source_verification_risk,
+            "multi_run_corroboration_missing": multi_run_corroboration_missing,
             "risk_flags": risk_flags,
         },
         "known_limitations": [
@@ -556,6 +624,18 @@ def render_md(report: dict[str, Any]) -> str:
     lines.append(f"- governance_integrity_ceiling: `{lv.get('governance_integrity_ceiling', None)}`")
     lines.append(f"- confidence_cap_reason: `{lv.get('confidence_cap_reason', None)}`")
     lines.append(f"- governance_integrity_cap_reason: `{lv.get('governance_integrity_cap_reason', None)}`")
+    vd = lv.get('verifier_diversity', {})
+    lines.append("- verifier_diversity_summary:")
+    lines.append(f"  - unique_independent_verifier_refs: {vd.get('unique_independent_verifier_refs', [])}")
+    lines.append(f"  - unique_independent_verifier_classes: {vd.get('unique_independent_verifier_classes', 0)}")
+    lines.append(f"  - independent_verifier_record_count: {vd.get('independent_verifier_record_count', 0)}")
+    lines.append(f"  - validator_self_record_count: {vd.get('validator_self_record_count', 0)}")
+    lines.append(f"  - non_validator_independent_record_count: {vd.get('non_validator_independent_record_count', 0)}")
+    lines.append(f"  - correlation_id_diversity: {vd.get('correlation_id_diversity', 0)}")
+    lines.append(f"  - observed_classes: {vd.get('observed_classes', [])}")
+    lines.append(f"  - multi_run_corroboration_present: {vd.get('multi_run_corroboration_present', False)}")
+    lines.append(f"  - functionally_self_referential: {vd.get('functionally_self_referential', False)}")
+    lines.append(f"  - high_confidence_corroboration_met: {vd.get('high_confidence_corroboration_met', False)}")
     lines.append("")
     lines.append("## Artifact-Structure Coverage")
     for k, v in report["coverage"]["artifact_structure"].items():

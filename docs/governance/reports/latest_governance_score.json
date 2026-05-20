@@ -1,6 +1,6 @@
 {
   "report_version": "v0-stub-runtime-ingest",
-  "generated_at_utc": "2026-05-20T03:40:27.857961+00:00",
+  "generated_at_utc": "2026-05-20T03:58:21.538234+00:00",
   "mode": "score_only_non_enforcing",
   "input_files": {
     "invariants": "docs/governance/invariants_v0.yaml",
@@ -13,7 +13,7 @@
   "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
   "runtime_evidence_validation": {
     "report_version": "v0-runtime-evidence-validation",
-    "generated_at_utc": "2026-05-20T03:40:27.811591Z",
+    "generated_at_utc": "2026-05-20T03:58:21.489927Z",
     "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
     "schema_file": "docs/governance/runtime_evidence_schema_v0.json",
     "validation_status": "valid",
@@ -39,14 +39,14 @@
       "self_attestation_caveat": "summary record is emitted by validator itself; deterministic but not third-party attestation"
     },
     "validation_summary_record": {
-      "event_id": "evt-249307c67ab17843",
+      "event_id": "evt-95a67c5e621278a5",
       "transition_type": "verifier_result",
       "actor_type": "policy_engine",
       "actor_id": "runtime_evidence_validator",
-      "correlation_id": "rex-reconcile-20260520T034027Z",
+      "correlation_id": "rex-reconcile-20260520T035821Z",
       "decision": "allow",
-      "previous_record_hash": "64bca3e53b09ed1ff4e81b898f4dc476639a797a72e5eb340bc30858f1fdbd09",
-      "record_hash": "5636747535d75cc871f412556a9040de2066e445a15027a62646ebabda654625",
+      "previous_record_hash": "c0e92dbce75fa4bcb14f4be188315cc051d0d12798035101974fec30fcd53cd9",
+      "record_hash": "ec8d421607f975379e35af7ab4d8de40538eda6f8085f1cbd961b38109276493",
       "reason_codes": [
         "validator_summary_record",
         "validation_status_valid",
@@ -63,7 +63,7 @@
       "validation_status_valid",
       "non_enforcing"
     ],
-    "record_hash": "5636747535d75cc871f412556a9040de2066e445a15027a62646ebabda654625",
+    "record_hash": "ec8d421607f975379e35af7ab4d8de40538eda6f8085f1cbd961b38109276493",
     "validator_summary_present": true,
     "validator_summary_valid": true,
     "validator_summary_self_recorded": true,
@@ -71,7 +71,28 @@
     "governance_integrity_ceiling": 60.0,
     "confidence_cap_reason": "high_confidence_requires_independent_multirun_corroboration",
     "governance_integrity_cap_reason": "cap_not_needed_or_already_below_ceiling",
-    "allow_above_ceiling": false
+    "allow_above_ceiling": false,
+    "verifier_diversity": {
+      "unique_independent_verifier_refs": [
+        "docs/governance/reports/latest_runtime_evidence_validation.json",
+        "pytest:backend/tests/test_phase40_verification.py",
+        "pytest:backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs",
+        "pytest:backend/tests/test_session2_migration_sanity.py"
+      ],
+      "unique_independent_verifier_classes": 3,
+      "independent_verifier_record_count": 4,
+      "validator_self_record_count": 1,
+      "non_validator_independent_record_count": 1,
+      "correlation_id_diversity": 1,
+      "multi_run_corroboration_present": false,
+      "observed_classes": [
+        "rollback_rehearsal",
+        "runtime_evidence_validator",
+        "unknown"
+      ],
+      "functionally_self_referential": false,
+      "high_confidence_corroboration_met": false
+    }
   },
   "coverage": {
     "artifact_structure": {
@@ -358,8 +379,13 @@
     "self_attestation_weaker_than_independent_verification": true,
     "runtime_evidence_missing": false,
     "validator_self_credit_risk": true,
+    "independent_verifier_diversity_missing": false,
+    "verifier_self_reference_risk": false,
+    "single_source_verification_risk": false,
+    "multi_run_corroboration_missing": true,
     "risk_flags": [
-      "validator_self_credit_risk"
+      "validator_self_credit_risk",
+      "multi_run_corroboration_missing"
     ]
   },
   "known_limitations": [

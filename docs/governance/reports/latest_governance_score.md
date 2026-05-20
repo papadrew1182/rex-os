@@ -1,6 +1,6 @@
 # Latest Governance Score (Deterministic Stub + Runtime Ingest)
 
-- Generated UTC: `2026-05-20T03:40:27.857961+00:00`
+- Generated UTC: `2026-05-20T03:58:21.538234+00:00`
 - Mode: `score_only_non_enforcing`
 - Runtime evidence file: `docs/governance/runtime/latest_runtime_evidence.jsonl`
 - Runtime evidence validation status: `valid`
@@ -13,6 +13,17 @@
 - governance_integrity_ceiling: `60.0`
 - confidence_cap_reason: `high_confidence_requires_independent_multirun_corroboration`
 - governance_integrity_cap_reason: `cap_not_needed_or_already_below_ceiling`
+- verifier_diversity_summary:
+  - unique_independent_verifier_refs: ['docs/governance/reports/latest_runtime_evidence_validation.json', 'pytest:backend/tests/test_phase40_verification.py', 'pytest:backend/tests/test_phase40_verification.py::test_ph40_advisory_lock_stable_across_repeat_runs', 'pytest:backend/tests/test_session2_migration_sanity.py']
+  - unique_independent_verifier_classes: 3
+  - independent_verifier_record_count: 4
+  - validator_self_record_count: 1
+  - non_validator_independent_record_count: 1
+  - correlation_id_diversity: 1
+  - observed_classes: ['rollback_rehearsal', 'runtime_evidence_validator', 'unknown']
+  - multi_run_corroboration_present: False
+  - functionally_self_referential: False
+  - high_confidence_corroboration_met: False
 
 ## Artifact-Structure Coverage
 - invariant_coverage: 6/6 (100.0%)
@@ -90,4 +101,8 @@
 - self_attestation_weaker_than_independent_verification: True
 - runtime_evidence_missing: False
 - validator_self_credit_risk: True
-- risk_flags: ['validator_self_credit_risk']
+- independent_verifier_diversity_missing: False
+- verifier_self_reference_risk: False
+- single_source_verification_risk: False
+- multi_run_corroboration_missing: True
+- risk_flags: ['validator_self_credit_risk', 'multi_run_corroboration_missing']
