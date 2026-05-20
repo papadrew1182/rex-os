@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rex/governance/runtime_evidence_schema_v0.json",
+  "title": "Rex Runtime Evidence Record v0",
+  "type": "object",
+  "required": [
+    "event_id",
+    "timestamp_utc",
+    "transition_type",
+    "actor_type",
+    "actor_id",
+    "target_service",
+    "target_env",
+    "source_commit_sha",
+    "artifact_digest",
+    "env_fingerprint",
+    "correlation_id",
+    "evidence_strength",
+    "evidence_source_type",
+    "self_attested",
+    "independent_verifier_ref",
+    "raw_log_refs",
+    "invariant_results",
+    "decision",
+    "reason_codes",
+    "previous_record_hash",
+    "record_hash"
+  ],
+  "properties": {
+    "event_id": {"type": "string", "minLength": 8},
+    "timestamp_utc": {"type": "string", "format": "date-time"},
+    "transition_type": {
+      "type": "string",
+      "enum": [
+        "deploy",
+        "migrate",
+        "rollback",
+        "reconcile",
+        "retry_reentry",
+        "verifier_result",
+        "invariant_result",
+        "escalation_event",
+        "break_glass_event"
+      ]
+    },
+    "actor_type": {"type": "string", "enum": ["human", "automation", "service"]},
+    "actor_id": {"type": "string"},
+    "target_service": {"type": "string"},
+    "target_env": {"type": "string"},
+    "source_commit_sha": {"type": "string", "pattern": "^[a-f0-9]{7,40}$"},
+    "artifact_digest": {"type": "string", "pattern": "^(sha256:)?[a-fA-F0-9]{64}$"},
+    "env_fingerprint": {"type": "string"},
+    "correlation_id": {"type": "string"},
+    "evidence_strength": {"type": "string", "enum": ["weak", "medium", "strong"]},
+    "evidence_source_type": {
+      "type": "string",
+      "enum": ["log", "test", "monitor", "manual_attestation", "external_verifier"]
+    },
+    "self_attested": {"type": "boolean"},
+    "independent_verifier_ref": {"type": ["string", "null"]},
+    "raw_log_refs": {
+      "type": "array",
+      "items": {"type": "string"},
+      "minItems": 1
+    },
+    "invariant_results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["invariant_id", "status", "verifier_ref"],
+        "properties": {
+          "invariant_id": {"type": "string"},
+          "status": {"type": "string", "enum": ["pass", "fail", "warn", "unknown"]},
+          "verifier_ref": {"type": ["string", "null"]}
+        }
+      }
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["proceed", "proceed_with_attestation", "block", "observe_only"]
+    },
+    "reason_codes": {
+      "type": "array",
+      "items": {"type": "string"}
+    },
+    "previous_record_hash": {"type": ["string", "null"], "pattern": "^[a-fA-F0-9]{64}$"},
+    "record_hash": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"}
+  }
+}
