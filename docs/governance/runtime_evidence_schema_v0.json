@@ -48,8 +48,14 @@
     "target_service": {"type": "string"},
     "target_env": {"type": "string"},
     "source_commit_sha": {"type": "string", "pattern": "^[a-f0-9]{7,40}$"},
-    "artifact_digest": {"type": "string", "pattern": "^(sha256:)?[a-fA-F0-9]{64}$"},
-    "env_fingerprint": {"type": "string"},
+    "artifact_digest": {
+      "anyOf": [
+        {"type": "string", "pattern": "^(sha256:)?[a-fA-F0-9]{64}$"},
+        {"type": "string", "enum": ["unknown"]},
+        {"type": "null"}
+      ]
+    },
+    "env_fingerprint": {"type": ["string", "null"]},
     "correlation_id": {"type": "string"},
     "evidence_strength": {"type": "string", "enum": ["weak", "medium", "strong"]},
     "evidence_source_type": {

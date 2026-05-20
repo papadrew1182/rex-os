@@ -79,9 +79,12 @@ def _parse_runtime_jsonl(path: Path | None) -> list[dict[str, Any]]:
     return records
 
 
-def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float) -> str:
+def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float, synthetic_ratio: float) -> str:
     if missing_inputs:
         return "low"
+    if synthetic_ratio > 0.0:
+        # Synthetic evidence can improve structure/coverage, never high trust.
+        return "low" if independent_ratio < 0.6 else "medium"
     if independent_ratio >= 0.6:
         return "high"
     if independent_ratio > 0.0 or self_ratio > 0.0:
@@ -96,12 +99,13 @@ def _score_entry(
     risk: str,
     independent_ratio: float,
     self_ratio: float,
+    synthetic_ratio: float,
 ) -> dict[str, Any]:
     return {
         "score": round(float(score), 2),
         "evidence_basis": evidence_basis,
         "missing_inputs": missing_inputs,
-        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio),
+        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio, synthetic_ratio),
         "known_false_confidence_risk": risk,
     }
 
@@ -162,6 +166,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
 
     independent_count = 0
     self_attested_count = 0
+    synthetic_count = 0
     runtime_complete_count = 0
     runtime_gate_count = 0
     runtime_rollback_count = 0
@@ -187,6 +192,9 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_count += 1
         if self_attested:
             self_attested_count += 1
+        reason_codes = set(rec.get("reason_codes", []) or [])
+        if "synthetic_example" in reason_codes:
+            synthetic_count += 1
 
         if rec.get("artifact_digest") and rec.get("raw_log_refs") and rec.get("source_commit_sha"):
             runtime_prov_complete_count += 1
@@ -199,6 +207,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     total_runtime = len(runtime_records)
     independent_ratio = 0.0 if total_runtime == 0 else independent_count / total_runtime
     self_ratio = 0.0 if total_runtime == 0 else self_attested_count / total_runtime
+    synthetic_ratio = 0.0 if total_runtime == 0 else synthetic_count / total_runtime
 
     risk_flags = []
     if "append-only" not in src["anti_md"].lower():
@@ -209,6 +218,8 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         risk_flags.append("no_independent_verification_in_runtime_feed")
     if self_attested_count > independent_count:
         risk_flags.append("self_attestation_dominates_runtime_feed")
+    if synthetic_count > 0:
+        risk_flags.append("synthetic_evidence_present")
 
     missing_runtime_inputs = []
     if total_runtime == 0:
@@ -256,8 +267,10 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         "confidence_sources": {
             "independent_verified_records": independent_count,
             "self_attested_records": self_attested_count,
+            "synthetic_records": synthetic_count,
             "independent_ratio": round(independent_ratio, 4),
             "self_attested_ratio": round(self_ratio, 4),
+            "synthetic_ratio": round(synthetic_ratio, 4),
         },
         "missing_runtime_evidence": missing_runtime_inputs,
     }
@@ -287,6 +300,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "rollback confidence remains capped without independent rollback verification",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "provenance_maturity": _score_entry(
             provenance_score,
@@ -295,6 +309,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "provenance can be overstated when records are self-attested",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "verifier_maturity": _score_entry(
             verifier_score,
@@ -303,6 +318,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "verifier maturity inflated if verifier_result exists without independent verifier refs",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "invariant_coverage_maturity": _score_entry(
             invariant_score,
@@ -311,6 +327,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "invariant checks may be shallow despite full artifact coverage",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "blast_radius_maturity": _score_entry(
             blast_score,
@@ -319,6 +336,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "blast-radius maturity is approximate until explicit blast score records are ingested",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "governance_integrity_maturity": _score_entry(
             integrity_score,
@@ -335,6 +353,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "integrity can appear healthy while independent verification is sparse",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
         "anti_theater_risk": _score_entry(
             anti_theater_risk,
@@ -350,6 +369,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "self-attested dominant evidence can suppress detectable theater while confidence remains weak",
             independent_ratio,
             self_ratio,
+            synthetic_ratio,
         ),
     }
 
@@ -438,6 +458,8 @@ def render_md(report: dict[str, Any]) -> str:
     lines.append(f"- self_attested_records: {cs['self_attested_records']}")
     lines.append(f"- independent_ratio: {cs['independent_ratio']}")
     lines.append(f"- self_attested_ratio: {cs['self_attested_ratio']}")
+    lines.append(f"- synthetic_records: {cs['synthetic_records']}")
+    lines.append(f"- synthetic_ratio: {cs['synthetic_ratio']}")
     lines.append(f"- missing_runtime_evidence: {rm['missing_runtime_evidence']}")
     lines.append("")
     lines.append("## Vector Scores")

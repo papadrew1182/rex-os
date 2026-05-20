@@ -1,6 +1,6 @@
 {
   "report_version": "v0-stub-runtime-ingest",
-  "generated_at_utc": "2026-05-20T03:16:25.610655+00:00",
+  "generated_at_utc": "2026-05-20T03:23:43.059092+00:00",
   "mode": "score_only_non_enforcing",
   "input_files": {
     "invariants": "docs/governance/invariants_v0.yaml",
@@ -10,7 +10,7 @@
     "anti_theater": "docs/governance/anti_theater_rules_v0.md",
     "runtime_schema": "docs/governance/runtime_evidence_schema_v0.json"
   },
-  "runtime_evidence_file": "docs/governance/examples/runtime_evidence_sample.jsonl",
+  "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
   "coverage": {
     "artifact_structure": {
       "invariant_coverage": {
@@ -74,49 +74,51 @@
       }
     },
     "runtime_evidence": {
-      "runtime_records_present": 4,
+      "runtime_records_present": 5,
       "runtime_record_schema_completeness": {
-        "num": 4,
-        "den": 4,
+        "num": 5,
+        "den": 5,
         "pct": 100.0
       },
       "runtime_gate_coverage": {
         "num": 2,
-        "den": 4,
-        "pct": 50.0
+        "den": 5,
+        "pct": 40.0
       },
       "runtime_rollback_coverage": {
         "num": 1,
-        "den": 4,
-        "pct": 25.0
+        "den": 5,
+        "pct": 20.0
       },
       "runtime_verifier_coverage": {
         "num": 1,
-        "den": 4,
-        "pct": 25.0
+        "den": 5,
+        "pct": 20.0
       },
       "runtime_provenance_completeness": {
-        "num": 4,
-        "den": 4,
+        "num": 5,
+        "den": 5,
         "pct": 100.0
       },
       "runtime_invariant_coverage": {
-        "num": 5,
+        "num": 4,
         "den": 6,
-        "pct": 83.33
+        "pct": 66.67
       },
       "confidence_sources": {
-        "independent_verified_records": 2,
+        "independent_verified_records": 3,
         "self_attested_records": 2,
-        "independent_ratio": 0.5,
-        "self_attested_ratio": 0.5
+        "synthetic_records": 0,
+        "independent_ratio": 0.6,
+        "self_attested_ratio": 0.4,
+        "synthetic_ratio": 0.0
       },
       "missing_runtime_evidence": []
     }
   },
   "score_vectors": {
     "rollback_trust_maturity": {
-      "score": 20.84,
+      "score": 18.34,
       "evidence_basis": {
         "artifact": {
           "num": 1,
@@ -125,12 +127,12 @@
         },
         "runtime": {
           "num": 1,
-          "den": 4,
-          "pct": 25.0
+          "den": 5,
+          "pct": 20.0
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "rollback confidence remains capped without independent rollback verification"
     },
     "provenance_maturity": {
@@ -146,17 +148,17 @@
           ]
         },
         "runtime": {
-          "num": 4,
-          "den": 4,
+          "num": 5,
+          "den": 5,
           "pct": 100.0
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "provenance can be overstated when records are self-attested"
     },
     "verifier_maturity": {
-      "score": 21.67,
+      "score": 18.67,
       "evidence_basis": {
         "artifact": {
           "num": 1,
@@ -165,16 +167,16 @@
         },
         "runtime": {
           "num": 1,
-          "den": 4,
-          "pct": 25.0
+          "den": 5,
+          "pct": 20.0
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "verifier maturity inflated if verifier_result exists without independent verifier refs"
     },
     "invariant_coverage_maturity": {
-      "score": 93.33,
+      "score": 86.67,
       "evidence_basis": {
         "artifact": {
           "num": 6,
@@ -182,17 +184,17 @@
           "pct": 100.0
         },
         "runtime": {
-          "num": 5,
+          "num": 4,
           "den": 6,
-          "pct": 83.33
+          "pct": 66.67
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "invariant checks may be shallow despite full artifact coverage"
     },
     "blast_radius_maturity": {
-      "score": 41.66,
+      "score": 36.66,
       "evidence_basis": {
         "artifact": {
           "num": 2,
@@ -201,31 +203,31 @@
         },
         "runtime": {
           "num": 2,
-          "den": 4,
-          "pct": 50.0
+          "den": 5,
+          "pct": 40.0
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "blast-radius maturity is approximate until explicit blast score records are ingested"
     },
     "governance_integrity_maturity": {
-      "score": 48.83,
+      "score": 45.4,
       "evidence_basis": {
         "decomposed": {
-          "rollback_trust_maturity": 20.84,
+          "rollback_trust_maturity": 18.34,
           "provenance_maturity": 66.67,
-          "verifier_maturity": 21.67,
-          "invariant_coverage_maturity": 93.33,
-          "blast_radius_maturity": 41.66
+          "verifier_maturity": 18.67,
+          "invariant_coverage_maturity": 86.67,
+          "blast_radius_maturity": 36.66
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "integrity can appear healthy while independent verification is sparse"
     },
     "anti_theater_risk": {
-      "score": 20.0,
+      "score": 16.0,
       "evidence_basis": {
         "artifact": {
           "anti_theater_invariant_links": {
@@ -237,11 +239,11 @@
         "runtime": {
           "runtime_record_schema_completeness": 100.0,
           "runtime_provenance_completeness": 100.0,
-          "independent_ratio": 0.5
+          "independent_ratio": 0.6
         }
       },
       "missing_inputs": [],
-      "confidence_level": "medium",
+      "confidence_level": "high",
       "known_false_confidence_risk": "self-attested dominant evidence can suppress detectable theater while confidence remains weak"
     }
   },
@@ -277,13 +279,13 @@
       "missing_inputs": []
     },
     "heuristic_when_deterministic_possible": {
-      "count": 1,
+      "count": 0,
       "basis": "runtime evidence ingest",
       "confidence_level": "medium",
       "missing_inputs": []
     },
     "unsafe_autonomous_execution_surfaces": {
-      "count": 1,
+      "count": 0,
       "basis": "runtime evidence ingest",
       "confidence_level": "medium",
       "missing_inputs": []
