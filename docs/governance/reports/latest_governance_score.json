@@ -1,6 +1,6 @@
 {
   "report_version": "v0-stub-runtime-ingest",
-  "generated_at_utc": "2026-05-20T03:23:43.059092+00:00",
+  "generated_at_utc": "2026-05-20T03:29:29.997226+00:00",
   "mode": "score_only_non_enforcing",
   "input_files": {
     "invariants": "docs/governance/invariants_v0.yaml",
@@ -11,6 +11,27 @@
     "runtime_schema": "docs/governance/runtime_evidence_schema_v0.json"
   },
   "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
+  "runtime_evidence_validation": {
+    "report_version": "v0-runtime-evidence-validation",
+    "generated_at_utc": "2026-05-20T03:29:29.952641Z",
+    "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
+    "schema_file": "docs/governance/runtime_evidence_schema_v0.json",
+    "validation_status": "valid",
+    "summary": {
+      "total_records": 5,
+      "valid_records": 5,
+      "invalid_records": 0,
+      "hash_chain_valid": true,
+      "hash_chain_invalid": false,
+      "self_attested_count": 2,
+      "independently_verified_count": 3
+    },
+    "missing_field_counts": {},
+    "unknown_policy_usage_counts": {},
+    "warnings": [],
+    "errors": [],
+    "trust_implications": []
+  },
   "coverage": {
     "artifact_structure": {
       "invariant_coverage": {

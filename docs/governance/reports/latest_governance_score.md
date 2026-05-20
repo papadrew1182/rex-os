@@ -1,8 +1,9 @@
 # Latest Governance Score (Deterministic Stub + Runtime Ingest)
 
-- Generated UTC: `2026-05-20T03:23:43.059092+00:00`
+- Generated UTC: `2026-05-20T03:29:29.997226+00:00`
 - Mode: `score_only_non_enforcing`
 - Runtime evidence file: `docs/governance/runtime/latest_runtime_evidence.jsonl`
+- Runtime evidence validation status: `valid`
 
 ## Artifact-Structure Coverage
 - invariant_coverage: 6/6 (100.0%)

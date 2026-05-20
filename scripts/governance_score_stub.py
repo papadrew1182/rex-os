@@ -28,6 +28,7 @@ INPUTS = {
     "anti_theater": DOCS / "anti_theater_rules_v0.md",
     "runtime_schema": DOCS / "runtime_evidence_schema_v0.json",
 }
+VALIDATION_REPORT_PATH = DOCS / "reports" / "latest_runtime_evidence_validation.json"
 
 DEFAULT_RUNTIME_EVIDENCE = DOCS / "examples" / "runtime_evidence_sample.jsonl"
 
@@ -79,8 +80,19 @@ def _parse_runtime_jsonl(path: Path | None) -> list[dict[str, Any]]:
     return records
 
 
-def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float, synthetic_ratio: float) -> str:
+def _load_validation_report() -> dict[str, Any] | None:
+    if not VALIDATION_REPORT_PATH.exists():
+        return None
+    try:
+        return json.loads(VALIDATION_REPORT_PATH.read_text())
+    except Exception:
+        return None
+
+
+def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float, synthetic_ratio: float, validation_degraded: bool) -> str:
     if missing_inputs:
+        return "low"
+    if validation_degraded:
         return "low"
     if synthetic_ratio > 0.0:
         # Synthetic evidence can improve structure/coverage, never high trust.
@@ -100,12 +112,13 @@ def _score_entry(
     independent_ratio: float,
     self_ratio: float,
     synthetic_ratio: float,
+    validation_degraded: bool,
 ) -> dict[str, Any]:
     return {
         "score": round(float(score), 2),
         "evidence_basis": evidence_basis,
         "missing_inputs": missing_inputs,
-        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio, synthetic_ratio),
+        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio, synthetic_ratio, validation_degraded),
         "known_false_confidence_risk": risk,
     }
 
@@ -163,6 +176,8 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
 
     runtime_records = _parse_runtime_jsonl(runtime_evidence_path)
     runtime_schema_required = set(src["runtime_schema"].get("required", []))
+    validation_report = _load_validation_report()
+    validation_degraded = bool(validation_report and validation_report.get("validation_status") != "valid")
 
     independent_count = 0
     self_attested_count = 0
@@ -220,6 +235,8 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         risk_flags.append("self_attestation_dominates_runtime_feed")
     if synthetic_count > 0:
         risk_flags.append("synthetic_evidence_present")
+    if validation_degraded:
+        risk_flags.append("runtime_evidence_validation_degraded")
 
     missing_runtime_inputs = []
     if total_runtime == 0:
@@ -282,6 +299,10 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     blast_score = round((artifact_metrics["gate_coverage"]["pct"] * 0.5) + (runtime_metrics["runtime_gate_coverage"]["pct"] * 0.5), 2)
     integrity_score = round((rollback_score + provenance_score + verifier_score + invariant_score + blast_score) / 5.0, 2)
 
+    if validation_degraded:
+        # quality-gate penalty without enforcing runtime transitions
+        integrity_score = round(max(0.0, integrity_score - 10.0), 2)
+
     anti_theater_risk = round(
         100.0
         - (
@@ -301,6 +322,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "provenance_maturity": _score_entry(
             provenance_score,
@@ -310,6 +332,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "verifier_maturity": _score_entry(
             verifier_score,
@@ -319,6 +342,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "invariant_coverage_maturity": _score_entry(
             invariant_score,
@@ -328,6 +352,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "blast_radius_maturity": _score_entry(
             blast_score,
@@ -337,6 +362,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "governance_integrity_maturity": _score_entry(
             integrity_score,
@@ -354,6 +380,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
         "anti_theater_risk": _score_entry(
             anti_theater_risk,
@@ -370,6 +397,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             independent_ratio,
             self_ratio,
             synthetic_ratio,
+            validation_degraded,
         ),
     }
 
@@ -414,6 +442,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         "mode": "score_only_non_enforcing",
         "input_files": {k: str(v.relative_to(ROOT)) for k, v in INPUTS.items()},
         "runtime_evidence_file": str(runtime_evidence_path.relative_to(ROOT)) if runtime_evidence_path and runtime_evidence_path.exists() else None,
+        "runtime_evidence_validation": validation_report,
         "coverage": {
             "artifact_structure": artifact_metrics,
             "runtime_evidence": runtime_metrics,
@@ -441,6 +470,8 @@ def render_md(report: dict[str, Any]) -> str:
     lines.append(f"- Generated UTC: `{report['generated_at_utc']}`")
     lines.append(f"- Mode: `{report['mode']}`")
     lines.append(f"- Runtime evidence file: `{report['runtime_evidence_file']}`")
+    vr = report.get('runtime_evidence_validation')
+    lines.append(f"- Runtime evidence validation status: `{(vr or {}).get('validation_status', 'missing')}`")
     lines.append("")
     lines.append("## Artifact-Structure Coverage")
     for k, v in report["coverage"]["artifact_structure"].items():
