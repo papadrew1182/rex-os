@@ -1,0 +1,305 @@
+{
+  "report_version": "v0-stub",
+  "generated_at_utc": "2026-05-20T03:09:47.137786+00:00",
+  "mode": "score_only_non_enforcing",
+  "input_files": {
+    "invariants": "docs/governance/invariants_v0.yaml",
+    "evidence_schema": "docs/governance/evidence_ledger_v0_schema.json",
+    "policy": "docs/governance/policy_engine_v0.md",
+    "trust": "docs/governance/trust_boundaries_v0.md",
+    "anti_theater": "docs/governance/anti_theater_rules_v0.md"
+  },
+  "metrics": {
+    "invariant_coverage": {
+      "num": 6,
+      "den": 6,
+      "pct": 100.0
+    },
+    "gate_coverage": {
+      "num": 2,
+      "den": 6,
+      "pct": 33.33
+    },
+    "rollback_proof_coverage": {
+      "num": 1,
+      "den": 6,
+      "pct": 16.67
+    },
+    "verifier_coverage": {
+      "num": 1,
+      "den": 6,
+      "pct": 16.67
+    },
+    "provenance_completeness": {
+      "num": 1,
+      "den": 6,
+      "pct": 16.67,
+      "schema_required_provenance_fields": [
+        "source_uri",
+        "source_sha256"
+      ]
+    },
+    "evidence_completeness": {
+      "num": 6,
+      "den": 6,
+      "pct": 100.0,
+      "schema_required_top_level_fields": [
+        "ledger_run_id",
+        "timestamp_utc",
+        "commit_sha",
+        "branch",
+        "records",
+        "scores",
+        "debt",
+        "known_theater_risks"
+      ],
+      "schema_required_record_fields": [
+        "record_id",
+        "invariant_id",
+        "gate_id",
+        "trust_boundary",
+        "autonomy_safety_level",
+        "verifier_id",
+        "status",
+        "provenance"
+      ]
+    },
+    "trust_primitive_maturity": {
+      "num": 5,
+      "den": 5,
+      "pct": 100.0
+    }
+  },
+  "score_vectors": {
+    "rollback_trust_maturity": {
+      "score": 16.67,
+      "evidence_basis": {
+        "invariant_links": {
+          "num": 1,
+          "den": 6,
+          "pct": 16.67
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "rollback maturity is artifact-linked, not execution-proven in this stub"
+    },
+    "provenance_maturity": {
+      "score": 16.67,
+      "evidence_basis": {
+        "invariant_links": {
+          "num": 1,
+          "den": 6,
+          "pct": 16.67,
+          "schema_required_provenance_fields": [
+            "source_uri",
+            "source_sha256"
+          ]
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "provenance references exist, but runtime artifact verification is not observed"
+    },
+    "verifier_maturity": {
+      "score": 16.67,
+      "evidence_basis": {
+        "invariant_links": {
+          "num": 1,
+          "den": 6,
+          "pct": 16.67
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "verifier fields are declared, not validated from real verifier executions"
+    },
+    "invariant_coverage_maturity": {
+      "score": 100.0,
+      "evidence_basis": {
+        "invariant_links": {
+          "num": 6,
+          "den": 6,
+          "pct": 100.0
+        }
+      },
+      "missing_inputs": [],
+      "confidence_level": "medium",
+      "known_false_confidence_risk": "high score here can still hide shallow checks"
+    },
+    "blast_radius_maturity": {
+      "score": 16.67,
+      "evidence_basis": {
+        "invariant_links": {
+          "num": 1,
+          "den": 6,
+          "pct": 16.67
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "blast-radius scoring exists in artifacts but no runtime blast-radius evidence feed"
+    },
+    "governance_integrity_maturity": {
+      "score": 62.5,
+      "evidence_basis": {
+        "decomposed_inputs": {
+          "invariant_coverage_pct": 100.0,
+          "evidence_completeness_pct": 100.0,
+          "gate_coverage_pct": 33.33,
+          "provenance_completeness_pct": 16.67
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "integrity score can be inflated without independent runtime evidence"
+    },
+    "anti_theater_risk": {
+      "score": 83.33,
+      "evidence_basis": {
+        "risk_flags": [],
+        "anti_theater_invariant_links": {
+          "num": 1,
+          "den": 6,
+          "pct": 16.67
+        }
+      },
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ],
+      "confidence_level": "low",
+      "known_false_confidence_risk": "low anti-theater risk score can be false if evidence remains self-attested or unverifiable"
+    }
+  },
+  "governance_debt": {
+    "ungated_transitions": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "unverifiable_claims": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "missing_provenance": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "missing_rollback_proof": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "detector_blind_spots": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "heuristic_when_deterministic_possible": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    },
+    "unsafe_autonomous_execution_surfaces": {
+      "count": 0,
+      "basis": "docs-only stub cannot observe runtime incidents; count defaults to 0 with low confidence",
+      "confidence_level": "low",
+      "missing_inputs": [
+        "evidence_ledger_runtime_records",
+        "gate_transition_events",
+        "rollback_rehearsal_run_artifacts",
+        "verifier_execution_results",
+        "provenance_artifact_hash_observations"
+      ]
+    }
+  },
+  "anti_theater_flags": {
+    "low_confidence_required_when_missing_or_unverifiable": true,
+    "runtime_evidence_missing": true,
+    "risk_flags": [],
+    "high_false_confidence_risk": true
+  },
+  "known_limitations": [
+    "No runtime evidence ledger dataset is consumed in this stub.",
+    "No deploy/runtime behavior is blocked or mutated by this scorer.",
+    "Scores are structural/readiness indicators and may overstate operational maturity."
+  ]
+}
