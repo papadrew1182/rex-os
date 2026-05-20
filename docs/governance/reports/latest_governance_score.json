@@ -1,6 +1,6 @@
 {
   "report_version": "v0-stub-runtime-ingest",
-  "generated_at_utc": "2026-05-20T03:34:07.823232+00:00",
+  "generated_at_utc": "2026-05-20T03:40:27.857961+00:00",
   "mode": "score_only_non_enforcing",
   "input_files": {
     "invariants": "docs/governance/invariants_v0.yaml",
@@ -13,7 +13,7 @@
   "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
   "runtime_evidence_validation": {
     "report_version": "v0-runtime-evidence-validation",
-    "generated_at_utc": "2026-05-20T03:34:07.775520Z",
+    "generated_at_utc": "2026-05-20T03:40:27.811591Z",
     "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
     "schema_file": "docs/governance/runtime_evidence_schema_v0.json",
     "validation_status": "valid",
@@ -39,14 +39,14 @@
       "self_attestation_caveat": "summary record is emitted by validator itself; deterministic but not third-party attestation"
     },
     "validation_summary_record": {
-      "event_id": "evt-61bf13dc240191f9",
+      "event_id": "evt-249307c67ab17843",
       "transition_type": "verifier_result",
       "actor_type": "policy_engine",
       "actor_id": "runtime_evidence_validator",
-      "correlation_id": "rex-reconcile-20260520T033407Z",
+      "correlation_id": "rex-reconcile-20260520T034027Z",
       "decision": "allow",
-      "previous_record_hash": "917520aebce87dea63c6ec5078a7fd7bcb66210cd52e4378e5761cb52f80deb8",
-      "record_hash": "e2d7dd4f76966b473c65b5e6660f911c772d7d52077c9a1de961f18644f63c78",
+      "previous_record_hash": "64bca3e53b09ed1ff4e81b898f4dc476639a797a72e5eb340bc30858f1fdbd09",
+      "record_hash": "5636747535d75cc871f412556a9040de2066e445a15027a62646ebabda654625",
       "reason_codes": [
         "validator_summary_record",
         "validation_status_valid",
@@ -63,7 +63,15 @@
       "validation_status_valid",
       "non_enforcing"
     ],
-    "record_hash": "e2d7dd4f76966b473c65b5e6660f911c772d7d52077c9a1de961f18644f63c78"
+    "record_hash": "5636747535d75cc871f412556a9040de2066e445a15027a62646ebabda654625",
+    "validator_summary_present": true,
+    "validator_summary_valid": true,
+    "validator_summary_self_recorded": true,
+    "validator_summary_score_cap_applied": false,
+    "governance_integrity_ceiling": 60.0,
+    "confidence_cap_reason": "high_confidence_requires_independent_multirun_corroboration",
+    "governance_integrity_cap_reason": "cap_not_needed_or_already_below_ceiling",
+    "allow_above_ceiling": false
   },
   "coverage": {
     "artifact_structure": {
@@ -186,7 +194,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "rollback confidence remains capped without independent rollback verification"
     },
     "provenance_maturity": {
@@ -208,7 +216,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "provenance can be overstated when records are self-attested"
     },
     "verifier_maturity": {
@@ -226,7 +234,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "verifier maturity inflated if verifier_result exists without independent verifier refs"
     },
     "invariant_coverage_maturity": {
@@ -244,7 +252,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "invariant checks may be shallow despite full artifact coverage"
     },
     "blast_radius_maturity": {
@@ -262,7 +270,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "blast-radius maturity is approximate until explicit blast score records are ingested"
     },
     "governance_integrity_maturity": {
@@ -277,7 +285,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "integrity can appear healthy while independent verification is sparse"
     },
     "anti_theater_risk": {
@@ -297,7 +305,7 @@
         }
       },
       "missing_inputs": [],
-      "confidence_level": "high",
+      "confidence_level": "medium",
       "known_false_confidence_risk": "self-attested dominant evidence can suppress detectable theater while confidence remains weak"
     }
   },
@@ -349,7 +357,10 @@
     "low_confidence_required_when_missing_or_unverifiable": true,
     "self_attestation_weaker_than_independent_verification": true,
     "runtime_evidence_missing": false,
-    "risk_flags": []
+    "validator_self_credit_risk": true,
+    "risk_flags": [
+      "validator_self_credit_risk"
+    ]
   },
   "known_limitations": [
     "No gate enforcement/block behavior in this scorer pass.",

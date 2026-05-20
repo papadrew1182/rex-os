@@ -89,7 +89,7 @@ def _load_validation_report() -> dict[str, Any] | None:
         return None
 
 
-def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float, synthetic_ratio: float, validation_degraded: bool) -> str:
+def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio: float, synthetic_ratio: float, validation_degraded: bool, high_confidence_allowed: bool) -> str:
     if missing_inputs:
         return "low"
     if validation_degraded:
@@ -97,6 +97,9 @@ def _confidence(missing_inputs: list[str], independent_ratio: float, self_ratio:
     if synthetic_ratio > 0.0:
         # Synthetic evidence can improve structure/coverage, never high trust.
         return "low" if independent_ratio < 0.6 else "medium"
+    # Never allow high confidence unless independent corroboration threshold is met.
+    if not high_confidence_allowed and (independent_ratio > 0.0 or self_ratio > 0.0):
+        return "medium"
     if independent_ratio >= 0.6:
         return "high"
     if independent_ratio > 0.0 or self_ratio > 0.0:
@@ -113,12 +116,13 @@ def _score_entry(
     self_ratio: float,
     synthetic_ratio: float,
     validation_degraded: bool,
+    high_confidence_allowed: bool,
 ) -> dict[str, Any]:
     return {
         "score": round(float(score), 2),
         "evidence_basis": evidence_basis,
         "missing_inputs": missing_inputs,
-        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio, synthetic_ratio, validation_degraded),
+        "confidence_level": _confidence(missing_inputs, independent_ratio, self_ratio, synthetic_ratio, validation_degraded, high_confidence_allowed),
         "known_false_confidence_risk": risk,
     }
 
@@ -182,10 +186,15 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         if rec.get("actor_id") == "runtime_evidence_validator" and rec.get("transition_type") in {"verifier_result", "invariant_result"}:
             validation_summary_record = rec
             break
+    validator_summary_present = validation_summary_record is not None
+    validator_summary_valid = False
+    validator_summary_self_recorded = False
     ledger_validation_degraded = False
     if validation_summary_record:
         rc = set(validation_summary_record.get("reason_codes", []) or [])
         dec = validation_summary_record.get("decision")
+        validator_summary_valid = ("validation_status_valid" in rc) and dec == "allow"
+        validator_summary_self_recorded = validation_summary_record.get("actor_id") == "runtime_evidence_validator"
         ledger_validation_degraded = ("validation_degraded" in rc) or (dec in {"observe_only", "block", "warn", "escalate"})
     sidecar_validation_degraded = bool(validation_report and validation_report.get("validation_status") != "valid")
     validation_degraded = ledger_validation_degraded or sidecar_validation_degraded
@@ -235,6 +244,22 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     self_ratio = 0.0 if total_runtime == 0 else self_attested_count / total_runtime
     synthetic_ratio = 0.0 if total_runtime == 0 else synthetic_count / total_runtime
 
+    runtime_history_run_markers = len({str(r.get('correlation_id')) for r in runtime_records if r.get('correlation_id')})
+    has_runtime_operational_evidence = runtime_gate_count > 0
+    validator_ref_credit = 1 if (validator_summary_present and validation_summary_record and validation_summary_record.get('independent_verifier_ref')) else 0
+    has_independent_beyond_validator = independent_count > validator_ref_credit
+    has_multirun_history = runtime_history_run_markers > 1
+    hash_chain_valid = bool((validation_report or {}).get("summary", {}).get("hash_chain_valid", False))
+    governance_integrity_ceiling = 60.0
+    allow_above_ceiling = bool(
+        validator_summary_valid
+        and has_independent_beyond_validator
+        and has_runtime_operational_evidence
+        and hash_chain_valid
+        and has_multirun_history
+    )
+    high_confidence_allowed = allow_above_ceiling
+
     risk_flags = []
     if "append-only" not in src["anti_md"].lower():
         risk_flags.append("missing_append_only_provenance_control")
@@ -248,6 +273,14 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         risk_flags.append("synthetic_evidence_present")
     if validation_degraded:
         risk_flags.append("runtime_evidence_validation_degraded")
+    validator_self_credit_risk = bool(
+        validator_summary_present
+        and validator_summary_valid
+        and validator_summary_self_recorded
+        and not allow_above_ceiling
+    )
+    if validator_self_credit_risk:
+        risk_flags.append("validator_self_credit_risk")
 
     missing_runtime_inputs = []
     if total_runtime == 0:
@@ -308,7 +341,14 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     verifier_score = round((artifact_metrics["verifier_coverage"]["pct"] * 0.4) + (runtime_metrics["runtime_verifier_coverage"]["pct"] * 0.6), 2)
     invariant_score = round((artifact_metrics["invariant_coverage"]["pct"] * 0.6) + (runtime_metrics["runtime_invariant_coverage"]["pct"] * 0.4), 2)
     blast_score = round((artifact_metrics["gate_coverage"]["pct"] * 0.5) + (runtime_metrics["runtime_gate_coverage"]["pct"] * 0.5), 2)
-    integrity_score = round((rollback_score + provenance_score + verifier_score + invariant_score + blast_score) / 5.0, 2)
+    integrity_score_raw = round((rollback_score + provenance_score + verifier_score + invariant_score + blast_score) / 5.0, 2)
+    validator_summary_score_cap_applied = False
+    integrity_score = integrity_score_raw
+    governance_integrity_cap_reason = "cap_not_needed_or_already_below_ceiling"
+    if not allow_above_ceiling and integrity_score_raw > governance_integrity_ceiling:
+        integrity_score = governance_integrity_ceiling
+        validator_summary_score_cap_applied = True
+        governance_integrity_cap_reason = "capped_due_to_missing_independent_multirun_corroboration"
 
     if validation_degraded:
         # quality-gate penalty without enforcing runtime transitions
@@ -334,6 +374,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "provenance_maturity": _score_entry(
             provenance_score,
@@ -344,6 +385,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "verifier_maturity": _score_entry(
             verifier_score,
@@ -354,6 +396,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "invariant_coverage_maturity": _score_entry(
             invariant_score,
@@ -364,6 +407,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "blast_radius_maturity": _score_entry(
             blast_score,
@@ -374,6 +418,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "governance_integrity_maturity": _score_entry(
             integrity_score,
@@ -392,6 +437,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
         "anti_theater_risk": _score_entry(
             anti_theater_risk,
@@ -409,6 +455,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             self_ratio,
             synthetic_ratio,
             validation_degraded,
+            high_confidence_allowed,
         ),
     }
 
@@ -460,6 +507,14 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "decision": validation_summary_record.get("decision") if validation_summary_record else None,
             "reason_codes": validation_summary_record.get("reason_codes") if validation_summary_record else [],
             "record_hash": validation_summary_record.get("record_hash") if validation_summary_record else None,
+            "validator_summary_present": validator_summary_present,
+            "validator_summary_valid": validator_summary_valid,
+            "validator_summary_self_recorded": validator_summary_self_recorded,
+            "validator_summary_score_cap_applied": validator_summary_score_cap_applied,
+            "governance_integrity_ceiling": governance_integrity_ceiling,
+            "confidence_cap_reason": "high_confidence_requires_independent_multirun_corroboration" if not high_confidence_allowed else "independent_multirun_corroboration_met",
+            "governance_integrity_cap_reason": governance_integrity_cap_reason,
+            "allow_above_ceiling": allow_above_ceiling,
         },
         "coverage": {
             "artifact_structure": artifact_metrics,
@@ -471,6 +526,7 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
             "low_confidence_required_when_missing_or_unverifiable": True,
             "self_attestation_weaker_than_independent_verification": True,
             "runtime_evidence_missing": total_runtime == 0,
+            "validator_self_credit_risk": validator_self_credit_risk,
             "risk_flags": risk_flags,
         },
         "known_limitations": [
@@ -493,6 +549,13 @@ def render_md(report: dict[str, Any]) -> str:
     lines.append(f"- Runtime evidence validation status: `{(vr or {}).get('validation_status', 'missing')}`")
     lines.append(f"- Ledger validation record present: `{lv.get('present', False)}`")
     lines.append(f"- Ledger validation degraded: `{lv.get('degraded', None)}`")
+    lines.append(f"- validator_summary_present: `{lv.get('validator_summary_present', False)}`")
+    lines.append(f"- validator_summary_valid: `{lv.get('validator_summary_valid', False)}`")
+    lines.append(f"- validator_summary_self_recorded: `{lv.get('validator_summary_self_recorded', False)}`")
+    lines.append(f"- validator_summary_score_cap_applied: `{lv.get('validator_summary_score_cap_applied', False)}`")
+    lines.append(f"- governance_integrity_ceiling: `{lv.get('governance_integrity_ceiling', None)}`")
+    lines.append(f"- confidence_cap_reason: `{lv.get('confidence_cap_reason', None)}`")
+    lines.append(f"- governance_integrity_cap_reason: `{lv.get('governance_integrity_cap_reason', None)}`")
     lines.append("")
     lines.append("## Artifact-Structure Coverage")
     for k, v in report["coverage"]["artifact_structure"].items():

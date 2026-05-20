@@ -1,6 +1,6 @@
 # Runtime Evidence Validation
 
-- Generated UTC: `2026-05-20T03:34:07.775520Z`
+- Generated UTC: `2026-05-20T03:40:27.811591Z`
 - Validation status: `valid`
 - Runtime evidence file: `docs/governance/runtime/latest_runtime_evidence.jsonl`
 

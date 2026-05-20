@@ -1,6 +1,6 @@
 {
   "report_version": "v0-runtime-evidence-validation",
-  "generated_at_utc": "2026-05-20T03:34:07.775520Z",
+  "generated_at_utc": "2026-05-20T03:40:27.811591Z",
   "runtime_evidence_file": "docs/governance/runtime/latest_runtime_evidence.jsonl",
   "schema_file": "docs/governance/runtime_evidence_schema_v0.json",
   "validation_status": "valid",
@@ -26,14 +26,14 @@
     "self_attestation_caveat": "summary record is emitted by validator itself; deterministic but not third-party attestation"
   },
   "validation_summary_record": {
-    "event_id": "evt-61bf13dc240191f9",
+    "event_id": "evt-249307c67ab17843",
     "transition_type": "verifier_result",
     "actor_type": "policy_engine",
     "actor_id": "runtime_evidence_validator",
-    "correlation_id": "rex-reconcile-20260520T033407Z",
+    "correlation_id": "rex-reconcile-20260520T034027Z",
     "decision": "allow",
-    "previous_record_hash": "917520aebce87dea63c6ec5078a7fd7bcb66210cd52e4378e5761cb52f80deb8",
-    "record_hash": "e2d7dd4f76966b473c65b5e6660f911c772d7d52077c9a1de961f18644f63c78",
+    "previous_record_hash": "64bca3e53b09ed1ff4e81b898f4dc476639a797a72e5eb340bc30858f1fdbd09",
+    "record_hash": "5636747535d75cc871f412556a9040de2066e445a15027a62646ebabda654625",
     "reason_codes": [
       "validator_summary_record",
       "validation_status_valid",

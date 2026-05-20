@@ -1,11 +1,18 @@
 # Latest Governance Score (Deterministic Stub + Runtime Ingest)
 
-- Generated UTC: `2026-05-20T03:34:07.823232+00:00`
+- Generated UTC: `2026-05-20T03:40:27.857961+00:00`
 - Mode: `score_only_non_enforcing`
 - Runtime evidence file: `docs/governance/runtime/latest_runtime_evidence.jsonl`
 - Runtime evidence validation status: `valid`
 - Ledger validation record present: `True`
 - Ledger validation degraded: `False`
+- validator_summary_present: `True`
+- validator_summary_valid: `True`
+- validator_summary_self_recorded: `True`
+- validator_summary_score_cap_applied: `False`
+- governance_integrity_ceiling: `60.0`
+- confidence_cap_reason: `high_confidence_requires_independent_multirun_corroboration`
+- governance_integrity_cap_reason: `cap_not_needed_or_already_below_ceiling`
 
 ## Artifact-Structure Coverage
 - invariant_coverage: 6/6 (100.0%)
@@ -35,37 +42,37 @@
 ## Vector Scores
 - rollback_trust_maturity
   - score: 16.67
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: rollback confidence remains capped without independent rollback verification
 - provenance_maturity
   - score: 66.67
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: provenance can be overstated when records are self-attested
 - verifier_maturity
   - score: 26.67
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: verifier maturity inflated if verifier_result exists without independent verifier refs
 - invariant_coverage_maturity
   - score: 146.67
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: invariant checks may be shallow despite full artifact coverage
 - blast_radius_maturity
   - score: 33.33
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: blast-radius maturity is approximate until explicit blast score records are ingested
 - governance_integrity_maturity
   - score: 58.0
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: integrity can appear healthy while independent verification is sparse
 - anti_theater_risk
   - score: 13.33
-  - confidence_level: high
+  - confidence_level: medium
   - missing_inputs: none
   - known_false_confidence_risk: self-attested dominant evidence can suppress detectable theater while confidence remains weak
 
@@ -82,4 +89,5 @@
 - low_confidence_required_when_missing_or_unverifiable: True
 - self_attestation_weaker_than_independent_verification: True
 - runtime_evidence_missing: False
-- risk_flags: []
+- validator_self_credit_risk: True
+- risk_flags: ['validator_self_credit_risk']
