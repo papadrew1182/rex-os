@@ -1,11 +1,11 @@
 # DEPLOYMENT_STATE
 
-Last Updated (UTC): 20/05/2026 00:37:26 UTC
+Last Updated (UTC): 20/05/2026 01:15:57 UTC
 
 ## Baseline
 - Repo: `papadrew1182/rex-os`
 - Local Branch: `audit/gpt55-reconciliation-2026-05-18`
-- Local HEAD: `2956f67ea5e878f4bb95331cd48eb4ae4c86f8ce`
+- Local HEAD: `abccae1cc0f27242f22bb3076f95a5df86eb3551`
 
 ## Runtime Targets
 - Railway auth: **authenticated** (`railway whoami`)
