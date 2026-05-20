@@ -1,0 +1,94 @@
+version: v0
+generated_for: rex
+autonomy_safety_levels:
+  - safe_autonomous
+  - bounded_autonomous
+  - autonomous_with_human_attestation_required
+  - forbidden_autonomous_action
+trust_boundaries:
+  - deterministic_truth
+  - independently_verified_truth
+  - heuristic_interpretation
+  - human_authoritative_override
+  - unverifiable_state
+maturity_primitives:
+  rollback_trust_maturity: {min: 0, max: 100}
+  provenance_maturity: {min: 0, max: 100}
+  verifier_maturity: {min: 0, max: 100}
+  invariant_coverage_maturity: {min: 0, max: 100}
+  blast_radius_maturity: {min: 0, max: 100}
+  governance_integrity_maturity: {min: 0, max: 100}
+invariants:
+  - id: INV-ROLLBACK-001
+    name: Rollback path executable and evidenced
+    description: Every high-risk transition has validated rollback proof in current cadence window.
+    boundary: deterministic_truth
+    safety_level: bounded_autonomous
+    verification:
+      type: deterministic
+      check_hook: rollback_rehearsal.latest_result == pass
+      evidence_required: [rollback_run_id, artifact_hash, recovery_state_hash]
+  - id: INV-PROV-001
+    name: Claims must carry provenance
+    description: Operational claims in canonical docs reference traceable evidence IDs.
+    boundary: independently_verified_truth
+    safety_level: safe_autonomous
+    verification:
+      type: deterministic
+      check_hook: provenance_link_rate >= 0.90
+      evidence_required: [claim_id, source_artifact_uri, source_sha256]
+  - id: INV-GATE-001
+    name: No ungated phase transition
+    description: Phase/status transition is forbidden unless gate record exists.
+    boundary: deterministic_truth
+    safety_level: forbidden_autonomous_action
+    verification:
+      type: deterministic
+      check_hook: ungated_transitions_count == 0
+      evidence_required: [transition_id, gate_record_id]
+  - id: INV-VERIFIER-001
+    name: Critical gate verifier coverage
+    description: Critical gates must be covered by deterministic or independent verifiers.
+    boundary: independently_verified_truth
+    safety_level: bounded_autonomous
+    verification:
+      type: deterministic
+      check_hook: critical_gate_verifier_coverage >= 0.85
+      evidence_required: [gate_id, verifier_id, verifier_result]
+  - id: INV-BLAST-001
+    name: Blast radius bounded before autonomy
+    description: Autonomous actions require pre-scored blast radius and permitted level.
+    boundary: heuristic_interpretation
+    safety_level: autonomous_with_human_attestation_required
+    verification:
+      type: heuristic
+      check_hook: blast_radius_score <= threshold_for_action
+      evidence_required: [action_id, blast_radius_score, threshold, attestor]
+  - id: INV-THEATER-001
+    name: Anti-theater declaration present
+    description: Reconciliation outputs must declare confidence caveats and unresolved assumptions.
+    boundary: human_authoritative_override
+    safety_level: safe_autonomous
+    verification:
+      type: deterministic
+      check_hook: anti_theater_section_present == true
+      evidence_required: [report_id, anti_theater_risks]
+governance_debt_categories:
+  - ungated_transitions
+  - unverifiable_claims
+  - missing_provenance
+  - missing_rollback_proof
+  - detector_blind_spots
+  - heuristic_when_deterministic_possible
+  - unsafe_autonomous_execution_surfaces
+known_theater_risks:
+  inflated_confidence_risks:
+    - Maturity score increases with no increase in evidence completeness.
+  shallow_verification_risks:
+    - Route-level tests pass while end-to-end gate behaviors are unverified.
+  immature_detector_risks:
+    - Detector exists but has no false-positive/false-negative baseline.
+  unverifiable_trust_assumptions:
+    - Human operator statements accepted without independent artifact checks.
+  sophistication_outruns_maturity:
+    - Rich scoring model used before deterministic invariants are broadly implemented.

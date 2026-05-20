@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "rex/governance/evidence_ledger_v0_schema.json",
+  "title": "Rex Governance Evidence Ledger v0",
+  "type": "object",
+  "required": [
+    "ledger_run_id",
+    "timestamp_utc",
+    "commit_sha",
+    "branch",
+    "records",
+    "scores",
+    "debt",
+    "known_theater_risks"
+  ],
+  "properties": {
+    "ledger_run_id": {"type": "string", "minLength": 8},
+    "timestamp_utc": {"type": "string", "format": "date-time"},
+    "commit_sha": {"type": "string", "pattern": "^[a-f0-9]{7,40}$"},
+    "branch": {"type": "string"},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "record_id",
+          "invariant_id",
+          "gate_id",
+          "trust_boundary",
+          "autonomy_safety_level",
+          "verifier_id",
+          "status",
+          "provenance"
+        ],
+        "properties": {
+          "record_id": {"type": "string"},
+          "invariant_id": {"type": "string"},
+          "gate_id": {"type": "string"},
+          "trust_boundary": {
+            "type": "string",
+            "enum": [
+              "deterministic_truth",
+              "independently_verified_truth",
+              "heuristic_interpretation",
+              "human_authoritative_override",
+              "unverifiable_state"
+            ]
+          },
+          "autonomy_safety_level": {
+            "type": "string",
+            "enum": [
+              "safe_autonomous",
+              "bounded_autonomous",
+              "autonomous_with_human_attestation_required",
+              "forbidden_autonomous_action"
+            ]
+          },
+          "verifier_id": {"type": "string"},
+          "status": {"type": "string", "enum": ["pass", "fail", "warn", "unknown"]},
+          "provenance": {
+            "type": "object",
+            "required": ["source_uri", "source_sha256"],
+            "properties": {
+              "source_uri": {"type": "string"},
+              "source_sha256": {"type": "string", "pattern": "^[a-fA-F0-9]{64}$"},
+              "collector": {"type": "string"}
+            }
+          }
+        }
+      }
+    },
+    "scores": {
+      "type": "object",
+      "required": [
+        "rollback_trust_maturity",
+        "provenance_maturity",
+        "verifier_maturity",
+        "invariant_coverage_maturity",
+        "blast_radius_maturity",
+        "governance_integrity_maturity"
+      ],
+      "properties": {
+        "rollback_trust_maturity": {"type": "number", "minimum": 0, "maximum": 100},
+        "provenance_maturity": {"type": "number", "minimum": 0, "maximum": 100},
+        "verifier_maturity": {"type": "number", "minimum": 0, "maximum": 100},
+        "invariant_coverage_maturity": {"type": "number", "minimum": 0, "maximum": 100},
+        "blast_radius_maturity": {"type": "number", "minimum": 0, "maximum": 100},
+        "governance_integrity_maturity": {"type": "number", "minimum": 0, "maximum": 100}
+      }
+    },
+    "debt": {
+      "type": "object",
+      "required": [
+        "ungated_transitions",
+        "unverifiable_claims",
+        "missing_provenance",
+        "missing_rollback_proof",
+        "detector_blind_spots",
+        "heuristic_when_deterministic_possible",
+        "unsafe_autonomous_execution_surfaces"
+      ],
+      "properties": {
+        "ungated_transitions": {"type": "integer", "minimum": 0},
+        "unverifiable_claims": {"type": "integer", "minimum": 0},
+        "missing_provenance": {"type": "integer", "minimum": 0},
+        "missing_rollback_proof": {"type": "integer", "minimum": 0},
+        "detector_blind_spots": {"type": "integer", "minimum": 0},
+        "heuristic_when_deterministic_possible": {"type": "integer", "minimum": 0},
+        "unsafe_autonomous_execution_surfaces": {"type": "integer", "minimum": 0}
+      }
+    },
+    "known_theater_risks": {
+      "type": "object",
+      "required": [
+        "inflated_confidence_risks",
+        "shallow_verification_risks",
+        "immature_detector_risks",
+        "unverifiable_trust_assumptions",
+        "sophistication_outruns_maturity"
+      ],
+      "properties": {
+        "inflated_confidence_risks": {"type": "array", "items": {"type": "string"}},
+        "shallow_verification_risks": {"type": "array", "items": {"type": "string"}},
+        "immature_detector_risks": {"type": "array", "items": {"type": "string"}},
+        "unverifiable_trust_assumptions": {"type": "array", "items": {"type": "string"}},
+        "sophistication_outruns_maturity": {"type": "array", "items": {"type": "string"}}
+      }
+    }
+  }
+}
