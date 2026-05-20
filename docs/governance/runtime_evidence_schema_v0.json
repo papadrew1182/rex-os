@@ -43,7 +43,7 @@
         "break_glass_event"
       ]
     },
-    "actor_type": {"type": "string", "enum": ["human", "automation", "service"]},
+    "actor_type": {"type": "string", "enum": ["human", "automation", "service", "agent", "policy_engine"]},
     "actor_id": {"type": "string"},
     "target_service": {"type": "string"},
     "target_env": {"type": "string"},
@@ -83,7 +83,7 @@
     },
     "decision": {
       "type": "string",
-      "enum": ["proceed", "proceed_with_attestation", "block", "observe_only"]
+      "enum": ["proceed", "proceed_with_attestation", "block", "observe_only", "allow", "warn", "escalate"]
     },
     "reason_codes": {
       "type": "array",

@@ -177,7 +177,18 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
     runtime_records = _parse_runtime_jsonl(runtime_evidence_path)
     runtime_schema_required = set(src["runtime_schema"].get("required", []))
     validation_report = _load_validation_report()
-    validation_degraded = bool(validation_report and validation_report.get("validation_status") != "valid")
+    validation_summary_record = None
+    for rec in reversed(runtime_records):
+        if rec.get("actor_id") == "runtime_evidence_validator" and rec.get("transition_type") in {"verifier_result", "invariant_result"}:
+            validation_summary_record = rec
+            break
+    ledger_validation_degraded = False
+    if validation_summary_record:
+        rc = set(validation_summary_record.get("reason_codes", []) or [])
+        dec = validation_summary_record.get("decision")
+        ledger_validation_degraded = ("validation_degraded" in rc) or (dec in {"observe_only", "block", "warn", "escalate"})
+    sidecar_validation_degraded = bool(validation_report and validation_report.get("validation_status") != "valid")
+    validation_degraded = ledger_validation_degraded or sidecar_validation_degraded
 
     independent_count = 0
     self_attested_count = 0
@@ -443,6 +454,13 @@ def build_report(runtime_evidence_path: Path | None) -> dict[str, Any]:
         "input_files": {k: str(v.relative_to(ROOT)) for k, v in INPUTS.items()},
         "runtime_evidence_file": str(runtime_evidence_path.relative_to(ROOT)) if runtime_evidence_path and runtime_evidence_path.exists() else None,
         "runtime_evidence_validation": validation_report,
+        "runtime_evidence_validation_from_ledger": {
+            "present": validation_summary_record is not None,
+            "degraded": ledger_validation_degraded,
+            "decision": validation_summary_record.get("decision") if validation_summary_record else None,
+            "reason_codes": validation_summary_record.get("reason_codes") if validation_summary_record else [],
+            "record_hash": validation_summary_record.get("record_hash") if validation_summary_record else None,
+        },
         "coverage": {
             "artifact_structure": artifact_metrics,
             "runtime_evidence": runtime_metrics,
@@ -471,7 +489,10 @@ def render_md(report: dict[str, Any]) -> str:
     lines.append(f"- Mode: `{report['mode']}`")
     lines.append(f"- Runtime evidence file: `{report['runtime_evidence_file']}`")
     vr = report.get('runtime_evidence_validation')
+    lv = report.get('runtime_evidence_validation_from_ledger') or {}
     lines.append(f"- Runtime evidence validation status: `{(vr or {}).get('validation_status', 'missing')}`")
+    lines.append(f"- Ledger validation record present: `{lv.get('present', False)}`")
+    lines.append(f"- Ledger validation degraded: `{lv.get('degraded', None)}`")
     lines.append("")
     lines.append("## Artifact-Structure Coverage")
     for k, v in report["coverage"]["artifact_structure"].items():
